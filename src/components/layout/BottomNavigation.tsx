@@ -1,8 +1,8 @@
 import dayjs from "dayjs";
 
-import type { RootState } from "@/redux/store";
+import type { RootState } from "@/data/redux/store";
 import { useSelector, useDispatch } from "react-redux";
-import { setGameSpeed } from "@/redux/engineSlice";
+import { setGameSpeed } from "@/data/redux/engineSlice";
 
 import { Timer, Pause, Play, NavArrowRight, FastArrowRight, PiggyBank } from "iconoir-react";
 

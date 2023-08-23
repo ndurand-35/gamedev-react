@@ -1,12 +1,11 @@
-import type { RootState } from "@/redux/store";
-import { useSelector, useDispatch } from "react-redux";
+import type { RootState } from "@/data/redux/store";
+import { useSelector } from "react-redux";
 
 import { Coins, Star } from "iconoir-react";
 
 export const Header = () => {
     const money = useSelector((state: RootState) => state.company.money);
     const reputation = useSelector((state: RootState) => state.company.reputation);
-    const dispatch = useDispatch();
 
     return (
         <nav className="top-0 left-0 z-20 w-full">
@@ -92,4 +91,3 @@ export const Header = () => {
         </nav>
     );
 };
-

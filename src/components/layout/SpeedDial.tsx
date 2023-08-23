@@ -18,7 +18,7 @@ export const SpeedDial = () => {
                     </button>
                 </div>
             </div>
-            <button className="btn btn-circle btn-primary">
+            <button className={"btn btn-circle btn-primary group-hover:rotate-45"}>
                 <Plus width={32} height={32} />
             </button>
             {/* <button

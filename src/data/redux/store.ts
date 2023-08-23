@@ -1,6 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
-import engineReducer from "@/redux/engineSlice";
-import companyReducer from "@/redux/companySlice";
+import engineReducer from "@/data/redux/engineSlice";
+import companyReducer from "@/data/redux/companySlice";
 
 const store = configureStore({
     reducer: {

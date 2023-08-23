@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 
-import type { RootState } from "@/redux/store";
-import { incrementTime } from "@/redux/engineSlice";
+import type { RootState } from "@/data/redux/store";
+import { incrementTime } from "@/data/redux/engineSlice";
 
 import { BottomNavigation, Header, PauseIndicator, SpeedDial } from "@/components/layout/index";
+import { BuildingList } from "@/components/building";
 
 function App() {
   const dispatch = useDispatch();
@@ -44,6 +45,9 @@ function App() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p> */}
+      <div className="p-8">
+        <BuildingList />
+      </div>
       <PauseIndicator />
       <SpeedDial />
       <BottomNavigation />

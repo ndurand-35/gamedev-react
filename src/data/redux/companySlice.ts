@@ -1,14 +1,17 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+import { Buidling } from "@/data/class/building";
 
 export interface CompanyState {
     money: number;
     reputation: number;
+    buildingList: Buidling[];
 }
 
 const initialState: CompanyState = {
     money: 50000,
     reputation: 0,
+    buildingList: [new Buidling(), new Buidling()]
 };
 
 export const companySlice = createSlice({

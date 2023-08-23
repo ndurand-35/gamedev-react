@@ -1,8 +1,8 @@
 import { useDispatch, useSelector } from "react-redux";
 import { Play } from "iconoir-react";
 
-import { RootState } from "@/redux/store";
-import { setGameSpeed } from "@/redux/engineSlice";
+import { RootState } from "@/data/redux/store";
+import { setGameSpeed } from "@/data/redux/engineSlice";
 
 
 export const PauseIndicator = () => {
