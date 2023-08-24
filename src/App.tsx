@@ -20,7 +20,7 @@ function App() {
     }, gameSpeed); // fps
 
     return () => clearInterval(loop);
-  }, [gameSpeed]);
+  }, [dispatch, gameSpeed]);
 
   return (
     <>
