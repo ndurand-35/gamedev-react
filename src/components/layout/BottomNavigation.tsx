@@ -1,15 +1,19 @@
 import dayjs from "dayjs";
+import { useLocation } from "react-router-dom";
 
 import type { RootState } from "@/data/redux/store";
 import { useSelector, useDispatch } from "react-redux";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 
-import { Timer, Pause, Play, NavArrowRight, FastArrowRight, PiggyBank, User } from "iconoir-react";
+import { Timer, Pause, Play, NavArrowRight, FastArrowRight, User, Home } from "iconoir-react";
 
 export const BottomNavigation = () => {
+    const location = useLocation();
+    const dispatch = useDispatch();
+
     const time = useSelector((state: RootState) => state.engine.time);
     const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
-    const dispatch = useDispatch();
+
     const displayTime = () => {
         let startDate = dayjs("1970-01-01");
         return startDate.add(time, "h").format("DD/MM/YYYY HH[H]");
@@ -61,13 +65,15 @@ export const BottomNavigation = () => {
             </div>
 
             <div className="flex items-center justify-center mx-auto space-x-4">
+                <div className="tooltip" data-tip="Accueil">
+                    <a className={"btn btn-circle " + location == "/" ? "btn-primary" : ""} href="/">
+                        <Home className="h-6 w-6" />
+                    </a>
+                </div>
                 <div className="tooltip" data-tip="Employé">
-                    <button
-                        className="btn btn-circle"
-                        onClick={() => (document.getElementById("employe_list_modal") as HTMLFormElement).showModal()}
-                    >
+                    <a className={"btn btn-circle " + location == "/employe" ? "btn-primary" : ""} href="/employe">
                         <User className="h-6 w-6" />
-                    </button>
+                    </a>
                 </div>
                 {/* <div
                     id="tooltip-microphone"
