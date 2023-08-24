@@ -1,81 +1,116 @@
 import dayjs from "dayjs";
-import { useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import type { RootState } from "@/data/redux/store";
 import { useSelector, useDispatch } from "react-redux";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 
-import { Timer, Pause, Play, NavArrowRight, FastArrowRight, User, Home } from "iconoir-react";
+import {
+  Timer,
+  Pause,
+  Play,
+  NavArrowRight,
+  FastArrowRight,
+  User,
+  Home,
+} from "iconoir-react";
 
 export const BottomNavigation = () => {
-    const location = useLocation();
-    const dispatch = useDispatch();
+  const dispatch = useDispatch();
 
-    const time = useSelector((state: RootState) => state.engine.time);
-    const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
+  const time = useSelector((state: RootState) => state.engine.time);
+  const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
 
-    const displayTime = () => {
-        let startDate = dayjs("1970-01-01");
-        return startDate.add(time, "h").format("DD/MM/YYYY HH[H]");
-    };
+  const displayTime = () => {
+    let startDate = dayjs("1970-01-01");
+    return startDate.add(time, "h").format("DD/MM/YYYY HH[H]");
+  };
 
-    return (
-        <div className="fixed bottom-0 left-0 z-40 grid w-full h-20 grid-cols-1 px-8 border-t border-gray-200 md:grid-cols-3 bg-white">
-            <div className="items-center justify-center hidden mr-auto text-gray-500 dark:text-gray-400 md:flex ">
-                <div className="flex items-center p-2 border-r">
-                    <Timer height={14} width={14} />
-                    <span className="ml-1 text-sm">{displayTime()}</span>
-                </div>
-                <div className="tooltip" data-tip="Mettre en pause">
-                    <button
-                        onClick={() => dispatch(setGameSpeed(0))}
-                        type="button"
-                        className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 0 && "text-error")}
-                    >
-                        <Pause height={20} width={20} />
-                    </button>
-                </div>
-                <div className="tooltip" data-tip="Vitesse x1">
-                    <button
-                        onClick={() => dispatch(setGameSpeed(600))}
-                        type="button"
-                        className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 600 && "text-info")}
-                    >
-                        <Play height={20} width={20} />
-                    </button>
-                </div>
-                <div className="tooltip" data-tip="Vitesse x2">
-                    <button
-                        onClick={() => dispatch(setGameSpeed(200))}
-                        type="button"
-                        className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 200 && "text-info")}
-                    >
-                        <NavArrowRight height={20} width={20} />
-                    </button>
-                </div>
-                <div className="tooltip" data-tip="Vitesse x3">
-                    <button
-                        onClick={() => dispatch(setGameSpeed(50))}
-                        type="button"
-                        className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 50 && "text-info")}
-                    >
-                        <FastArrowRight height={20} width={20} />
-                    </button>
-                </div>
-            </div>
+  return (
+    <div className="fixed bottom-0 left-0 z-40 grid w-full h-20 grid-cols-1 px-8 border-t border-gray-200 md:grid-cols-3 bg-white">
+      <div className="items-center justify-center hidden mr-auto text-gray-500 dark:text-gray-400 md:flex ">
+        <div className="flex items-center p-2 border-r">
+          <Timer height={14} width={14} />
+          <span className="ml-1 text-sm">{displayTime()}</span>
+        </div>
+        <div className="tooltip" data-tip="Mettre en pause">
+          <button
+            onClick={() => dispatch(setGameSpeed(0))}
+            type="button"
+            className={
+              "btn btn-circle btn-sm btn-ghost " +
+              (gameSpeed === 0 && "text-error")
+            }
+          >
+            <Pause height={20} width={20} />
+          </button>
+        </div>
+        <div className="tooltip" data-tip="Vitesse x1">
+          <button
+            onClick={() => dispatch(setGameSpeed(600))}
+            type="button"
+            className={
+              "btn btn-circle btn-sm btn-ghost " +
+              (gameSpeed === 600 && "text-info")
+            }
+          >
+            <Play height={20} width={20} />
+          </button>
+        </div>
+        <div className="tooltip" data-tip="Vitesse x2">
+          <button
+            onClick={() => dispatch(setGameSpeed(200))}
+            type="button"
+            className={
+              "btn btn-circle btn-sm btn-ghost " +
+              (gameSpeed === 200 && "text-info")
+            }
+          >
+            <NavArrowRight height={20} width={20} />
+          </button>
+        </div>
+        <div className="tooltip" data-tip="Vitesse x3">
+          <button
+            onClick={() => dispatch(setGameSpeed(50))}
+            type="button"
+            className={
+              "btn btn-circle btn-sm btn-ghost " +
+              (gameSpeed === 50 && "text-info")
+            }
+          >
+            <FastArrowRight height={20} width={20} />
+          </button>
+        </div>
+      </div>
 
-            <div className="flex items-center justify-center mx-auto space-x-4">
-                <div className="tooltip" data-tip="Accueil">
-                    <a className={"btn btn-circle " + location == "/" ? "btn-primary" : ""} href="/">
-                        <Home className="h-6 w-6" />
-                    </a>
-                </div>
-                <div className="tooltip" data-tip="Employé">
-                    <a className={"btn btn-circle " + location == "/employe" ? "btn-primary" : ""} href="/employe">
-                        <User className="h-6 w-6" />
-                    </a>
-                </div>
-                {/* <div
+      <div className="flex items-center justify-center mx-auto space-x-4">
+        <div className="tooltip" data-tip="Accueil">
+          <NavLink
+            to={"/"}
+            className={({ isActive }) =>
+              isActive ? "btn btn-circle btn-primary" : "btn btn-circle"
+            }
+          >
+            <Home className="h-6 w-6" />
+          </NavLink>
+          {/* <a
+            className={"btn btn-circle " + location == "/" ? "btn-primary" : ""}
+            href="/"
+          >
+            
+          </a> */}
+        </div>
+        <div className="tooltip" data-tip="Employé">
+          <NavLink
+            to={"/employe"}
+            className={({ isActive }) =>
+              isActive ? "btn btn-circle btn-primary" : "btn btn-circle"
+            }
+          >
+            <User className="h-6 w-6" />
+          </NavLink>
+        </div>
+        {/* <div
                     id="tooltip-microphone"
                     role="tooltip"
                     className="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white transition-opacity duration-300 bg-gray-900 rounded-lg shadow-sm opacity-0 tooltip dark:bg-gray-700"
@@ -192,7 +227,7 @@ export const BottomNavigation = () => {
                         </li>
                     </ul>
                 </div> */}
-            </div>
-        </div>
-    );
+      </div>
+    </div>
+  );
 };

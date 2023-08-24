@@ -16,6 +16,4 @@ export interface Candidate extends Person {
 
 export interface Employe extends Person {
 	buildingId: number;
-
-
 }
