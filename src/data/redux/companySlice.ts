@@ -13,21 +13,18 @@ const initialState: CompanyState = {
 	reputation: 0,
 	buildingList: [
 		{
+			id: 1,
 			name: "Garage",
 			price: 0,
 			place: 1,
-			energyPrice: 100,
-			employeList: [
-				{ firstName: "Nicolas", lastName: "Durand" },
-				{ firstName: "John", lastName: "Doe" },
-			],
+			energyPrice: 100
 		},
 		{
+			id: 2,
 			name: "No Name",
 			price: 0,
 			place: 1,
 			energyPrice: 100,
-			employeList: [],
 		},
 	],
 };

@@ -6,26 +6,27 @@ import { incrementTime } from "@/data/redux/engineSlice";
 
 import { BottomNavigation, Header, PauseIndicator, SpeedDial } from "@/components/layout/index";
 import { BuildingList } from "@/components/building";
+import { EmployeListModal } from "@/components/employe/EmployeListModal";
 
 function App() {
-  const dispatch = useDispatch();
-  const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
+	const dispatch = useDispatch();
+	const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
 
-  /* GameLoop */
-  useEffect(() => {
-    const loop = setInterval(() => {
-      if (gameSpeed !== 0) {
-        dispatch(incrementTime());
-      }
-    }, gameSpeed); // fps
+	/* GameLoop */
+	useEffect(() => {
+		const loop = setInterval(() => {
+			if (gameSpeed !== 0) {
+				dispatch(incrementTime());
+			}
+		}, gameSpeed); // fps
 
-    return () => clearInterval(loop);
-  }, [dispatch, gameSpeed]);
+		return () => clearInterval(loop);
+	}, [dispatch, gameSpeed]);
 
-  return (
-    <>
-      <Header />
-      {/* <div>
+	return (
+		<>
+			<Header />
+			{/* <div>
         <a href="https://vitejs.dev" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
         </a>
@@ -45,14 +46,17 @@ function App() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p> */}
-      <div className="p-8">
-        <BuildingList />
-      </div>
-      <PauseIndicator />
-      <SpeedDial />
-      <BottomNavigation />
-    </>
-  );
+			<div className="p-8">
+				<BuildingList />
+			</div>
+			<PauseIndicator />
+			<SpeedDial />
+			<BottomNavigation />
+
+
+			<EmployeListModal />
+		</>
+	);
 }
 
 export default App;

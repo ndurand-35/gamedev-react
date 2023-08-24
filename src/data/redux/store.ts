@@ -1,11 +1,13 @@
 import { configureStore } from "@reduxjs/toolkit";
 import engineReducer from "@/data/redux/engineSlice";
 import companyReducer from "@/data/redux/companySlice";
+import employeReducer from "@/data/redux/employeSlice"
 
 const store = configureStore({
     reducer: {
         engine: engineReducer,
-        company: companyReducer
+        company: companyReducer,
+        employe: employeReducer
     },
 });
 

@@ -6,12 +6,11 @@ export const SpeedDial = () => {
 
     return (
         <div
-            data-dial-init
             className="fixed right-12 bottom-24 group"
             onMouseEnter={() => setIsHidden(false)}
             onMouseLeave={() => setIsHidden(true)}
         >
-            <div id="speed-dial-menu-default" className={"flex-col items-center mb-4 space-y-2 " + (isHidden ? "hidden" : "flex")}>
+            <div className={"flex-col items-center mb-4 space-y-2 " + (isHidden ? "hidden" : "flex")}>
                 <div className="tooltip tooltip-left" data-tip="Signer un contrat">
                     <button className="btn btn-circle">
                         <AddPage width={24} height={24} />

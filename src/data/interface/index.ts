@@ -1,2 +1,2 @@
-export * from "@/data/interface/employee";
+export * from "@/data/interface/employe";
 export * from "@/data/interface/building";
