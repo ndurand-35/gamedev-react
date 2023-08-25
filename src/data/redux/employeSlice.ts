@@ -3,6 +3,7 @@ import { SexType, faker } from "@faker-js/faker";
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import { Candidate, Employe } from "@/data/interface";
+import { generateNewEmploye } from "@/data/utils/employe";
 
 // const generateCandidateList = createAsyncThunk("candidate/generate", (data, thunkAPI) => {
 //     let state: RootState = thunkAPI.getState() as RootState;
@@ -46,16 +47,7 @@ export const employeSlice = createSlice({
         generateCandidateList(state, action: PayloadAction<{ reputation: number; time: number }>) {
             if (action.payload.time - state.lastCandidateGeneration > 168) {
                 state.lastCandidateGeneration = action.payload.time;
-                let sex = faker.person.sex();
-                state.candidateList = [
-                    {
-                        id: 1,
-                        sex,
-                        firstName: faker.person.firstName(sex as SexType),
-                        lastName: faker.person.firstName(sex as SexType),
-                        salary: 1200,
-                    },
-                ];
+                state.candidateList = generateNewEmploye(action.payload.reputation);
             }
         },
     },

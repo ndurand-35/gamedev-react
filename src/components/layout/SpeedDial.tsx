@@ -1,5 +1,6 @@
 import { AddPage, Plus } from "iconoir-react";
 import { useState } from "react";
+import { NavLink } from "react-router-dom";
 
 export const SpeedDial = () => {
     const [isHidden, setIsHidden] = useState<Boolean>(true);
@@ -12,11 +13,12 @@ export const SpeedDial = () => {
         >
             <div className={"flex-col items-center mb-4 space-y-2 " + (isHidden ? "hidden" : "flex")}>
                 <div className="tooltip tooltip-left" data-tip="Signer un contrat">
-                    <button className="btn btn-circle">
+                    <NavLink to={"/task"} className="btn btn-circle">
                         <AddPage width={24} height={24} />
-                    </button>
+                    </NavLink>
                 </div>
             </div>
+
             <button className={"btn btn-circle btn-primary group-hover:rotate-45"}>
                 <Plus width={32} height={32} />
             </button>
@@ -38,6 +40,6 @@ export const SpeedDial = () => {
                 </svg>
                 <span className="sr-only">Open actions menu</span>
             </button> */}
-        </div>
+        </div >
     );
 };

@@ -31,7 +31,7 @@ export const EmployePage: React.FC = (): ReactElement => {
       <div className="flex flex-row">
         <ul className="menu bg-base-200 rounded-box space-y-2 min-w-fit">
           {modalTabList.map((modalTab: ModalTab) => (
-            <li>
+            <li key={modalTab.key}>
               <a
                 className={activeTab === modalTab.key ? "active" : ""}
                 onClick={() => setActiveTab(modalTab.key)}

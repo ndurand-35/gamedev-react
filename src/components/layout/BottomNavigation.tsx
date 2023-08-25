@@ -88,7 +88,7 @@ export const BottomNavigation = () => {
           <NavLink
             to={"/"}
             className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-primary" : "btn btn-circle"
+              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
             }
           >
             <Home className="h-6 w-6" />
@@ -104,7 +104,7 @@ export const BottomNavigation = () => {
           <NavLink
             to={"/employe"}
             className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-primary" : "btn btn-circle"
+              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
             }
           >
             <User className="h-6 w-6" />

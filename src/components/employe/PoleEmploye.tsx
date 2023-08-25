@@ -65,7 +65,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
                   <input
                     type="checkbox"
                     className="checkbox"
-                    onClick={selectAllEmploye}
+                    onChange={selectAllEmploye}
                     checked={
                       candidateList.length > 0 &&
                       selectedEmployeList.length === candidateList.length
@@ -91,7 +91,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
                     <input
                       type="checkbox"
                       className="checkbox"
-                      onClick={() => selectEmploye(employe.id)}
+                      onChange={() => selectEmploye(employe.id)}
                       checked={
                         selectedEmployeList.findIndex(
                           (e: number) => e === employe.id

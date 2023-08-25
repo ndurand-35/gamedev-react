@@ -1,4 +1,4 @@
-import { ReactElement, useState } from "react";
+import { ReactElement, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import { FireFlame } from "iconoir-react";
@@ -8,16 +8,12 @@ import { fired } from "@/data/redux/employeSlice";
 import { RootState } from "@/data/redux/store";
 import { matchSorter } from "match-sorter";
 
-interface EmployeListProps {}
+interface EmployeListProps { }
 
 export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
   const dispatch = useDispatch();
-  const buildingList = useSelector(
-    (state: RootState) => state.company.buildingList
-  );
-  const employeList = useSelector(
-    (state: RootState) => state.employe.employeList
-  );
+  const buildingList = useSelector((state: RootState) => state.company.buildingList);
+  const employeList = useSelector((state: RootState) => state.employe.employeList);
 
   const [selectedEmployeList, setSelectedEmployeList] = useState<number[]>([]);
   const [localEmployeList, setLocalEmployeList] = useState(employeList);
@@ -25,12 +21,10 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
   const [searchValue, setSearchValue] = useState("");
   const [buildingFilter, setBuildingFilter] = useState<number | null>(null);
 
-  const filterTable = () => {
-    console.log(buildingFilter, searchValue);
+  useEffect(() => {
     let baseFilter = employeList;
-    if (buildingFilter !== null) {
-      baseFilter.filter((e: Employe) => e.buildingId == buildingFilter);
-    }
+    if (buildingFilter !== null) baseFilter = baseFilter.filter((e: Employe) => e.buildingId == buildingFilter);
+
     if (searchValue !== "")
       setLocalEmployeList(
         matchSorter(baseFilter, searchValue, {
@@ -38,25 +32,18 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
         })
       );
     else setLocalEmployeList(baseFilter);
-  };
+  }, [buildingFilter, searchValue, setLocalEmployeList]);
 
   const selectAllEmploye = () => {
     if (selectedEmployeList.length === employeList.length) {
       setSelectedEmployeList([]);
     } else {
-      setSelectedEmployeList(
-        employeList.reduce((acc: number[], cV: Employe) => {
-          acc.push(cV.id);
-          return acc;
-        }, [])
-      );
+      setSelectedEmployeList(employeList.reduce((acc: number[], cV: Employe) => [...acc, cV.id], []));
     }
   };
   const selectEmploye = (id: number) => {
     if (selectedEmployeList.findIndex((e: number) => e === id) !== -1) {
-      setSelectedEmployeList(
-        selectedEmployeList.filter((e: number) => e !== id)
-      );
+      setSelectedEmployeList(selectedEmployeList.filter((e: number) => e !== id));
     } else {
       setSelectedEmployeList([...selectedEmployeList, id]);
     }
@@ -73,28 +60,24 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
             type="text"
             onChange={(event) => {
               setSearchValue(event.target.value);
-              filterTable();
             }}
             placeholder="Chercher"
             className="input input-bordered input-sm"
           />
           <select
             className="select select-sm select-bordered"
+
+            defaultValue={"null"}
             onChange={(event) => {
-              setBuildingFilter(
-                event.target.value !== "null"
-                  ? parseInt(event.target.value)
-                  : null
-              );
-              filterTable();
+              setBuildingFilter(event.target.value !== "null" ? parseInt(event.target.value) : null);
             }}
           >
-            <option value={"null"} selected>
+            <option value={"null"}>
               Filtrer Batiment
             </option>
             <option value={0}>Sans Batiment</option>
             {buildingList.map((b: Building) => (
-              <option value={b.id}>{b.name}</option>
+              <option key={b.name} value={b.id}>{b.name}</option>
             ))}
           </select>
         </div>
@@ -109,7 +92,7 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
                   <input
                     type="checkbox"
                     className="checkbox"
-                    onClick={selectAllEmploye}
+                    onChange={selectAllEmploye}
                     checked={selectedEmployeList.length === employeList.length}
                   />
                 </label>
@@ -121,22 +104,14 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
           </thead>
           <tbody>
             {localEmployeList.map((employe: Employe, index: number) => (
-              <tr
-                key={`employe_${index}`}
-                className="hover cursor-pointer"
-                onClick={() => selectEmploye(employe.id)}
-              >
+              <tr key={`employe_${index}`} className="hover cursor-pointer" onClick={() => selectEmploye(employe.id)}>
                 <th>
                   <label>
                     <input
                       type="checkbox"
                       className="checkbox"
-                      onClick={() => selectEmploye(employe.id)}
-                      checked={
-                        selectedEmployeList.findIndex(
-                          (e: number) => e === employe.id
-                        ) !== -1
-                      }
+                      onChange={() => selectEmploye(employe.id)}
+                      checked={selectedEmployeList.findIndex((e: number) => e === employe.id) !== -1}
                     />
                   </label>
                 </th>
@@ -155,11 +130,7 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
                         {employe.firstName} {employe.lastName}
                       </div>
                       <div className="text-sm opacity-50">
-                        {
-                          buildingList.find(
-                            (b: Building) => b.id == employe.buildingId
-                          )?.name
-                        }
+                        {buildingList.find((b: Building) => b.id == employe.buildingId)?.name}
                       </div>
                     </div>
                   </div>
