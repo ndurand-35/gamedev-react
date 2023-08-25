@@ -44,12 +44,12 @@ function App() {
 
 function Root() {
 	return (
-		<>
+		<div className="prose-h1:text-2xl prose-h1:font-medium prose-h2:text-2xl">
 			<Header />
 			<Outlet />
 			<PauseIndicator />
 			<BottomNavigation />
-		</>
+		</div>
 	);
 }
 

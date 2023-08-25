@@ -8,12 +8,17 @@ export const Header = () => {
     const reputation = useSelector((state: RootState) => state.company.reputation);
 
     return (
-        <nav className="top-0 left-0 z-20 w-full">
+        <nav className="fixed top-0 left-0 z-20 w-full">
             <div className="flex flex-wrap items-center justify-between mx-auto">
                 <div className="flex flex-row">
-                    <div className="flex flex-row items-center p-4 space-x-2 text-gray-500 bg-white border-b border-r">
+                    <div
+                        className={
+                            "flex flex-row items-center p-4 space-x-2  bg-white border-b border-r " +
+                            (money > 0 ? "text-gray-500" : "text-error")
+                        }
+                    >
                         <Coins className="flex w-4 h-4" />
-                        <span className="text-sm">{money}</span>
+                        <span className="text-sm ">{money}</span>
                     </div>
                     <div className="flex flex-row items-center p-4 space-x-2 text-gray-500 bg-white border-b border-r rounded-br">
                         <Star className="flex w-4 h-4" />

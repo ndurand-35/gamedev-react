@@ -3,10 +3,12 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { FireFlame } from "iconoir-react";
 
+import { MyTable } from "@/components/Table";
+
 import { Building, Employe } from "@/data/interface";
 import { fired } from "@/data/redux/employeSlice";
 import { RootState } from "@/data/redux/store";
-import { matchSorter } from "match-sorter";
+import { createColumnHelper } from "@tanstack/react-table";
 
 interface EmployeListProps { }
 
@@ -15,145 +17,79 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
   const buildingList = useSelector((state: RootState) => state.company.buildingList);
   const employeList = useSelector((state: RootState) => state.employe.employeList);
 
-  const [selectedEmployeList, setSelectedEmployeList] = useState<number[]>([]);
-  const [localEmployeList, setLocalEmployeList] = useState(employeList);
-
-  const [searchValue, setSearchValue] = useState("");
-  const [buildingFilter, setBuildingFilter] = useState<number | null>(null);
+  const [rowSelection, setRowSelection] = useState({});
 
   useEffect(() => {
-    let baseFilter = employeList;
-    if (buildingFilter !== null) baseFilter = baseFilter.filter((e: Employe) => e.buildingId == buildingFilter);
+    console.log(rowSelection);
+  }, [rowSelection]);
 
-    if (searchValue !== "")
-      setLocalEmployeList(
-        matchSorter(baseFilter, searchValue, {
-          keys: ["firstName", "lastName"],
-        })
-      );
-    else setLocalEmployeList(baseFilter);
-  }, [buildingFilter, searchValue, setLocalEmployeList]);
-
-  const selectAllEmploye = () => {
-    if (selectedEmployeList.length === employeList.length) {
-      setSelectedEmployeList([]);
-    } else {
-      setSelectedEmployeList(employeList.reduce((acc: number[], cV: Employe) => [...acc, cV.id], []));
-    }
-  };
-  const selectEmploye = (id: number) => {
-    if (selectedEmployeList.findIndex((e: number) => e === id) !== -1) {
-      setSelectedEmployeList(selectedEmployeList.filter((e: number) => e !== id));
-    } else {
-      setSelectedEmployeList([...selectedEmployeList, id]);
-    }
-  };
+  const columnHelper = createColumnHelper<Employe>();
+  const columns = [
+    {
+      header: "Name",
+      accessorFn: (row: Employe) => row.lastName + " " + row.firstName,
+      enableColumnFilter: false,
+      cell: (props: any) => {
+        return (
+          <div className="flex items-center space-x-3">
+            <div className="avatar placeholder">
+              <div className="bg-neutral-focus text-neutral-content rounded-full w-8">
+                <span className="text-xs">
+                  {props.row.original.firstName[0]}
+                  {props.row.original.lastName[0]}
+                </span>
+              </div>
+            </div>
+            <div>
+              <div className="font-bold">
+                {props.row.original.firstName} {props.row.original.lastName}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Building",
+      accessorFn: (row: Employe) => buildingList.find((b: Building) => b.id == row.buildingId)?.name ?? "Sans Building",
+      cell: (info: any) => buildingList.find((b: Building) => b.id == info.row.original.buildingId)?.name,
+    },
+    columnHelper.accessor("salary", {
+      header: "Salaire",
+      cell: (info) => info.renderValue() + " / Mois",
+    }),
+    columnHelper.display({
+      header: "Action",
+      cell: (props) => {
+        return (
+          props.row.original.id !== 1 && (
+            <div className="tooltip" data-tip="Licencier">
+              <button
+                className="btn btn-xs btn-warning btn-square"
+                onClick={() => {
+                  dispatch(fired(props.row.original.id));
+                }}
+              >
+                <FireFlame />
+              </button>
+            </div>
+          )
+        );
+      },
+    }),
+  ];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-row justify-between">
-        <h1 className="heading-1">
-          {employeList.length} Employé{employeList.length > 1 ? "s" : ""}
-        </h1>
-        <div className="flex flex-row space-x-2">
-          <input
-            type="text"
-            onChange={(event) => {
-              setSearchValue(event.target.value);
-            }}
-            placeholder="Chercher"
-            className="input input-bordered input-sm"
-          />
-          <select
-            className="select select-sm select-bordered"
-
-            defaultValue={"null"}
-            onChange={(event) => {
-              setBuildingFilter(event.target.value !== "null" ? parseInt(event.target.value) : null);
-            }}
-          >
-            <option value={"null"}>
-              Filtrer Batiment
-            </option>
-            <option value={0}>Sans Batiment</option>
-            {buildingList.map((b: Building) => (
-              <option key={b.name} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       <div className="overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>
-                <label>
-                  <input
-                    type="checkbox"
-                    className="checkbox"
-                    onChange={selectAllEmploye}
-                    checked={selectedEmployeList.length === employeList.length}
-                  />
-                </label>
-              </th>
-              <th>Name</th>
-              <th>Salaire</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {localEmployeList.map((employe: Employe, index: number) => (
-              <tr key={`employe_${index}`} className="hover cursor-pointer" onClick={() => selectEmploye(employe.id)}>
-                <th>
-                  <label>
-                    <input
-                      type="checkbox"
-                      className="checkbox"
-                      onChange={() => selectEmploye(employe.id)}
-                      checked={selectedEmployeList.findIndex((e: number) => e === employe.id) !== -1}
-                    />
-                  </label>
-                </th>
-                <td>
-                  <div className="flex items-center space-x-3">
-                    <div className="avatar placeholder">
-                      <div className="bg-neutral-focus text-neutral-content rounded-full w-8">
-                        <span className="text-xs">
-                          {employe.firstName[0]}
-                          {employe.lastName[0]}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-bold">
-                        {employe.firstName} {employe.lastName}
-                      </div>
-                      <div className="text-sm opacity-50">
-                        {buildingList.find((b: Building) => b.id == employe.buildingId)?.name}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td>{employe.salary} / mois</td>
-                <th>
-                  {employe.id !== 1 && (
-                    <div className="tooltip" data-tip="Licencier">
-                      <button
-                        className="btn btn-xs btn-warning btn-square"
-                        onClick={() => {
-                          dispatch(fired(employe.id));
-                        }}
-                      >
-                        <FireFlame />
-                      </button>
-                    </div>
-                  )}
-                </th>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <MyTable
+          columns={columns}
+          defaultData={employeList.filter((e: Employe) => e.id !== 1)}
+          title={employeList.length + " Employé" + (employeList.length > 1 ? "s" : "")}
+          isRowSelectable={true}
+          rowSelection={rowSelection}
+          setRowSelection={setRowSelection}
+        />
       </div>
     </div>
   );
