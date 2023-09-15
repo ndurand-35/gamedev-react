@@ -2,6 +2,8 @@ export interface Task {
     id: number;
     name: string;
     priority: number;
+
+    buildingIds?: number[] | null;
 }
 
 export interface Contract extends Task {

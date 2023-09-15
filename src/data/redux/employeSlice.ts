@@ -1,5 +1,3 @@
-import { SexType, faker } from "@faker-js/faker";
-
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import { Candidate, Employe } from "@/data/interface";

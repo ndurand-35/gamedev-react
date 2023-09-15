@@ -1,9 +1,10 @@
 import { ReactElement, useState, FC } from "react";
 import { useSelector } from "react-redux";
 
-import { Employe, Building } from "@/data/interface";
+import { Employe, Building, Task } from "@/data/interface";
 import { RootState } from "@/data/redux/store";
-
+import { Contract } from "@/data/interface";
+import { ContractProgress } from "@/components/contract";
 
 interface BuildingCardProps {
     building: Building;
@@ -11,6 +12,7 @@ interface BuildingCardProps {
 
 export const BuildingCard: FC<BuildingCardProps> = ({ building }): ReactElement => {
     const employeList = useSelector((state: RootState) => state.employe.employeList);
+    const taskList = useSelector((state: RootState) => state.task.taskList);
     const [activeTab, setActiveTab] = useState<number>(0);
     return (
         <>
@@ -30,27 +32,37 @@ export const BuildingCard: FC<BuildingCardProps> = ({ building }): ReactElement 
             </div>
             {activeTab == 0 && (
                 <div className="overflow-x-auto border border-base-600 rounded-b-lg rounded-tr-lg">
-                    <div className="flex min-h-[6rem] min-w-[18rem] max-w-4xl flex-wrap items-center justify-center gap-2 p-4"></div>
+                    <div className="flex flex-col min-h-[6rem] divide-y">
+                        {taskList
+                            .filter((task: Task) => task.buildingIds?.includes(building.id))
+                            .map((task: Task) => (
+                                <div key={`active_task_${task.id}`}>
+                                    <ContractProgress contract={task as Contract} />
+                                </div>
+                            ))}
+                    </div>
                 </div>
             )}
             {activeTab == 1 && (
-                <div className="overflow-x-auto border border-base-600 rounded-lg ">
+                <div className="overflow-x-auto border border-base-600 rounded-lg">
                     <div className="flex flex-col space-y-2 min-h-[6rem] p-4">
-                        {employeList.filter((employe: Employe) => employe.buildingId == building.id).map((employe: Employe, index: number) => (
-                            <div key={index} className="flex flex-row space-x-2 items-center">
-                                <div className="avatar placeholder">
-                                    <div className="bg-neutral-focus text-neutral-content rounded-full w-8">
-                                        <span className="text-xs">
-                                            {employe.firstName[0]}
-                                            {employe.lastName[0]}
-                                        </span>
+                        {employeList
+                            .filter((employe: Employe) => employe.buildingId == building.id)
+                            .map((employe: Employe, index: number) => (
+                                <div key={index} className="flex flex-row space-x-2 items-center">
+                                    <div className="avatar placeholder">
+                                        <div className="bg-neutral-focus text-neutral-content rounded-full w-8">
+                                            <span className="text-xs">
+                                                {employe.firstName[0]}
+                                                {employe.lastName[0]}
+                                            </span>
+                                        </div>
                                     </div>
+                                    <p>
+                                        {employe.firstName} {employe.lastName}
+                                    </p>
                                 </div>
-                                <p>
-                                    {employe.firstName} {employe.lastName}
-                                </p>
-                            </div>
-                        ))}
+                            ))}
                     </div>
                 </div>
             )}

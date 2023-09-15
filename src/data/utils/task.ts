@@ -3,7 +3,7 @@ import { faker } from "@faker-js/faker/locale/en";
 import { capitalize, randomIntFromInterval } from "@/data/utils";
 
 export const generateNewContract = (reputation: number): Contract[] => {
-    let nbGenerated = 3;
+    let nbGenerated = 30;
     if (reputation > 25) nbGenerated = 5;
     if (reputation > 50) nbGenerated = 7;
     if (reputation > 75) nbGenerated = 9;

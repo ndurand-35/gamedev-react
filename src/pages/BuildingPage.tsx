@@ -6,20 +6,16 @@ import { TopMenuItem } from "@/data/interface";
 
 const pageTopMenuItems: TopMenuItem[] = [
     {
-        name: "Fondateur",
-        link: "/employe/me",
+        name: "Mes batiments",
+        link: "/building/owned",
     },
     {
-        name: "Employé",
-        link: "/employe/list",
-    },
-    {
-        name: "Pole Emploi",
-        link: "/employe/recruit",
+        name: "Agence",
+        link: "/building/buy",
     },
 ];
 
-export const EmployePage: React.FC = (): ReactElement => {
+export const BuildingPage: React.FC = (): ReactElement => {
     const dispatch = useDispatch();
     const [isMounted, setIsMounted] = useState<Boolean>(false);
 

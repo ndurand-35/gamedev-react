@@ -13,6 +13,7 @@ import {
   FastArrowRight,
   User,
   Home,
+  Building,
 } from "iconoir-react";
 
 export const BottomNavigation = () => {
@@ -93,12 +94,7 @@ export const BottomNavigation = () => {
           >
             <Home className="h-6 w-6" />
           </NavLink>
-          {/* <a
-            className={"btn btn-circle " + location == "/" ? "btn-primary" : ""}
-            href="/"
-          >
-            
-          </a> */}
+
         </div>
         <div className="tooltip" data-tip="Employé">
           <NavLink
@@ -108,6 +104,16 @@ export const BottomNavigation = () => {
             }
           >
             <User className="h-6 w-6" />
+          </NavLink>
+        </div>
+        <div className="tooltip" data-tip="Bureau">
+          <NavLink
+            to={"/building"}
+            className={({ isActive }) =>
+              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
+            }
+          >
+            <Building className="h-6 w-6" />
           </NavLink>
         </div>
         {/* <div
