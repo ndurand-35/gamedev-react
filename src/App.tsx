@@ -5,27 +5,30 @@ import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
 
 import type { RootState } from "@/data/redux/store";
 import { incrementTime } from "@/data/redux/engineSlice";
-import { payMonhlyBilling } from "@/data/redux/companySlice";
+import { payMonthlyBilling } from "@/data/redux/companySlice";
+import { generateCandidateList } from "@/data/redux/employeSlice";
 
 import { BottomNavigation, Header, PauseIndicator } from "@/components/layout/index";
 import { HomePage, EmployePage, TaskPage, BuildingPage, FondateurPage, PoleEmploiPage, EmployeListPage, SelogerPage } from "@/pages";
 function App() {
-	const dispatch = useDispatch();
-	const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
-	const time = useSelector((state: RootState) => state.engine.time);
-	const employeList = useSelector((state: RootState) => state.employe.employeList);
+  const dispatch = useDispatch();
+  const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
+  const time = useSelector((state: RootState) => state.engine.time);
+  const reputation = useSelector((state: RootState) => state.company.reputation);
+  const employeList = useSelector((state: RootState) => state.employe.employeList);
 
-	/* GameLoop */
-	useEffect(() => {
-		const loop = setInterval(() => {
-			if (gameSpeed !== 0) {
-				dispatch(payMonhlyBilling({ time, employeList }));
-				dispatch(incrementTime());
-			}
-		}, gameSpeed); // fps
+  /* GameLoop */
+  useEffect(() => {
+    const loop = setInterval(() => {
+      if (gameSpeed !== 0) {
+        dispatch(payMonthlyBilling({ time, employeList }));
+        dispatch(generateCandidateList({ time, reputation }));
+        dispatch(incrementTime());
+      }
+    }, gameSpeed); // fps
 
-		return () => clearInterval(loop);
-	}, [dispatch, gameSpeed, time]);
+    return () => clearInterval(loop);
+  }, [dispatch, gameSpeed, time]);
 
 	const router = createBrowserRouter([
 		{
@@ -45,18 +48,18 @@ function App() {
 		},
 	]);
 
-	return <RouterProvider router={router} />;
+  return <RouterProvider router={router} />;
 }
 
 function Root() {
-	return (
-		<div className="prose-h1:text-2xl prose-h1:font-medium prose-h2:text-2xl">
-			<Header />
-			<Outlet />
-			<PauseIndicator />
-			<BottomNavigation />
-		</div>
-	);
+  return (
+    <div className="prose-h1:text-2xl prose-h1:font-medium prose-h2:text-2xl">
+      <Header />
+      <Outlet />
+      <PauseIndicator />
+      <BottomNavigation />
+    </div>
+  );
 }
 
 export default App;

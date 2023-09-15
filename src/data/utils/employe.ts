@@ -1,5 +1,6 @@
 import { Candidate } from "@/data/interface";
 import { SexType, faker } from "@faker-js/faker";
+import { randomIntFromInterval } from "@/data/utils";
 
 export const generateNewEmploye = (reputation: number): Candidate[] => {
     let nbGenerated = 3;
@@ -16,7 +17,7 @@ export const generateNewEmploye = (reputation: number): Candidate[] => {
             sex,
             firstName: faker.person.firstName(sex as SexType),
             lastName: faker.person.firstName(sex as SexType),
-            salary: 1200,
+            salary: randomIntFromInterval(1000, 2000),
         });
     }
     return generated;

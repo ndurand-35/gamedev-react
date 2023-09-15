@@ -10,18 +10,21 @@ import { fired } from "@/data/redux/employeSlice";
 import { RootState } from "@/data/redux/store";
 import { createColumnHelper } from "@tanstack/react-table";
 
-interface EmployeListProps { }
+interface EmployeListProps {}
 
 export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
   const dispatch = useDispatch();
   const buildingList = useSelector((state: RootState) => state.company.buildingList);
   const employeList = useSelector((state: RootState) => state.employe.employeList);
 
-  const [rowSelection, setRowSelection] = useState({});
+  const employListWithoutBoss = employeList.filter((e: Employe) => e.id !== 1);
 
-  useEffect(() => {
-    console.log(rowSelection);
-  }, [rowSelection]);
+  const [rowSelection, setRowSelection] = useState<Object>({});
+  const fireSelected = () => {
+    Object.keys(rowSelection).map((index) => {
+      dispatch(fired(employListWithoutBoss[parseInt(index)].id));
+    });
+  };
 
   const columnHelper = createColumnHelper<Employe>();
   const columns = [
@@ -84,11 +87,21 @@ export const EmployeList: React.FC<EmployeListProps> = (): ReactElement => {
       <div className="overflow-x-auto">
         <MyTable
           columns={columns}
-          defaultData={employeList.filter((e: Employe) => e.id !== 1)}
-          title={employeList.length + " Employé" + (employeList.length > 1 ? "s" : "")}
+          defaultData={employListWithoutBoss}
+          title={employListWithoutBoss.length + " Employé" + (employListWithoutBoss.length > 1 ? "s" : "")}
           isRowSelectable={true}
           rowSelection={rowSelection}
           setRowSelection={setRowSelection}
+          action={
+            Object.keys(rowSelection).length > 0 ? (
+              <button className="btn btn-xs btn-warning" onClick={fireSelected}>
+                <FireFlame />
+                <p>Licencier</p>
+              </button>
+            ) : (
+              <></>
+            )
+          }
         />
       </div>
     </div>

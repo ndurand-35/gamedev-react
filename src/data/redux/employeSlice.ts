@@ -10,6 +10,7 @@ import { generateNewEmploye } from "@/data/utils/employe";
 export interface EmployeState {
     employeList: Employe[];
     candidateList: Candidate[];
+    stopCandidateGeneration : boolean;
     lastCandidateGeneration: number;
 }
 
@@ -25,6 +26,7 @@ const initialState: EmployeState = {
         },
     ],
     candidateList: [],
+    stopCandidateGeneration  : false,
     lastCandidateGeneration: -168,
 };
 
@@ -32,6 +34,10 @@ export const employeSlice = createSlice({
     name: "employe",
     initialState,
     reducers: {
+        setStopCandidateGeneration(state,action :PayloadAction<boolean>){
+            console.log(action.payload)
+            state.stopCandidateGeneration = action.payload
+        },
         fired(state, action: PayloadAction<number>) {
             state.employeList = state.employeList.filter((e: Employe) => e.id !== action.payload);
         },
@@ -43,7 +49,7 @@ export const employeSlice = createSlice({
             }
         },
         generateCandidateList(state, action: PayloadAction<{ reputation: number; time: number }>) {
-            if (action.payload.time - state.lastCandidateGeneration > 168) {
+            if (!state.stopCandidateGeneration && action.payload.time - state.lastCandidateGeneration > 168) {
                 state.lastCandidateGeneration = action.payload.time;
                 state.candidateList = generateNewEmploye(action.payload.reputation);
             }
@@ -57,6 +63,6 @@ export const employeSlice = createSlice({
 });
 
 // Action creators are generated for each case reducer function
-export const { fired, hire, generateCandidateList } = employeSlice.actions;
+export const { setStopCandidateGeneration, fired, hire, generateCandidateList } = employeSlice.actions;
 
 export default employeSlice.reducer;
