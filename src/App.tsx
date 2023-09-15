@@ -8,7 +8,7 @@ import { incrementTime } from "@/data/redux/engineSlice";
 import { payMonhlyBilling } from "@/data/redux/companySlice";
 
 import { BottomNavigation, Header, PauseIndicator } from "@/components/layout/index";
-import { HomePage, EmployePage, TaskPage, BuildingPage, FondateurPage, PoleEmploiPage, EmployeListPage } from "@/pages";
+import { HomePage, EmployePage, TaskPage, BuildingPage, FondateurPage, PoleEmploiPage, EmployeListPage, SelogerPage } from "@/pages";
 function App() {
 	const dispatch = useDispatch();
 	const gameSpeed = useSelector((state: RootState) => state.engine.gameSpeed);
@@ -40,6 +40,7 @@ function App() {
 				{ path: "employe/recruit", element: <PoleEmploiPage /> },
 				{ path: "task", element: <TaskPage /> },
 				{ path: "building", element: <BuildingPage /> },
+				{ path: "building/buy", element: <SelogerPage /> },
 			],
 		},
 	]);

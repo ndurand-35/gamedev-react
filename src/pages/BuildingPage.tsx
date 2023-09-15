@@ -10,7 +10,7 @@ const pageTopMenuItems: TopMenuItem[] = [
         link: "/building/owned",
     },
     {
-        name: "Agence",
+        name: "SeLoger",
         link: "/building/buy",
     },
 ];

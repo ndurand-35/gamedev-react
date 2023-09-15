@@ -1,12 +1,16 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+
 import { Building, Employe } from "@/data/interface";
 import { getTimeAsDate } from "@/data/utils/time";
+import { generateNewBuilding } from "@/data/utils/building";
 
 export interface CompanyState {
 	money: number;
 	reputation: number;
 	buildingList: Building[];
+	availableBuildingList: Building[];
+	lastBuildingGeneration: number;
 }
 
 const initialState: CompanyState = {
@@ -28,6 +32,8 @@ const initialState: CompanyState = {
 			energyPrice: 100,
 		},
 	],
+	availableBuildingList: [],
+	lastBuildingGeneration: -168,
 };
 
 export const companySlice = createSlice({
@@ -38,7 +44,7 @@ export const companySlice = createSlice({
 			state.money = action.payload;
 		},
 		payMonhlyBilling(state, action: PayloadAction<{ time: number; employeList: Employe[] }>) {
-			let date = getTimeAsDate(action.payload.time)
+			let date = getTimeAsDate(action.payload.time);
 
 			/* Tout les mois */
 			if (date.add(1, "day").date() == 1 && date.hour() == 23) {
@@ -47,14 +53,20 @@ export const companySlice = createSlice({
 				});
 
 				action.payload.employeList.map((e: Employe) => {
-					state.money = state.money - e.salary
-				})
+					state.money = state.money - e.salary;
+				});
+			}
+		},
+		generateCompanyList(state, action: PayloadAction<{ reputation: number; time: number }>) {
+			if (action.payload.time - state.lastBuildingGeneration > 168) {
+				state.lastBuildingGeneration = action.payload.time;
+				state.availableBuildingList = generateNewBuilding(action.payload.reputation);
 			}
 		},
 	},
 });
 
 // Action creators are generated for each case reducer function
-export const { setMoney, payMonhlyBilling } = companySlice.actions;
+export const { setMoney, payMonhlyBilling, generateCompanyList } = companySlice.actions;
 
 export default companySlice.reducer;

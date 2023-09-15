@@ -9,13 +9,9 @@ import { RootState } from "@/data/redux/store";
 
 export const PoleEmploye: React.FC = (): ReactElement => {
   const dispatch = useDispatch();
-  const reputation = useSelector(
-    (state: RootState) => state.company.reputation
-  );
+  const reputation = useSelector((state: RootState) => state.company.reputation);
   const time = useSelector((state: RootState) => state.engine.time);
-  const candidateList = useSelector(
-    (state: RootState) => state.employe.candidateList
-  );
+  const candidateList = useSelector((state: RootState) => state.employe.candidateList);
 
   const [isMounted, setIsMounted] = useState<Boolean>(false);
   const [selectedEmployeList, setSelectedEmployeList] = useState<number[]>([]);
@@ -41,9 +37,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
   };
   const selectEmploye = (id: number) => {
     if (selectedEmployeList.findIndex((e: number) => e === id) !== -1) {
-      setSelectedEmployeList(
-        selectedEmployeList.filter((e: number) => e !== id)
-      );
+      setSelectedEmployeList(selectedEmployeList.filter((e: number) => e !== id));
     } else {
       setSelectedEmployeList([...selectedEmployeList, id]);
     }
@@ -66,10 +60,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
                     type="checkbox"
                     className="checkbox"
                     onChange={selectAllEmploye}
-                    checked={
-                      candidateList.length > 0 &&
-                      selectedEmployeList.length === candidateList.length
-                    }
+                    checked={candidateList.length > 0 && selectedEmployeList.length === candidateList.length}
                   />
                 </label>
               </th>
@@ -81,22 +72,14 @@ export const PoleEmploye: React.FC = (): ReactElement => {
           </thead>
           <tbody>
             {candidateList.map((employe: Candidate, index: number) => (
-              <tr
-                key={`employe_${index}`}
-                className="hover cursor-pointer"
-                onClick={() => selectEmploye(employe.id)}
-              >
+              <tr key={`employe_${index}`} className="hover cursor-pointer" onClick={() => selectEmploye(employe.id)}>
                 <th>
                   <label>
                     <input
                       type="checkbox"
                       className="checkbox"
                       onChange={() => selectEmploye(employe.id)}
-                      checked={
-                        selectedEmployeList.findIndex(
-                          (e: number) => e === employe.id
-                        ) !== -1
-                      }
+                      checked={selectedEmployeList.findIndex((e: number) => e === employe.id) !== -1}
                     />
                   </label>
                 </th>
