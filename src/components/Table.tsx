@@ -101,7 +101,7 @@ export const MyTable: React.FC<TableProps> = ({
           <DebouncedInput
             value={globalFilter ?? ""}
             onChange={(value) => setGlobalFilter(String(value))}
-            className="input input-sm input-bordered"
+            className="input input-sm input-bordered placeholder-base-content placeholder-opacity-70"
             placeholder="Chercher"
           />
           <div className="dropdown dropdown-end">
@@ -233,7 +233,7 @@ function Filter({ column, table }: { column: Column<any, unknown>; table: Table<
           value={(columnFilterValue as [number, number])?.[0] ?? ""}
           onChange={(value) => column.setFilterValue((old: [number, number]) => [value, old?.[1]])}
           placeholder={`Min ${column.getFacetedMinMaxValues()?.[0] ? `(${column.getFacetedMinMaxValues()?.[0]})` : ""}`}
-          className="input input-sm input-bordered"
+          className="input input-sm input-bordered placeholder-base-content placeholder-opacity-70"
         />
         <DebouncedInput
           type="number"
@@ -242,7 +242,7 @@ function Filter({ column, table }: { column: Column<any, unknown>; table: Table<
           value={(columnFilterValue as [number, number])?.[1] ?? ""}
           onChange={(value) => column.setFilterValue((old: [number, number]) => [old?.[0], value])}
           placeholder={`Max ${column.getFacetedMinMaxValues()?.[1] ? `(${column.getFacetedMinMaxValues()?.[1]})` : ""}`}
-          className="input input-sm input-bordered"
+          className="input input-sm input-bordered placeholder-base-content placeholder-opacity-70"
         />
       </div>
       <div className="h-1" />

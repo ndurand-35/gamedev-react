@@ -1,8 +1,14 @@
 export interface Task {
     id: number;
     name: string;
-    priority: number;
+}
 
+export interface StartedTask extends Task {
+    startDate: number;
+    paused: boolean;
+    progression: number;
+
+    priority: number;
     buildingIds?: number[] | null;
 }
 
@@ -16,3 +22,5 @@ export interface Contract extends Task {
     priceAdditional: number;
     priceMalus: number;
 }
+
+export interface StartedContract extends StartedTask, Contract { }

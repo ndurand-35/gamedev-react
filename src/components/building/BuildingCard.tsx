@@ -1,9 +1,8 @@
 import { ReactElement, useState, FC } from "react";
 import { useSelector } from "react-redux";
 
-import { Employe, Building, Task } from "@/data/interface";
+import { Employe, Building, StartedTask, StartedContract } from "@/data/interface";
 import { RootState } from "@/data/redux/store";
-import { Contract } from "@/data/interface";
 import { ContractProgress } from "@/components/contract";
 
 interface BuildingCardProps {
@@ -34,10 +33,10 @@ export const BuildingCard: FC<BuildingCardProps> = ({ building }): ReactElement 
                 <div className="overflow-x-auto border border-base-600 rounded-b-lg rounded-tr-lg">
                     <div className="flex flex-col min-h-[6rem] divide-y">
                         {taskList
-                            .filter((task: Task) => task.buildingIds?.includes(building.id))
-                            .map((task: Task) => (
+                            .filter((task: StartedTask) => task.buildingIds?.includes(building.id))
+                            .map((task: StartedTask) => (
                                 <div key={`active_task_${task.id}`}>
-                                    <ContractProgress contract={task as Contract} />
+                                    <ContractProgress contract={task as StartedContract} />
                                 </div>
                             ))}
                     </div>

@@ -1,10 +1,10 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { Contract, Task } from "@/data/interface";
+import { Contract, StartedContract, StartedTask, Task } from "@/data/interface";
 import { generateNewContract } from "@/data/utils/task";
 
 export interface TaskState {
-    taskList: Task[];
+    taskList: StartedTask[];
     availableContractList: Contract[];
     lastContractGeneration: number;
 }
@@ -25,23 +25,25 @@ export const taskSlice = createSlice({
                 state.availableContractList = generateNewContract(action.payload.reputation);
             }
         },
-        acceptContract(state, action: PayloadAction<{ acceptedContract: Contract, buildingIds: number[] }>) {
-            state.availableContractList = state.availableContractList.filter(
-                (contract: Contract) => contract.id !== action.payload.acceptedContract.id
-            );
-            state.taskList = [...state.taskList, { ...action.payload.acceptedContract, buildingIds: action.payload.buildingIds }];
+        acceptContract(state, action: PayloadAction<StartedContract>) {
+            state.availableContractList = state.availableContractList.filter((contract: Contract) => contract.id !== action.payload.id);
+            state.taskList = [...state.taskList, action.payload];
         },
 
-        setTaskPriority(state, action: PayloadAction<{ task: Task, priority: number }>) {
+        setTaskPriority(state, action: PayloadAction<{ task: Task; priority: number }>) {
             let taskIndex = state.taskList.findIndex((t: Task) => t.id === action.payload.task.id);
             let duplicatedtaskList = state.taskList;
             duplicatedtaskList[taskIndex].priority = action.payload.priority;
             state.taskList = duplicatedtaskList;
-        }
+        },
+
+        setTaskList(state, action: PayloadAction<{ taskList: StartedTask[] }>) {
+            state.taskList = [...action.payload.taskList];
+        },
     },
 });
 
 // Action creators are generated for each case reducer function
-export const { generateAvailableContractList, acceptContract, setTaskPriority } = taskSlice.actions;
+export const { generateAvailableContractList, acceptContract, setTaskPriority, setTaskList } = taskSlice.actions;
 
 export default taskSlice.reducer;

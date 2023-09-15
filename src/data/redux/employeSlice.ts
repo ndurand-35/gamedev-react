@@ -35,7 +35,6 @@ export const employeSlice = createSlice({
     initialState,
     reducers: {
         setStopCandidateGeneration(state,action :PayloadAction<boolean>){
-            console.log(action.payload)
             state.stopCandidateGeneration = action.payload
         },
         fired(state, action: PayloadAction<number>) {

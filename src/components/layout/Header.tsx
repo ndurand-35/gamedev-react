@@ -16,14 +16,14 @@ export const Header = () => {
                 <div className="flex flex-row">
                     <div
                         className={
-                            "flex flex-row items-center p-4 space-x-2  bg-white border-b border-r " +
-                            (money > 0 ? "text-gray-500" : "text-error")
+                            "flex flex-row items-center p-4 space-x-2 border-base-content border-opacity-20 bg-base-300 border-b border-r " +
+                            (money > 0 ? "text-base-content" : "text-error")
                         }
                     >
                         <Coins className="flex w-4 h-4" />
                         <span className="text-sm ">{money}</span>
                     </div>
-                    <div className="flex flex-row items-center p-4 space-x-2 text-gray-500 bg-white border-b border-r rounded-br">
+                    <div className="flex flex-row items-center p-4 space-x-2 text-base-content border-base-content border-opacity-20 bg-base-300 border-b border-r rounded-br">
                         <Star className="flex w-4 h-4" />
                         <span className="text-sm">{reputation}</span>
                     </div>
@@ -49,13 +49,10 @@ export const Header = () => {
                     </button>
                 </div> */}
                 <div className="md:items-center justify-between items-right flex w-auto md:order-1">
-                    <ul className="flex font-medium flex-row md:space-x-2 bg-white border-b border-l">
+                    <ul className="menu menu-horizontal px-1 border-base-content border-opacity-20 bg-base-300 border-b border-l space-x-4">
                         {currentTopMenu.map((menu: TopMenuItem) => (
-                            <li>
-                                <NavLink
-                                    className={"block p-4 text-gray-900 hover:bg-gray-100 border-x-1 " + (menu.active ? "text-primary" : "")}
-                                    to={menu.link}
-                                >
+                            <li key={`topmenu_item_${menu.name}`}>
+                                <NavLink className={menu.active ? "active" : ""} to={menu.link}>
                                     {menu.name}
                                 </NavLink>
                             </li>

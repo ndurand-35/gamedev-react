@@ -2,10 +2,11 @@ import { FC, ReactElement, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Check, ClipboardCheck, ReceiveEuros, SendEuros, Timer } from "iconoir-react";
 
-import { Building, Contract } from "@/data/interface";
+import { Building, Contract, StartedContract } from "@/data/interface";
 import { RootState } from "@/data/redux/store";
 import { setMoney } from "@/data/redux/companySlice";
 import { acceptContract } from "@/data/redux/taskSlice";
+import { getTimeAsDate, hourToWeek } from "@/data/utils";
 
 interface ContractCardProps {
     contract: Contract;
@@ -14,8 +15,8 @@ interface ContractCardProps {
 export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement => {
     const dispatch = useDispatch();
 
-    const money = useSelector((state: RootState) => state.company.money);
-    const buildingList = useSelector((state: RootState) => state.company.buildingList);
+    const { money, buildingList } = useSelector((state: RootState) => state.company);
+    const { time } = useSelector((state: RootState) => state.engine);
 
     const [selectedBuildings, setSelectedBuildings] = useState<Building[]>([buildingList[0]]);
 
@@ -25,9 +26,17 @@ export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement 
     const deselectBuilding = (building: Building) => {
         setSelectedBuildings(selectedBuildings.filter((b: Building) => b.id !== building.id));
     };
+
     const submit = () => {
         dispatch(setMoney(money + contract.priceDeposit));
-        dispatch(acceptContract({ acceptedContract: contract, buildingIds: selectedBuildings.map((b: Building) => b.id) }));
+        let newAcceptedContract: StartedContract = {
+            ...contract,
+            buildingIds: selectedBuildings.map((b: Building) => b.id),
+            startDate: time,
+            priority: 1,
+            progression: 0,
+        };
+        dispatch(acceptContract(newAcceptedContract));
     };
 
     return (
@@ -48,7 +57,7 @@ export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement 
                     <div className="flex flex-row items-center space-x-1 tooltip" data-tip="Durée">
                         <Timer height={16} />
                         <p>
-                            {contract.time} semaine{contract.time > 1 ? "s" : ""}
+                            {hourToWeek(contract.time)} semaine{contract.time > 1 ? "s" : ""}
                         </p>
                     </div>
                     <div className="flex flex-row items-center space-x-1 tooltip" data-tip="Accompte">
@@ -74,7 +83,7 @@ export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement 
                         </div>
                         <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-full space-y-1">
                             {buildingList.map((b: Building) => (
-                                <li>
+                                <li key={`contract_${contract.id}_building_${b.id}`}>
                                     {selectedBuildings.find((sB: Building) => sB.id == b.id) ? (
                                         <a onClick={() => deselectBuilding(b)}>
                                             <Check height={18} /> {b.name}{" "}

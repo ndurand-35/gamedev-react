@@ -4,6 +4,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { Building, Employe } from "@/data/interface";
 import { getTimeAsDate } from "@/data/utils/time";
 import { generateNewBuilding } from "@/data/utils/building";
+import { faker } from "@faker-js/faker";
 
 export interface CompanyState {
 	money: number;
@@ -23,13 +24,12 @@ const initialState: CompanyState = {
 			price: 0,
 			place: 1,
 			energyPrice: 100,
-		},
-		{
-			id: 2,
-			name: "No Name",
-			price: 0,
-			place: 1,
-			energyPrice: 100,
+			address: {
+				adr1: faker.location.street(),
+				adr2: faker.location.secondaryAddress(),
+				city: faker.location.city(),
+				country: faker.location.country(),
+			},
 		},
 	],
 	availableBuildingList: [],
@@ -43,7 +43,7 @@ export const companySlice = createSlice({
 		setMoney(state, action: PayloadAction<number>) {
 			state.money = action.payload;
 		},
-		payMonhlyBilling(state, action: PayloadAction<{ time: number; employeList: Employe[] }>) {
+		payMonthlyBilling(state, action: PayloadAction<{ time: number; employeList: Employe[] }>) {
 			let date = getTimeAsDate(action.payload.time);
 
 			/* Tout les mois */
@@ -67,6 +67,6 @@ export const companySlice = createSlice({
 });
 
 // Action creators are generated for each case reducer function
-export const { setMoney, payMonhlyBilling, generateCompanyList } = companySlice.actions;
+export const { setMoney, payMonthlyBilling, generateCompanyList } = companySlice.actions;
 
 export default companySlice.reducer;

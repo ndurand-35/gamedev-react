@@ -1,5 +1,6 @@
 import { Building } from "@/data/interface";
-import { faker } from "@faker-js/faker";
+import { faker, allLocales } from "@faker-js/faker";
+import { randomIntFromInterval } from "@/data/utils";
 
 export const generateNewBuilding = (reputation: number): Building[] => {
     let nbGenerated = 3;
@@ -10,7 +11,21 @@ export const generateNewBuilding = (reputation: number): Building[] => {
 
     let generated: Building[] = [];
     for (let i = 0; i < nbGenerated; i++) {
-        generated.push({ id: i + 1, name: faker.location.street(), energyPrice: 400, place: 40, price: 2000000 });
+        let time = randomIntFromInterval(1, 8);
+        let nbPlace = randomIntFromInterval(time + 2, time * 4);
+        let price = randomIntFromInterval(nbPlace * 8000, nbPlace * 10250);
+        let energyPrice = randomIntFromInterval(nbPlace * 120, nbPlace * 240);
+
+        let address = { adr1: faker.location.street(), adr2: faker.location.secondaryAddress(), city: faker.location.city(), country: faker.location.country() };
+        generated.push({
+            id: i + 1,
+            name: faker.location.street(),
+            energyPrice: energyPrice,
+            address,
+            place: nbPlace,
+            price,
+            image: faker.image.urlLoremFlickr({ category: "building" }),
+        });
     }
     return generated;
 };

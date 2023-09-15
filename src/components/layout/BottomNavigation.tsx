@@ -5,16 +5,7 @@ import type { RootState } from "@/data/redux/store";
 import { useSelector, useDispatch } from "react-redux";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 
-import {
-  Timer,
-  Pause,
-  Play,
-  NavArrowRight,
-  FastArrowRight,
-  User,
-  Home,
-  Building,
-} from "iconoir-react";
+import { Timer, Pause, Play, NavArrowRight, FastArrowRight, User, Home, Building } from "iconoir-react";
 
 export const BottomNavigation = () => {
   const dispatch = useDispatch();
@@ -28,9 +19,9 @@ export const BottomNavigation = () => {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 z-40 grid w-full h-20 grid-cols-1 px-8 border-t border-gray-200 md:grid-cols-3 bg-white">
-      <div className="items-center justify-center hidden mr-auto text-gray-500 dark:text-gray-400 md:flex ">
-        <div className="flex items-center p-2 border-r">
+    <div className="fixed bottom-0 left-0 z-40 grid w-full h-20 grid-cols-1 px-8 border-t md:grid-cols-3 border-base-content border-opacity-20 bg-base-300">
+      <div className="items-center justify-center hidden mr-auto text-base-content md:flex ">
+        <div className="flex items-center p-2 border-r border-base-content border-opacity-20">
           <Timer height={14} width={14} />
           <span className="ml-1 text-sm">{displayTime()}</span>
         </div>
@@ -38,10 +29,7 @@ export const BottomNavigation = () => {
           <button
             onClick={() => dispatch(setGameSpeed(0))}
             type="button"
-            className={
-              "btn btn-circle btn-sm btn-ghost " +
-              (gameSpeed === 0 && "text-error")
-            }
+            className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 0 && "text-error")}
           >
             <Pause height={20} width={20} />
           </button>
@@ -50,10 +38,7 @@ export const BottomNavigation = () => {
           <button
             onClick={() => dispatch(setGameSpeed(600))}
             type="button"
-            className={
-              "btn btn-circle btn-sm btn-ghost " +
-              (gameSpeed === 600 && "text-info")
-            }
+            className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 600 && "text-info")}
           >
             <Play height={20} width={20} />
           </button>
@@ -62,10 +47,7 @@ export const BottomNavigation = () => {
           <button
             onClick={() => dispatch(setGameSpeed(200))}
             type="button"
-            className={
-              "btn btn-circle btn-sm btn-ghost " +
-              (gameSpeed === 200 && "text-info")
-            }
+            className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 200 && "text-info")}
           >
             <NavArrowRight height={20} width={20} />
           </button>
@@ -74,10 +56,7 @@ export const BottomNavigation = () => {
           <button
             onClick={() => dispatch(setGameSpeed(50))}
             type="button"
-            className={
-              "btn btn-circle btn-sm btn-ghost " +
-              (gameSpeed === 50 && "text-info")
-            }
+            className={"btn btn-circle btn-sm btn-ghost " + (gameSpeed === 50 && "text-info")}
           >
             <FastArrowRight height={20} width={20} />
           </button>
@@ -86,33 +65,17 @@ export const BottomNavigation = () => {
 
       <div className="flex items-center justify-center mx-auto space-x-4">
         <div className="tooltip" data-tip="Accueil">
-          <NavLink
-            to={"/"}
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
-          >
+          <NavLink to={"/"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
             <Home className="h-6 w-6" />
           </NavLink>
-
         </div>
         <div className="tooltip" data-tip="Employé">
-          <NavLink
-            to={"/employe"}
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
-          >
+          <NavLink to={"/employe"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
             <User className="h-6 w-6" />
           </NavLink>
         </div>
         <div className="tooltip" data-tip="Bureau">
-          <NavLink
-            to={"/building"}
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
-          >
+          <NavLink to={"/building"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
             <Building className="h-6 w-6" />
           </NavLink>
         </div>
