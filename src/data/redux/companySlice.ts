@@ -24,6 +24,7 @@ const initialState: CompanyState = {
 			price: 0,
 			place: 1,
 			energyPrice: 100,
+			image: 'https://www.menuiserie-legoffic.com/wp-content/uploads/2023/11/transformer-un-garage-en-bureau.jpg',
 			address: {
 				adr1: faker.location.street(),
 				adr2: faker.location.secondaryAddress(),
@@ -60,7 +61,9 @@ export const companySlice = createSlice({
 		generateCompanyList(state, action: PayloadAction<{ reputation: number; time: number }>) {
 			if (action.payload.time - state.lastBuildingGeneration > 168) {
 				state.lastBuildingGeneration = action.payload.time;
-				state.availableBuildingList = generateNewBuilding(action.payload.reputation);
+				let data = generateNewBuilding(action.payload.reputation);
+				//console.log(data)
+				state.availableBuildingList = data;
 			}
 		},
 	},

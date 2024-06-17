@@ -28,31 +28,11 @@ export const Header = () => {
                         <span className="text-sm">{reputation}</span>
                     </div>
                 </div>
-                {/* <div className="flex md:order-2">
-                    <button
-                        data-collapse-toggle="navbar-sticky"
-                        type="button"
-                        className="inline-flex items-center justify-center w-10 h-10 p-2 text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 "
-                        aria-controls="navbar-sticky"
-                        aria-expanded="false"
-                    >
-                        <span className="sr-only">Open main menu</span>
-                        <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 14">
-                            <path
-                                stroke="currentColor"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M1 1h15M1 7h15M1 13h15"
-                            />
-                        </svg>
-                    </button>
-                </div> */}
                 <div className="md:items-center justify-between items-right flex w-auto md:order-1">
-                    <ul className="menu menu-horizontal px-1 border-base-content border-opacity-20 bg-base-300 border-b border-l space-x-4">
-                        {currentTopMenu.map((menu: TopMenuItem) => (
+                    <ul className="menu menu-horizontal px-4 border-base-content border-opacity-20 bg-base-300 border-b border-l rounded-bl space-x-4">
+                        {currentTopMenu && currentTopMenu.map((menu: TopMenuItem) => (
                             <li key={`topmenu_item_${menu.name}`}>
-                                <NavLink className={menu.active ? "active" : ""} to={menu.link}>
+                                <NavLink className={menu.active ? "active" : ""} to={menu.link} end>
                                     {menu.name}
                                 </NavLink>
                             </li>

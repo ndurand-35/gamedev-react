@@ -1,26 +1,10 @@
 import { ReactElement, useEffect, useState } from "react";
 
 import { EmployeList } from "@/components/employe";
-import { TopMenuItem } from "@/data/interface";
 import { useDispatch } from "react-redux";
 import { setCurrentTopMenu } from "@/data/redux/engineSlice";
 
-const pageTopMenuItems: TopMenuItem[] = [
-  {
-    name: "Fondateur",
-    link: "/employe/me",
-  },
-  {
-    name: "Employé",
-    link: "/employe/list",
-    active: true
-  },
-  {
-    name: "Pole Emploi",
-    link: "/employe/recruit",
-  },
-];
-
+import { pageTopMenuItems } from "../EmployePage";
 
 export const EmployeListPage: React.FC = (): ReactElement => {
   const dispatch = useDispatch();

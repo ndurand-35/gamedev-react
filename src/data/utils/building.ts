@@ -1,4 +1,4 @@
-import { Building } from "@/data/interface";
+import { Building, Employe } from "@/data/interface";
 import { faker, allLocales } from "@faker-js/faker";
 import { randomIntFromInterval } from "@/data/utils";
 
@@ -29,3 +29,6 @@ export const generateNewBuilding = (reputation: number): Building[] => {
     }
     return generated;
 };
+export const getBuildingEmploye = (employeList: Employe[], building: Building): Employe[] => {
+    return employeList.filter(employe => employe.buildingId === building.id);
+}

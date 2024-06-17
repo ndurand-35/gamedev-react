@@ -20,6 +20,7 @@ import {
   EmployeListPage,
   SelogerPage,
 } from "@/pages";
+import { OwnedPage } from "./pages/building/OwnedPage";
 function App() {
   const dispatch = useDispatch();
   const state = useSelector((state: RootState) => state);
@@ -57,6 +58,7 @@ function App() {
         { path: "task", element: <TaskPage /> },
         //Building
         { path: "building", element: <BuildingPage /> },
+        { path: "building/owned", element: <OwnedPage /> },
         { path: "building/buy", element: <SelogerPage /> },
       ],
     },
