@@ -1,14 +1,14 @@
 import type { RootState } from "@/data/redux/store";
-import { useSelector } from "react-redux";
+import { shallowEqual, useSelector } from "react-redux";
 
 import { Coins, Star } from "iconoir-react";
 import { TopMenuItem } from "@/data/interface";
 import { NavLink } from "react-router-dom";
 
 export const Header = () => {
-    const currentTopMenu = useSelector((state: RootState) => state.engine.currentTopMenu);
-    const money = useSelector((state: RootState) => state.company.money);
-    const reputation = useSelector((state: RootState) => state.company.reputation);
+    const currentTopMenu = useSelector((state: RootState) => state.engine.currentTopMenu, shallowEqual);
+    const money = useSelector((state: RootState) => state.company.money, shallowEqual);
+    const reputation = useSelector((state: RootState) => state.company.reputation, shallowEqual);
 
     return (
         <nav className="fixed top-0 left-0 z-20 w-full">

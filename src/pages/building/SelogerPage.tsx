@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { setCurrentTopMenu } from "@/data/redux/engineSlice";
 import { Building, TopMenuItem } from "@/data/interface";
-import { generateCompanyList } from "@/data/redux/companySlice";
+import { generateCompanyList, buyBuilding } from "@/data/redux/companySlice";
 import { RootState } from "@/data/redux/store";
 import { Coins, Community, SendEuros } from "iconoir-react";
 import { formatPrice } from "@/data/utils";
@@ -26,6 +26,7 @@ export const SelogerPage: React.FC = (): ReactElement => {
 
     const reputation = useSelector((state: RootState) => state.company.reputation);
     const time = useSelector((state: RootState) => state.engine.time);
+    const money = useSelector((state: RootState) => state.company.money);
     const availableBuildingList = useSelector((state: RootState) => state.company.availableBuildingList);
 
     useEffect(() => {
@@ -38,7 +39,7 @@ export const SelogerPage: React.FC = (): ReactElement => {
 
     return (
         <div className="p-8 px-16 mt-14 mb-20 space-y-4">
-            {availableBuildingList &&
+            {availableBuildingList && (
                 <>
                     <h1>{availableBuildingList.length} Annonces</h1>
                     <div className="grid 2xl:grid-cols-4 xl:grid-cols-3 lg:grid-cols-2 md:grid-cols-2 sm:grid-cols-1 grid-cols-1 gap-4">
@@ -46,10 +47,12 @@ export const SelogerPage: React.FC = (): ReactElement => {
                             return (
                                 <div className="card bg-base-100 shadow-xl">
                                     <figure>
-                                        <img src={b?.image ?? ""} />
+                                        <img src={b?.image ?? ""} className="h-18" />
                                     </figure>
                                     <div className="card-body pb-4 space-y-1">
-                                        <p>{b.address.city} - {b.address.country}</p>
+                                        <p>
+                                            {b.address.city} - {b.address.country}
+                                        </p>
                                         <h2 className="card-title">
                                             {formatPrice(b.price)}
                                             <Coins className="flex w-6 h-6" />
@@ -65,7 +68,11 @@ export const SelogerPage: React.FC = (): ReactElement => {
                                             </div>
                                         </div>
                                         <div className="card-actions justify-end">
-                                            <button className="btn btn-primary">Acheter</button>
+                                            <button className="btn btn-primary"
+                                                onClick={() => dispatch(buyBuilding(b.id))}
+                                                disabled={b.price > money}>
+                                                Acheter
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -85,7 +92,8 @@ export const SelogerPage: React.FC = (): ReactElement => {
                             );
                         })}
                     </div>
-                </>}
+                </>
+            )}
         </div>
     );
 };

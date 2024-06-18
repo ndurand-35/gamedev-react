@@ -2,16 +2,20 @@ import { Building } from "@/data/interface";
 import { createColumnHelper } from "@tanstack/react-table";
 
 import { MyTable } from "@/components/Table";
-import { useSelector } from "react-redux";
+import { shallowEqual, useSelector } from "react-redux";
 import { RootState } from "@/data/redux/store";
 import { useState } from "react";
 import { getBuildingEmploye } from "@/data/utils";
+import { BuildingNameModal } from "./BuildingNameModal";
+import { Text } from "iconoir-react";
 
 export const BuildingTable = () => {
-    const buildingList = useSelector((state: RootState) => state.company.buildingList);
-    const employeList = useSelector((state: RootState) => state.employe.employeList);
+    const buildingList = useSelector((state: RootState) => state.company.buildingList, { equalityFn: shallowEqual });
+    const employeList = useSelector((state: RootState) => state.employe.employeList, shallowEqual);
+    console.log(buildingList);
 
     const [rowSelection, setRowSelection] = useState<Object>({});
+    const [currentBuilding, setCurrentBuilding] = useState<Building | null>(null);
 
     const columnHelper = createColumnHelper<Building>();
     const columns = [
@@ -48,20 +52,19 @@ export const BuildingTable = () => {
         }),
         columnHelper.display({
             header: "Action",
-            // cell: (props) => {
-            //     return (
-            //         <div className="tooltip" data-tip="Embaucher">
-            //             <button
-            //                 className="btn btn-xs btn-info btn-square"
-            //                 onClick={() => {
-            //                     dispatch(hire(props.row.original.id));
-            //                 }}
-            //             >
-            //                 <AddUser />
-            //             </button>
-            //         </div>
-            //     );
-            // },
+            cell: (props) => {
+                return (
+                    <button
+                        className="btn btn-sm btn-circle"
+                        onClick={() => {
+                            setCurrentBuilding(props.row.original);
+                            (document.getElementById("building_name_modal") as HTMLFormElement)?.showModal();
+                        }}
+                    >
+                        <Text />
+                    </button>
+                );
+            },
         }),
     ];
 
@@ -86,6 +89,7 @@ export const BuildingTable = () => {
             //     )
             // }
             />
+            {currentBuilding && <BuildingNameModal building={currentBuilding} setCurrentBuilding={setCurrentBuilding} />}
         </div>
     );
 };

@@ -66,10 +66,20 @@ export const companySlice = createSlice({
 				state.availableBuildingList = data;
 			}
 		},
+		buyBuilding(state, action: PayloadAction<number>) {
+			let building = state.availableBuildingList.find(building => building.id === action.payload)
+			if (building) {
+				state.buildingList = [...state.buildingList, building]
+				state.availableBuildingList = state.availableBuildingList.filter(building => building.id !== action.payload)
+			} else {
+				//TODO: BUG
+			}
+
+		}
 	},
 });
 
 // Action creators are generated for each case reducer function
-export const { setMoney, payMonthlyBilling, generateCompanyList } = companySlice.actions;
+export const { setMoney, payMonthlyBilling, generateCompanyList, buyBuilding } = companySlice.actions;
 
 export default companySlice.reducer;
