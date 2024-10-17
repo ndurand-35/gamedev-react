@@ -24,7 +24,7 @@ export const OwnedPage: React.FC = (): ReactElement => {
             dispatch(setCurrentTopMenu(pageTopMenuItems));
             setIsMounted(true);
         }
-    }, [dispatch, setIsMounted, isMounted]);
+    }, [dispatch,  isMounted]);
 
     return (
         <div className="p-8 mt-14 mb-20">

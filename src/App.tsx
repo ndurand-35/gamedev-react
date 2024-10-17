@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 
 import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
@@ -20,49 +20,63 @@ import {
   EmployeListPage,
   SelogerPage,
 } from "@/pages";
+
 import { OwnedPage } from "./pages/building/OwnedPage";
+import MainMenu from "./pages/start/MainMenu";
+import NewGamePage from "./pages/start/NewGamePage";
+
+
+const router = createBrowserRouter([
+  { path: "/menu", element: <MainMenu /> },
+  { path: "/new-game", element: <NewGamePage /> },
+  {
+    path: "/",
+    element: <Root />,
+    children: [
+
+      { path: "/", element: <HomePage /> },
+      // Employe
+      { path: "employe", element: <EmployePage /> },
+      { path: "employe/me", element: <FondateurPage /> },
+      { path: "employe/list", element: <EmployeListPage /> },
+      { path: "employe/recruit", element: <PoleEmploiPage /> },
+      { path: "task", element: <TaskPage /> },
+      //Building
+      { path: "building", element: <BuildingPage /> },
+      { path: "building/owned", element: <OwnedPage /> },
+      { path: "building/buy", element: <SelogerPage /> },
+    ],
+  },
+]);
+
+
 function App() {
   const dispatch = useDispatch();
   const state = useSelector((state: RootState) => state);
 
-  const { gameSpeed, time } = useSelector((state: RootState) => state.engine);
-  const reputation = useSelector((state: RootState) => state.company.reputation);
-  const employeList = useSelector((state: RootState) => state.employe.employeList);
+  const { gameSpeed, time, reputation, employeList } = useSelector((state: RootState) => ({
+    gameSpeed: state.engine.gameSpeed,
+    time: state.engine.time,
+    reputation: state.company.reputation,
+    employeList: state.employe.employeList,
+  }));
 
   /* GameLoop */
+  const loopCallback = useCallback(() => {
+    if (gameSpeed !== 0) {
+      treatTasks(dispatch, state);
+      dispatch(payMonthlyBilling({ time, employeList }));
+      dispatch(generateCandidateList({ time, reputation }));
+      dispatch(incrementTime());
+    }
+  }, [dispatch, gameSpeed, time, state, reputation]);
+  
   useEffect(() => {
-    const loop = setInterval(() => {
-      if (gameSpeed !== 0) {
-        treatTasks(dispatch, state);
-
-        dispatch(payMonthlyBilling({ time, employeList }));
-        dispatch(generateCandidateList({ time, reputation }));
-        dispatch(incrementTime());
-      }
-    }, gameSpeed); // fps
-
+    const loop = setInterval(loopCallback, gameSpeed);
     return () => clearInterval(loop);
-  }, [dispatch, gameSpeed, time, state]);
+  }, [loopCallback, gameSpeed]); // fps
+  
 
-  const router = createBrowserRouter([
-    {
-      path: "/",
-      element: <Root />,
-      children: [
-        { path: "/", element: <HomePage /> },
-        // Employe
-        { path: "employe", element: <EmployePage /> },
-        { path: "employe/me", element: <FondateurPage /> },
-        { path: "employe/list", element: <EmployeListPage /> },
-        { path: "employe/recruit", element: <PoleEmploiPage /> },
-        { path: "task", element: <TaskPage /> },
-        //Building
-        { path: "building", element: <BuildingPage /> },
-        { path: "building/owned", element: <OwnedPage /> },
-        { path: "building/buy", element: <SelogerPage /> },
-      ],
-    },
-  ]);
 
   return <RouterProvider router={router} />;
 }

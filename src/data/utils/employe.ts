@@ -2,6 +2,9 @@ import { Candidate } from "@/data/interface";
 import { SexType, faker } from "@faker-js/faker";
 import { randomIntFromInterval } from "@/data/utils";
 
+
+export const MAX_STAT_POSSIBLE = 20
+
 export const generateNewEmploye = (reputation: number): Candidate[] => {
     let nbGenerated = 3;
     if (reputation > 25) nbGenerated = 5;

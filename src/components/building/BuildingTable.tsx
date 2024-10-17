@@ -12,7 +12,6 @@ import { Text } from "iconoir-react";
 export const BuildingTable = () => {
     const buildingList = useSelector((state: RootState) => state.company.buildingList, { equalityFn: shallowEqual });
     const employeList = useSelector((state: RootState) => state.employe.employeList, shallowEqual);
-    console.log(buildingList);
 
     const [rowSelection, setRowSelection] = useState<Object>({});
     const [currentBuilding, setCurrentBuilding] = useState<Building | null>(null);
