@@ -1,7 +1,7 @@
 import { ReactElement, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
-import { AddUser } from "iconoir-react";
+import { UserPlus } from "iconoir-react";
 
 import { Candidate, Employe } from "@/data/interface";
 import { hire, setStopCandidateGeneration } from "@/data/redux/employeSlice";
@@ -76,7 +76,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
                 dispatch(hire(props.row.original.id));
               }}
             >
-              <AddUser />
+              <UserPlus />
             </button>
           </div>
         );
@@ -97,7 +97,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
           action={
             Object.keys(rowSelection).length > 0 ? (
               <button className="btn btn-xs btn-info" onClick={hireSelected}>
-                <AddUser />
+                <UserPlus />
                 <p>Embaucher</p>
               </button>
             ) : (

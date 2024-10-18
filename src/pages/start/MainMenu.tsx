@@ -23,7 +23,7 @@ const MainMenu: React.FC = () => {
           </button>
 
           {/* Paramètres */}
-          <Link to="/settings" className="btn btn-ghost w-full">
+          <Link to="/settings" className="btn btn-active w-full">
             Paramètres
           </Link>
 

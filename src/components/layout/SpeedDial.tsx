@@ -1,4 +1,4 @@
-import { AddPage, Plus } from "iconoir-react";
+import { PagePlus, Plus } from "iconoir-react";
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 
@@ -14,7 +14,7 @@ export const SpeedDial = () => {
             <div className={"flex-col items-center mb-4 space-y-2 " + (isHidden ? "hidden" : "flex")}>
                 <div className="tooltip tooltip-left" data-tip="Signer un contrat">
                     <NavLink to={"/task"} className="btn btn-circle">
-                        <AddPage width={24} height={24} />
+                        <PagePlus width={24} height={24} />
                     </NavLink>
                 </div>
             </div>

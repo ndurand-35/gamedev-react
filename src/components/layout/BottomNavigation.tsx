@@ -65,17 +65,17 @@ export const BottomNavigation = () => {
 
       <div className="flex items-center justify-center mx-auto space-x-4">
         <div className="tooltip" data-tip="Accueil">
-          <NavLink to={"/"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
+          <NavLink to={"/game"}  className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
             <Home className="h-6 w-6" />
           </NavLink>
         </div>
         <div className="tooltip" data-tip="Employé">
-          <NavLink to={"/employe"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
+          <NavLink to={"/game/employe"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
             <User className="h-6 w-6" />
           </NavLink>
         </div>
         <div className="tooltip" data-tip="Bureau">
-          <NavLink to={"/building"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
+          <NavLink to={"/game/building"} className={({ isActive }) => (isActive ? "btn btn-circle btn-neutral" : "btn btn-circle")}>
             <Building className="h-6 w-6" />
           </NavLink>
         </div>

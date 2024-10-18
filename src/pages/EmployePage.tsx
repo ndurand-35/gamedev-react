@@ -8,19 +8,19 @@ import { RootState } from "@/data/redux/store";
 export const pageTopMenuItems: TopMenuItem[] = [
     {
         name: "Accueil",
-        link: "/employe",
+        link: "/game/employe",
     },
     {
         name: "Fondateur",
-        link: "/employe/me",
+        link: "/game/employe/me",
     },
     {
         name: "Employé",
-        link: "/employe/list",
+        link: "/game/employe/list",
     },
     {
         name: "Pole Emploi",
-        link: "/employe/recruit",
+        link: "/game/employe/recruit",
     },
 ];
 

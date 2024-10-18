@@ -1,3 +1,15 @@
+export enum PersonType {
+    PROD = "Production",
+}
+
+
+export enum ProductionType {
+    DEV = "Développeur",
+    DESIGNER = "Designer",
+}
+
+
+
 // Interface générique pour les attributs communs à tous les employés
 export interface Person {
     id: number;
@@ -5,25 +17,24 @@ export interface Person {
     firstName: string;
     lastName: string;
     salary: number;
+    buildingId?: number;
+    personType: PersonType;
 }
 
-// Interface spécifique pour les développeurs (Developer)
-export interface Developer extends Person {
+export interface ProductionPerson extends Person {
+    productionType: ProductionType;
     frontStat: number;
     frontMaxStat: number;
     backStat: number;
     backMaxStat: number;
     debugStat: number;
     debugMaxStat: number;
-}
 
-// Interface spécifique pour les designers (Designer)
-export interface Designer extends Person {
     creativityStat: number;
     creativityMaxStat: number;
     visualDesignStat: number;
     visualDesignMaxStat: number;
-    animationStat: number;         // Nouvelle compétence : Animation
+    animationStat: number;
     animationMaxStat: number;
 }
 
@@ -57,16 +68,4 @@ export interface Support extends Person {
     customerSatisfactionMaxStat: number;
     problemSolvingStat: number;
     problemSolvingMaxStat: number;
-}
-
-
-
-export interface Candidate extends Person {
-
-}
-
-
-
-export interface Employe extends Person {
-	buildingId: number;
 }

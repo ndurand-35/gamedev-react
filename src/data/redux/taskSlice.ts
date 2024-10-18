@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import { Contract, StartedContract, StartedTask, Task } from "@/data/interface";
 import { generateNewContract } from "@/data/utils/task";
+import { DEFAULT_TASK_STATE } from "@/data/utils/constant";
 
 export interface TaskState {
     taskList: StartedTask[];
@@ -9,16 +10,17 @@ export interface TaskState {
     lastContractGeneration: number;
 }
 
-const initialState: TaskState = {
-    taskList: [],
-    availableContractList: [],
-    lastContractGeneration: -168,
-};
+const initialState: TaskState = DEFAULT_TASK_STATE;
 
 export const taskSlice = createSlice({
     name: "task",
     initialState,
     reducers: {
+        initializeTaskState(state) {
+            state.taskList = DEFAULT_TASK_STATE.taskList;
+            state.availableContractList = DEFAULT_TASK_STATE.availableContractList;
+            state.lastContractGeneration = DEFAULT_TASK_STATE.lastContractGeneration;
+        },
         generateAvailableContractList(state, action: PayloadAction<{ reputation: number; time: number }>) {
             if (action.payload.time - state.lastContractGeneration > 168) {
                 state.lastContractGeneration = action.payload.time;
@@ -44,6 +46,7 @@ export const taskSlice = createSlice({
 });
 
 // Action creators are generated for each case reducer function
-export const { generateAvailableContractList, acceptContract, setTaskPriority, setTaskList } = taskSlice.actions;
+export const { generateAvailableContractList, acceptContract, setTaskPriority, setTaskList, initializeTaskState } =
+    taskSlice.actions;
 
 export default taskSlice.reducer;

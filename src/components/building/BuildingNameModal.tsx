@@ -1,11 +1,11 @@
 import { Building } from "@/data/interface";
-import { FieldApi, createFormFactory } from "@tanstack/react-form";
+import { FieldApi, useForm } from "@tanstack/react-form";
 import { FC } from "react";
 
 function FieldInfo({ field }: { field: FieldApi<any, any, any, any> }) {
     return (
         <>
-            {field.state.meta.touchedErrors ? <em>{field.state.meta.touchedErrors}</em> : null}
+            {field.state.meta.errors ? <em>{field.state.meta.errors}</em> : null}
             {field.state.meta.isValidating ? "Validating..." : null}
         </>
     );
@@ -17,12 +17,11 @@ export interface BuildingNameModalProps {
 }
 
 export const BuildingNameModal: FC<BuildingNameModalProps> = ({ building, setCurrentBuilding }) => {
-    const formFactory = createFormFactory<Building>({ defaultValues: building });
-
-    const form = formFactory.useForm({
+    const form = useForm<Building>({
         onSubmit: async ({ value }) => {
             console.log(value);
         },
+        defaultValues: building
     });
 
     return (

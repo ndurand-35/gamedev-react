@@ -1,10 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
-import { Building, Employe } from "@/data/interface";
+import { Building, Person } from "@/data/interface";
 import { getTimeAsDate } from "@/data/utils/time";
 import { generateNewBuilding } from "@/data/utils/building";
-import { faker } from "@faker-js/faker";
+import { DEFAULT_COMPANY_STATE } from "@/data/utils/constant";
+
 
 export interface CompanyState {
 	money: number;
@@ -14,37 +15,23 @@ export interface CompanyState {
 	lastBuildingGeneration: number;
 }
 
-const initialState: CompanyState = {
-	money: 50000,
-	reputation: 0,
-	buildingList: [
-		{
-			id: 1,
-			name: "Garage",
-			price: 0,
-			place: 1,
-			energyPrice: 100,
-			image: 'https://www.menuiserie-legoffic.com/wp-content/uploads/2023/11/transformer-un-garage-en-bureau.jpg',
-			address: {
-				adr1: faker.location.street(),
-				adr2: faker.location.secondaryAddress(),
-				city: faker.location.city(),
-				country: faker.location.country(),
-			},
-		},
-	],
-	availableBuildingList: [],
-	lastBuildingGeneration: -168,
-};
+const initialState: CompanyState = DEFAULT_COMPANY_STATE;
 
 export const companySlice = createSlice({
 	name: "company",
 	initialState,
 	reducers: {
+		initializeCompanyState(state) {
+			state.money = DEFAULT_COMPANY_STATE.money;
+			state.reputation = DEFAULT_COMPANY_STATE.reputation
+			state.availableBuildingList = DEFAULT_COMPANY_STATE.availableBuildingList;
+			state.buildingList = DEFAULT_COMPANY_STATE.buildingList;
+			state.lastBuildingGeneration = DEFAULT_COMPANY_STATE.lastBuildingGeneration;
+		},
 		setMoney(state, action: PayloadAction<number>) {
 			state.money = action.payload;
 		},
-		payMonthlyBilling(state, action: PayloadAction<{ time: number; employeList: Employe[] }>) {
+		payMonthlyBilling(state, action: PayloadAction<{ time: number; employeList: Person[] }>) {
 			let date = getTimeAsDate(action.payload.time);
 
 			/* Tout les mois */
@@ -53,7 +40,7 @@ export const companySlice = createSlice({
 					state.money = state.money - building.energyPrice;
 				});
 
-				action.payload.employeList.map((e: Employe) => {
+				action.payload.employeList.map((e: Person) => {
 					state.money = state.money - e.salary;
 				});
 			}
@@ -80,6 +67,6 @@ export const companySlice = createSlice({
 });
 
 // Action creators are generated for each case reducer function
-export const { setMoney, payMonthlyBilling, generateCompanyList, buyBuilding } = companySlice.actions;
+export const { setMoney, payMonthlyBilling, generateCompanyList, buyBuilding, initializeCompanyState } = companySlice.actions;
 
 export default companySlice.reducer;
