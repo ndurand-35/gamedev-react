@@ -13,7 +13,7 @@ export const SpeedDial = () => {
         >
             <div className={"flex-col items-center mb-4 space-y-2 " + (isHidden ? "hidden" : "flex")}>
                 <div className="tooltip tooltip-left" data-tip="Signer un contrat">
-                    <NavLink to={"/task"} className="btn btn-circle">
+                    <NavLink to={"/game/task"} className="btn btn-circle">
                         <PagePlus width={24} height={24} />
                     </NavLink>
                 </div>

@@ -1,11 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { Contract, StartedContract, StartedTask, Task } from "@/data/interface";
+import { Contract, StartedContract, Task } from "@/data/interface";
 import { generateNewContract } from "@/data/utils/task";
 import { DEFAULT_TASK_STATE } from "@/data/utils/constant";
 
 export interface TaskState {
-    taskList: StartedTask[];
+    taskList: StartedContract[];
     availableContractList: Contract[];
     lastContractGeneration: number;
 }
@@ -39,7 +39,7 @@ export const taskSlice = createSlice({
             state.taskList = duplicatedtaskList;
         },
 
-        setTaskList(state, action: PayloadAction<{ taskList: StartedTask[] }>) {
+        setTaskList(state, action: PayloadAction<{ taskList: StartedContract[] }>) {
             state.taskList = [...action.payload.taskList];
         },
     },

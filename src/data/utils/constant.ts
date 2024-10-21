@@ -48,3 +48,7 @@ export const DEFAULT_EMPLOYE_STATE: EmployeState = {
     stopCandidateGeneration: false,
     lastCandidateGeneration: -168,
 }
+
+
+
+export const MAX_CONTRACT_DIFFICULTY = 100

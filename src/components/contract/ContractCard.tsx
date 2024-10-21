@@ -1,8 +1,8 @@
 import { FC, ReactElement, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Check, ClipboardCheck, ReceiveEuros, SendEuros, Timer } from "iconoir-react";
+import { Check, ClipboardCheck, Code, ConstrainedSurface, PenTablet, ReceiveEuros, SendEuros, Timer } from "iconoir-react";
 
-import { Building, Contract, StartedContract } from "@/data/interface";
+import { Building, Contract, ContractType, StartedContract } from "@/data/interface";
 import { RootState } from "@/data/redux/store";
 import { setMoney } from "@/data/redux/companySlice";
 import { acceptContract } from "@/data/redux/taskSlice";
@@ -35,31 +35,31 @@ export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement 
             startDate: time,
             priority: 1,
             progression: 0,
+            paused: false,
         };
         dispatch(acceptContract(newAcceptedContract));
     };
 
     return (
         <div key={`ac_${contract.id}`} className="card bg-base-100 shadow-xl">
-            <div className="flex flex-col space-y-4 p-4">
-                <div className="flex flex-row space-x-4">
+            <div className="flex flex-col space-y-4 ">
+                <div className="flex flex-row space-x-4 p-4 pb-2">
                     <div className="avatar">
                         <div className="w-16 rounded">
-                            <img src={contract.clientImage} />
+                            {contract.type === ContractType.DEV && <Code width={64} height={64} />}
+                            {contract.type === ContractType.DESIGN && <PenTablet width={64} height={64} />}
+                            {contract.type === ContractType.FULL_STACK && <ConstrainedSurface width={64} height={64} />}
                         </div>
                     </div>
                     <div>
                         <h2 className="card-title">{contract.name}</h2>
-                        <p>{contract.clientName}</p>
+                        <div className="flex flex-row space-x-2 items-center">
+                            <p>{contract.clientName}</p>
+                            <div className="badge badge-neutral">{contract.taskDifficulty}</div>
+                        </div>
                     </div>
                 </div>
-                <div className="flex flex-row justify-between">
-                    <div className="flex flex-row items-center space-x-1 tooltip" data-tip="Durée">
-                        <Timer height={16} />
-                        <p>
-                            {hourToWeek(contract.time)} semaine{contract.time > 1 ? "s" : ""}
-                        </p>
-                    </div>
+                <div className="flex flex-row justify-around px-4">
                     <div className="flex flex-row items-center space-x-1 tooltip" data-tip="Accompte">
                         <ReceiveEuros height={24} />
                         <p>{contract.priceDeposit}</p>
@@ -73,12 +73,85 @@ export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement 
                         <p>{contract.priceMalus}</p>
                     </div>
                 </div>
+                <div>
+                    <hr />
+                    <table className="table table-xs table-zebra">
+                        <tbody>
+                            <tr>
+                                <td>Durée</td>
+                                <td colSpan={3} className="text-center">{hourToWeek(contract.time)} semaine{contract.time > 1 ? "s" : ""}</td>
+                            </tr>
+                            {contract.type !== ContractType.DESIGN && (
+                                <>
+                                    <tr>
+                                        <td>Développement </td>
+                                        <td className="text-primary">{contract.backNeed}</td>
+                                        <td className="text-secondary">{contract.frontNeed}</td>
+                                        <td className="text-accent">{contract.backNeed}</td>
+                                    </tr>
+                                </>
+                            )}
+                            {contract.type !== ContractType.DEV && (
+                                <>
+                                    <tr>
+                                        <td>Design</td>
+                                        <td className="text-primary">{contract.creativityNeed}</td>
+                                        <td className="text-secondary">{contract.visualDesignNeed}</td>
+                                        <td className="text-accent">{contract.animationNeed}</td>
+                                    </tr>
+                                </>
+                            )}
+                        </tbody>
+                    </table>
+                    <hr />
+                </div>
 
-                <div className="join w-full">
-                    <div className="dropdown dropdown-bottom dropdown-end w-full">
+                {/* {contract.type !== ContractType.DESIGN && (
+                    <div className="flex flex-row justify-around">
+                        <div className="avatar placeholder tooltip" data-tip="BackEnd">
+                            <div className="bg-primary text-neutral-content w-8 rounded-full">
+                                <span className="text-xs">{contract.backNeed}</span>
+                            </div>
+                        </div>
+                        <div className="avatar placeholder tooltip" data-tip="FrontEnd">
+                            <div className="bg-secondary text-neutral-content w-8 rounded-full">
+                                <span className="text-xs">{contract.frontNeed}</span>
+                            </div>
+                        </div>
+                        <div className="avatar placeholder tooltip" data-tip="Debug">
+                            <div className="bg-accent text-neutral-content w-8 rounded-full">
+                                <span className="text-xs">{contract.debugNeed}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {contract.type !== ContractType.DEV && (
+                    <div className="flex flex-row justify-around">
+                        <div className="avatar placeholder tooltip" data-tip="Créativité">
+                            <div className="bg-primary text-neutral-content w-8 rounded-full">
+                                <span className="text-xs">{contract.creativityNeed}</span>
+                            </div>
+                        </div>
+                        <div className="avatar placeholder tooltip" data-tip="Visuel">
+                            <div className="bg-secondary text-neutral-content w-8 rounded-full">
+                                <span className="text-xs">{contract.visualDesignNeed}</span>
+                            </div>
+                        </div>
+                        <div className="avatar placeholder tooltip" data-tip="Animation">
+                            <div className="bg-accent text-neutral-content w-8 rounded-full">
+                                <span className="text-xs">{contract.animationNeed}</span>
+                            </div>
+                        </div>
+                    </div>
+                )} */}
+
+                <div className="join w-full p-4 pt-1">
+                    <div className="dropdown dropdown-bottom dropdown-end w-full join-item">
                         <div className="select select-sm select-bordered join-item w-full flex items-center space-x-2" tabIndex={0}>
                             {selectedBuildings.map((b: Building) => (
-                                <div className="badge badge-ghost">{b.name}</div>
+                                <div key={`task_${contract.id}_building_${b.id}`} className="badge badge-ghost">
+                                    {b.name}
+                                </div>
                             ))}
                         </div>
                         <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-full space-y-1">
@@ -97,6 +170,7 @@ export const ContractCard: FC<ContractCardProps> = ({ contract }): ReactElement 
                             ))}
                         </ul>
                     </div>
+                    <hr />
                     <button onClick={submit} className="btn btn-primary btn-sm join-item">
                         Accepter
                     </button>
