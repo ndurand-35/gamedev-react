@@ -1,1 +1,1 @@
-export * from '@/pages/building/SelogerPage'
+export * from "@/pages/building/SelogerPage";

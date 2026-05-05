@@ -1,40 +1,40 @@
-import React from 'react';
-import { Link } from 'react-router-dom'; // Utilisez Link si vous utilisez react-router pour la navigation
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
+
+import { useAppSelector } from "@/data/redux/hooks";
 
 const MainMenu: React.FC = () => {
+  const navigate = useNavigate();
+  const hasSavedGame = useAppSelector(
+    (state) => state.engine.gameName !== undefined,
+  );
+
   return (
     <div
       className="min-h-screen bg-cover bg-center flex flex-col justify-center items-center"
-      style={{ backgroundImage: 'url(/menu-bg.jpg)' }}
+      style={{ backgroundImage: "url(/menu-bg.jpg)" }}
     >
-      {/* Menu principal */}
-      <div className="bg-white bg-opacity-90 p-8 rounded-lg shadow-lg max-w-lg w-full text-center">
-        <h1 className="text-4xl font-bold mb-8 text-gray-800">Software Tycoon</h1>
+      <div className="bg-white/90 p-8 rounded-lg shadow-lg max-w-lg w-full text-center">
+        <h1 className="text-4xl font-bold mb-8 text-gray-800">
+          Codex Inc.
+        </h1>
 
         <div className="flex flex-col gap-4">
-          {/* Démarrer une nouvelle partie */}
-          <Link to="/new-game" className="btn btn-primary w-ful">
+          <Link to="/new-game" className="btn btn-primary w-full">
             Démarrer une nouvelle partie
           </Link>
 
-          {/* Charger une partie */}
-          <button className="btn btn-primary w-full">
-            Charger une partie
-          </button>
-
-          {/* Paramètres */}
-          <Link to="/settings" className="btn btn-active w-full">
-            Paramètres
-          </Link>
-
-          {/* Quitter le jeu */}
-          <button className="btn btn-error w-full">
-            Quitter
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            disabled={!hasSavedGame}
+            onClick={() => navigate("/game")}
+          >
+            {hasSavedGame ? "Continuer la partie" : "Aucune partie sauvegardée"}
           </button>
         </div>
       </div>
 
-      {/* Crédit en bas de la page */}
       <footer className="mt-8 text-center">
         <p className="text-white text-sm">Créé par Nicolas Durand</p>
       </footer>

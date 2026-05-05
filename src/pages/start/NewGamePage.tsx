@@ -1,11 +1,18 @@
 import { RangeInput } from "@/components/global/form/RangeInput";
 import { SelectInput } from "@/components/global/form/SelectInput";
 import { TextInput } from "@/components/global/form/TextInput";
-import { PersonType, ProductionPerson, ProductionType } from "@/data/interface";
+import {
+  DEFAULT_MORALE,
+  PersonType,
+  ProductionPerson,
+  ProductionType,
+} from "@/data/interface";
 import { initializeCompanyState } from "@/data/redux/companySlice";
+import { initializeComponentState } from "@/data/redux/componentSlice";
 import { initializeEmployeState } from "@/data/redux/employeSlice";
 import { initializeEngineState } from "@/data/redux/engineSlice";
 import { initializeTaskState } from "@/data/redux/taskSlice";
+import { initializeProductState } from "@/data/redux/productSlice";
 import { MAX_STAT_POSSIBLE } from "@/data/utils";
 import { useForm } from "@tanstack/react-form";
 
@@ -21,16 +28,17 @@ const NewGamePage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const form = useForm<ProductionPerson>({
-    onSubmit: async ({ value }) => {
-      let director: ProductionPerson = value;
+    onSubmit: ({ value }) => {
+      const director: ProductionPerson = value;
 
-      await dispatch(initializeEngineState(director));
-      await dispatch(initializeCompanyState());
-      await dispatch(initializeTaskState());
-      await dispatch(initializeEmployeState(director));
+      dispatch(initializeEngineState(director));
+      dispatch(initializeCompanyState());
+      dispatch(initializeTaskState());
+      dispatch(initializeEmployeState(director));
+      dispatch(initializeComponentState());
+      dispatch(initializeProductState());
 
-      navigate("/game")
-
+      navigate("/game");
     },
     defaultValues: {
       id: 1,
@@ -39,7 +47,9 @@ const NewGamePage: React.FC = () => {
       lastName: "",
       salary: 0,
       personType: PersonType.PROD,
+      morale: DEFAULT_MORALE + 20,
       productionType: ProductionType.DEV,
+      specialty: "FULLSTACK",
       frontStat: 5,
       frontMaxStat: MAX_STAT_POSSIBLE,
       backStat: 5,
@@ -61,7 +71,9 @@ const NewGamePage: React.FC = () => {
     return form.store.subscribe(() => {
       if (form.store.state.values.productionType === ProductionType.DEV) {
         let { frontStat, backStat, debugStat } = form.store.state.values;
-        setPointsRemaining(pointToSpend - (+frontStat + +backStat + +debugStat));
+        setPointsRemaining(
+          pointToSpend - (+frontStat + +backStat + +debugStat),
+        );
       } else {
       }
     });
@@ -72,8 +84,10 @@ const NewGamePage: React.FC = () => {
       className="min-h-screen bg-cover bg-center flex flex-col justify-center items-center"
       style={{ backgroundImage: "url(/menu-bg.jpg)" }} // Image de fond fournie
     >
-      <div className="bg-white bg-opacity-90 p-8 rounded-lg shadow-lg max-w-lg md:max-w-4xl w-full my-4">
-        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Nouvelle Partie</h1>
+      <div className="bg-white/90 p-8 rounded-lg shadow-lg max-w-lg md:max-w-4xl w-full my-4">
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+          Nouvelle Partie
+        </h1>
 
         <form
           className="flex flex-col gap-4"
@@ -85,8 +99,14 @@ const NewGamePage: React.FC = () => {
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <form.Field name="firstName" children={(field) => <TextInput field={field} label="Prenom" />} />
-              <form.Field name="lastName" children={(field) => <TextInput field={field} label="Nom" />} />
+              <form.Field
+                name="firstName"
+                children={(field) => <TextInput field={field} label="Prenom" />}
+              />
+              <form.Field
+                name="lastName"
+                children={(field) => <TextInput field={field} label="Nom" />}
+              />
               <form.Field
                 name="sex"
                 children={(field) => (
@@ -112,14 +132,31 @@ const NewGamePage: React.FC = () => {
 
             {/* Panneau de compétences */}
             <div className="form-control mt-6 space-y-2">
-              <h2 className="text-xl font-semibold mb-4">Dépenser des points de compétence</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                Dépenser des points de compétence
+              </h2>
               <p className="mb-2">Points restants : {pointsRemaining}</p>
 
               {form.getFieldValue("productionType") === ProductionType.DEV && (
                 <>
-                  <form.Field name="frontStat" children={(field) => <RangeInput field={field} label="FrontEnd" />} />
-                  <form.Field name="backStat" children={(field) => <RangeInput field={field} label="BackEnd" />} />
-                  <form.Field name="debugStat" children={(field) => <RangeInput field={field} label="FrontEnd" />} />
+                  <form.Field
+                    name="frontStat"
+                    children={(field) => (
+                      <RangeInput field={field} label="FrontEnd" />
+                    )}
+                  />
+                  <form.Field
+                    name="backStat"
+                    children={(field) => (
+                      <RangeInput field={field} label="BackEnd" />
+                    )}
+                  />
+                  <form.Field
+                    name="debugStat"
+                    children={(field) => (
+                      <RangeInput field={field} label="Debug" />
+                    )}
+                  />
                 </>
               )}
             </div>
@@ -128,9 +165,19 @@ const NewGamePage: React.FC = () => {
             selector={(state) => [state.canSubmit, state.isSubmitting]}
             children={([canSubmit, isSubmitting]) => (
               <>
-                <button type="submit" disabled={!canSubmit} className="mt-6 btn btn-primary">
+                <button
+                  type="submit"
+                  disabled={!canSubmit || pointsRemaining < 0}
+                  className="mt-6 btn btn-primary"
+                >
                   {isSubmitting ? "..." : "Commencer la Partie"}
                 </button>
+                {pointsRemaining < 0 && (
+                  <p className="text-error text-sm text-center">
+                    Vous avez dépensé {-pointsRemaining} point
+                    {pointsRemaining < -1 ? "s" : ""} de trop.
+                  </p>
+                )}
               </>
             )}
           />

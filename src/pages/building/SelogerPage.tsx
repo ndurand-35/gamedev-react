@@ -1,99 +1,116 @@
-import { ReactElement, useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { ReactElement, useState } from "react";
 
-import { setCurrentTopMenu } from "@/data/redux/engineSlice";
-import { Building, TopMenuItem } from "@/data/interface";
-import { generateCompanyList, buyBuilding } from "@/data/redux/companySlice";
-import { RootState } from "@/data/redux/store";
+import {
+  Building,
+  TopMenuItem,
+  getBuildingMonthlyCharges,
+} from "@/data/interface";
+import { buyBuilding } from "@/data/redux/companySlice";
+import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
+import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { Coins, Community, SendEuros } from "iconoir-react";
 import { formatPrice } from "@/data/utils";
 
 const pageTopMenuItems: TopMenuItem[] = [
-    {
-        name: "Mes batiments",
-        link: "/building/owned",
-    },
-    {
-        name: "SeLoger",
-        link: "/building/buy",
-        active: true,
-    },
+  { name: "Accueil", link: "/game/building" },
+  { name: "Mes bâtiments", link: "/game/building/owned" },
+  { name: "SeLoger", link: "/game/building/buy", active: true },
 ];
 
 export const SelogerPage: React.FC = (): ReactElement => {
-    const dispatch = useDispatch();
-    const [isMounted, setIsMounted] = useState<Boolean>(false);
+  const dispatch = useAppDispatch();
+  const money = useAppSelector((state) => state.company.money);
+  const availableBuildingList = useAppSelector(
+    (state) => state.company.availableBuildingList,
+  );
+  const [pendingBuyId, setPendingBuyId] = useState<number | null>(null);
+  useTopMenu(pageTopMenuItems);
 
-    const reputation = useSelector((state: RootState) => state.company.reputation);
-    const time = useSelector((state: RootState) => state.engine.time);
-    const money = useSelector((state: RootState) => state.company.money);
-    const availableBuildingList = useSelector((state: RootState) => state.company.availableBuildingList);
+  const pendingBuilding =
+    pendingBuyId == null
+      ? null
+      : availableBuildingList.find((b: Building) => b.id === pendingBuyId);
 
-    useEffect(() => {
-        if (!isMounted) {
-            dispatch(generateCompanyList({ reputation, time }));
-            dispatch(setCurrentTopMenu(pageTopMenuItems));
-            setIsMounted(true);
-        }
-    }, [dispatch, setIsMounted, isMounted]);
+  const confirmBuy = () => {
+    if (pendingBuyId != null) dispatch(buyBuilding(pendingBuyId));
+    setPendingBuyId(null);
+  };
 
-    return (
-        <div className="p-8 px-16 mt-14 mb-20 space-y-4">
-            {availableBuildingList && (
-                <>
-                    <h1>{availableBuildingList.length} Annonces</h1>
-                    <div className="grid 2xl:grid-cols-4 xl:grid-cols-3 lg:grid-cols-2 md:grid-cols-2 sm:grid-cols-1 grid-cols-1 gap-4">
-                        {availableBuildingList.map((b: Building) => {
-                            return (
-                                <div className="card bg-base-100 shadow-xl">
-                                    <figure>
-                                        <img src={b?.image ?? ""} className="h-18" />
-                                    </figure>
-                                    <div className="card-body pb-4 space-y-1">
-                                        <p>
-                                            {b.address.city} - {b.address.country}
-                                        </p>
-                                        <h2 className="card-title">
-                                            {formatPrice(b.price)}
-                                            <Coins className="flex w-6 h-6" />
-                                        </h2>
-                                        <div className="flex flex-row justify-between">
-                                            <div className="flex flex-row items-center space-x-1 text-info tooltip" data-tip="Espace">
-                                                <Community height={24} />
-                                                <p>{b.place}</p>
-                                            </div>
-                                            <div className="flex flex-row items-center space-x-1 text-error tooltip" data-tip="Charges">
-                                                <SendEuros height={24} />
-                                                <p>{b.energyPrice}</p>
-                                            </div>
-                                        </div>
-                                        <div className="card-actions justify-end">
-                                            <button className="btn btn-primary"
-                                                onClick={() => dispatch(buyBuilding(b.id))}
-                                                disabled={b.price > money}>
-                                                Acheter
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                // <div className="flex flex-row rounded border" key={`available_building_${b.id}`}>
-                                //     <img className="w-64 rounded-l" src={b.image} />
-                                //     <div className="py-4 px-8 flex flex-col justify-between">
-                                //         <div>
-                                //             <p>{b.name}</p>
-                                //             <div className="flex flex-row items-center space-x-2">
-                                //                 <h1>{formatPrice(b.price)} </h1>
-                                //                 <Coins className="flex w-6 h-6" />
-                                //             </div>
-                                //         </div>
+  return (
+    <div className="p-8 px-16 mt-14 mb-20 space-y-4">
+      <h1>{availableBuildingList.length} Annonces</h1>
+      <div className="grid 2xl:grid-cols-4 xl:grid-cols-3 lg:grid-cols-2 md:grid-cols-2 sm:grid-cols-1 grid-cols-1 gap-4">
+        {availableBuildingList.map((b: Building) => (
+          <div
+            key={`available_building_${b.id}`}
+            className="card bg-base-100 shadow-xl"
+          >
+            <figure>
+              <img src={b?.image ?? ""} className="h-18" alt="" />
+            </figure>
+            <div className="card-body pb-4 space-y-1">
+              <p>
+                {b.address.city} - {b.address.country}
+              </p>
+              <h2 className="card-title">
+                {formatPrice(b.price)}
+                <Coins className="flex w-6 h-6" />
+              </h2>
+              <div className="flex flex-row justify-between">
+                <div
+                  className="flex flex-row items-center space-x-1 text-info tooltip"
+                  data-tip="Espace"
+                >
+                  <Community height={24} />
+                  <p>{b.place}</p>
+                </div>
+                <div
+                  className="flex flex-row items-center space-x-1 text-error tooltip"
+                  data-tip={`Loyer ${formatPrice(b.rent)} · Électricité ${formatPrice(b.electricity)} · Internet ${formatPrice(b.internet)}`}
+                >
+                  <SendEuros height={24} />
+                  <p>{formatPrice(getBuildingMonthlyCharges(b))} / mois</p>
+                </div>
+              </div>
+              <div className="card-actions justify-end">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setPendingBuyId(b.id)}
+                  disabled={b.price > money}
+                >
+                  Acheter
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
-                                //     </div>
-                                // </div>
-                            );
-                        })}
-                    </div>
-                </>
-            )}
-        </div>
-    );
+      {pendingBuilding && (
+        <dialog open className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Confirmer l'achat</h3>
+            <p className="py-4">
+              Acheter ce bâtiment pour {formatPrice(pendingBuilding.price)} € ?
+            </p>
+            <div className="modal-action">
+              <button className="btn" onClick={() => setPendingBuyId(null)}>
+                Annuler
+              </button>
+              <button className="btn btn-primary" onClick={confirmBuy}>
+                Confirmer
+              </button>
+            </div>
+          </div>
+          <form
+            method="dialog"
+            className="modal-backdrop"
+            onClick={() => setPendingBuyId(null)}
+          >
+            <button>close</button>
+          </form>
+        </dialog>
+      )}
+    </div>
+  );
 };

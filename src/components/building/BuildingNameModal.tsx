@@ -1,83 +1,62 @@
 import { Building } from "@/data/interface";
-import { FieldApi, useForm } from "@tanstack/react-form";
-import { FC } from "react";
-
-function FieldInfo({ field }: { field: FieldApi<any, any, any, any> }) {
-    return (
-        <>
-            {field.state.meta.errors ? <em>{field.state.meta.errors}</em> : null}
-            {field.state.meta.isValidating ? "Validating..." : null}
-        </>
-    );
-}
+import { renameBuilding } from "@/data/redux/companySlice";
+import { useAppDispatch } from "@/data/redux/hooks";
+import { FC, FormEvent, useState } from "react";
 
 export interface BuildingNameModalProps {
-    building: Building;
-    setCurrentBuilding: (building: Building | null) => void;
+  building: Building;
+  setCurrentBuilding: (building: Building | null) => void;
 }
 
-export const BuildingNameModal: FC<BuildingNameModalProps> = ({ building, setCurrentBuilding }) => {
-    const form = useForm<Building>({
-        onSubmit: async ({ value }) => {
-            console.log(value);
-        },
-        defaultValues: building
-    });
+export const BuildingNameModal: FC<BuildingNameModalProps> = ({
+  building,
+  setCurrentBuilding,
+}) => {
+  const dispatch = useAppDispatch();
+  const [name, setName] = useState(building.name);
 
-    return (
-        <>
-            <dialog id="building_name_modal" className="modal">
-                <div className="modal-box">
-                    <form
-                        method="dialog"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            form.handleSubmit();
-                        }}
-                    >
-                        <h3 className="font-bold text-lg">Changer le nom</h3>
-                        <p className="py-4">
-                            <form.Field
-                                name="name"
-                                children={(field) => (
-                                    <>
-                                        <input
-                                            className="input input-bordered w-full text-black"
-                                            value={field.state.value}
-                                            onBlur={field.handleBlur}
-                                            onChange={(e) => field.handleChange(e.target.value)}
-                                        />
-                                        <FieldInfo field={field} />
-                                    </>
-                                )}
-                            />
-                        </p>
-                        <div className="modal-action">
-                            <form.Subscribe
-                                selector={(state) => [state.canSubmit, state.isSubmitting]}
-                                children={([canSubmit, isSubmitting]) => (
-                                    <>
-                                        <button type="submit" disabled={!canSubmit} className="btn btn-primary">
-                                            {isSubmitting ? "..." : "Valider"}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                (document.getElementById("building_name_modal") as HTMLFormElement)?.close();
-                                                setCurrentBuilding(null);
-                                            }}
-                                            className="btn"
-                                        >
-                                            Annuler
-                                        </button>
-                                    </>
-                                )}
-                            />
-                        </div>
-                    </form>
-                </div>
-            </dialog>
-        </>
-    );
+  const close = () => {
+    (
+      document.getElementById("building_name_modal") as HTMLDialogElement
+    )?.close();
+    setCurrentBuilding(null);
+  };
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return;
+    dispatch(renameBuilding({ id: building.id, name: trimmed }));
+    close();
+  };
+
+  return (
+    <dialog id="building_name_modal" className="modal">
+      <div className="modal-box">
+        <form method="dialog" onSubmit={onSubmit}>
+          <h3 className="font-bold text-lg">Changer le nom</h3>
+          <p className="py-4">
+            <input
+              className="input input-bordered w-full text-black"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </p>
+          <div className="modal-action">
+            <button
+              type="submit"
+              disabled={name.trim().length === 0}
+              className="btn btn-primary"
+            >
+              Valider
+            </button>
+            <button type="button" onClick={close} className="btn">
+              Annuler
+            </button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  );
 };

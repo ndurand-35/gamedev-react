@@ -1,15 +1,21 @@
-import { useCallback, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useEffect } from "react";
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  RouterProvider,
+} from "react-router-dom";
 
-import { createBrowserRouter, Navigate, Outlet, RouterProvider } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
+import { setGameSpeed } from "@/data/redux/engineSlice";
 
-import type { RootState } from "@/data/redux/store";
-import { incrementTime, setGameSpeed } from "@/data/redux/engineSlice";
-import { payMonthlyBilling } from "@/data/redux/companySlice";
-import { generateCandidateList } from "@/data/redux/employeSlice";
-import { treatTasks } from "@/data/utils/task";
-
-import { BottomNavigation, Header, PauseIndicator } from "@/components/layout/index";
+import {
+  BottomNavigation,
+  Header,
+  NotificationCenter,
+  PauseIndicator,
+  ToastContainer,
+} from "@/components/layout/index";
 import {
   HomePage,
   EmployePage,
@@ -19,11 +25,13 @@ import {
   PoleEmploiPage,
   EmployeListPage,
   SelogerPage,
+  ComponentPage,
+  ProductPage,
 } from "@/pages";
 
-import { OwnedPage } from "./pages/building/OwnedPage";
-import MainMenu from "./pages/start/MainMenu";
-import NewGamePage from "./pages/start/NewGamePage";
+import { OwnedPage } from "@/pages/building/OwnedPage";
+import MainMenu from "@/pages/start/MainMenu";
+import NewGamePage from "@/pages/start/NewGamePage";
 
 const router = createBrowserRouter([
   { path: "/", element: <MainMenu /> },
@@ -33,13 +41,13 @@ const router = createBrowserRouter([
     element: <Game />,
     children: [
       { path: "/game", element: <HomePage /> },
-      // Employe
       { path: "/game/employe", element: <EmployePage /> },
       { path: "/game/employe/me", element: <FondateurPage /> },
       { path: "/game/employe/list", element: <EmployeListPage /> },
       { path: "/game/employe/recruit", element: <PoleEmploiPage /> },
       { path: "/game/task", element: <TaskPage /> },
-      //Building
+      { path: "/game/component", element: <ComponentPage /> },
+      { path: "/game/product", element: <ProductPage /> },
       { path: "/game/building", element: <BuildingPage /> },
       { path: "/game/building/owned", element: <OwnedPage /> },
       { path: "/game/building/buy", element: <SelogerPage /> },
@@ -52,53 +60,39 @@ function App() {
 }
 
 function Game() {
-  const dispatch = useDispatch();
-  const { gameName } = useSelector((state: RootState) => ({ gameName: state.engine.gameName }));
-  const state = useSelector((state: RootState) => state);
-  if (gameName === undefined) { return <Navigate to="/" replace />; }
-
-
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' || event.key === 'Esc') {
-      dispatch(setGameSpeed(0))
-    }
-  };
+  const dispatch = useAppDispatch();
+  const gameName = useAppSelector((state) => state.engine.gameName);
+  const gameSpeed = useAppSelector((state) => state.engine.gameSpeed);
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => { document.removeEventListener('keydown', handleKeyDown); };
+    dispatch(setGameSpeed(gameSpeed));
+    return () => {
+      dispatch(setGameSpeed(0));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-
-
-  const { gameSpeed, time, reputation, employeList } = useSelector((state: RootState) => ({
-    gameSpeed: state.engine.gameSpeed,
-    time: state.engine.time,
-    reputation: state.company.reputation,
-    employeList: state.employe.employeList,
-  }));
-
-  /* GameLoop */
-  const loopCallback = useCallback(() => {
-    if (gameSpeed !== 0) {
-      treatTasks(dispatch, state);
-      dispatch(payMonthlyBilling({ time, employeList }));
-      dispatch(generateCandidateList({ time, reputation }));
-      dispatch(incrementTime());
-    }
-  }, [dispatch, gameSpeed, time, state, reputation]);
-
   useEffect(() => {
-    const loop = setInterval(loopCallback, gameSpeed);
-    return () => clearInterval(loop);
-  }, [loopCallback, gameSpeed]); // fps
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" || event.key === "Esc") {
+        dispatch(setGameSpeed(0));
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [dispatch]);
+
+  if (gameName === undefined) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="prose-h1:text-2xl prose-h1:font-medium prose-h2:text-2xl">
       <Header />
+      <NotificationCenter />
       <Outlet />
       <PauseIndicator />
+      <ToastContainer />
       <BottomNavigation />
     </div>
   );

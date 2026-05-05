@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "game-balance",
+  "owner": "rbergman",
+  "repo": "dark-matter-marketplace",
+  "path": "plugins/game-dev/skills/game-balance",
+  "branch": "main",
+  "sha": "3a10cdd4111752e6887e6b71851c83303fbddaea",
+  "source": "manual"
+}

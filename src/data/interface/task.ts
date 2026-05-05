@@ -1,45 +1,53 @@
-import { TaskState } from "../redux/taskSlice";
+import {
+  ComponentQuality,
+  ComponentRequirement,
+  ComponentType,
+} from "@/data/interface/component";
 
 export interface Task {
-    id: number;
-    name: string;
+  id: number;
+  name: string;
 }
 
 export interface StartedTask extends Task {
-    startDate: number;
-    paused: boolean;
-    progression: number;
+  startDate: number;
+  paused: boolean;
+  progression: number;
 
-    priority: number;
-    buildingIds?: number[] | null;
+  priority: number;
+  buildingIds?: number[] | null;
 }
 
 export enum ContractType {
-    DEV = "Développement",
-    DESIGN = "Design",
-    FULL_STACK = "Full Stack",
+  DEV = "Développement",
+  DESIGN = "Design",
+  FULL_STACK = "Full Stack",
 }
 
 export interface Contract extends Task {
-    time: number;
+  time: number;
 
-    clientName: string;
-    clientImage: string;
+  clientName: string;
+  clientImage: string;
 
-    priceDeposit: number;
-    priceAdditional: number;
-    priceMalus: number;
+  priceDeposit: number;
+  priceAdditional: number;
+  priceMalus: number;
 
-    type: ContractType;
-    taskDifficulty: number;
+  type: ContractType;
+  taskDifficulty: number;
 
-    frontNeed: number;
-    backNeed: number;
-    debugNeed: number;
-
-    creativityNeed: number;
-    visualDesignNeed: number;
-    animationNeed: number;
+  requirements: ComponentRequirement[];
 }
 
-export interface StartedContract extends StartedTask, Contract { }
+export interface ConsumedComponent {
+  id: number;
+  type: ComponentType;
+  quality: ComponentQuality;
+}
+
+export interface StartedContract extends StartedTask, Contract {
+  assemblyPoints: number;
+  consumedComponents: ConsumedComponent[];
+  averageQuality: number;
+}

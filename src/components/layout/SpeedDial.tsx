@@ -1,45 +1,40 @@
-import { PagePlus, Plus } from "iconoir-react";
+import { Plus } from "iconoir-react";
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 
 export const SpeedDial = () => {
-    const [isHidden, setIsHidden] = useState<Boolean>(true);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
-    return (
-        <div
-            className="fixed right-12 bottom-24 group"
-            onMouseEnter={() => setIsHidden(false)}
-            onMouseLeave={() => setIsHidden(true)}
-        >
-            <div className={"flex-col items-center mb-4 space-y-2 " + (isHidden ? "hidden" : "flex")}>
-                <div className="tooltip tooltip-left" data-tip="Signer un contrat">
-                    <NavLink to={"/game/task"} className="btn btn-circle">
-                        <PagePlus width={24} height={24} />
-                    </NavLink>
-                </div>
-            </div>
+  return (
+    <div
+      className="fixed right-12 bottom-24 group"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <div
+        className={
+          "flex-col items-center mb-4 space-y-2 " + (isOpen ? "flex" : "hidden")
+        }
+      >
+        <div className="tooltip tooltip-left" data-tip="Signer un contrat">
+          <NavLink
+            to="/game/task"
+            aria-label="Signer un contrat"
+            className="btn btn-circle"
+          >
+            <Plus width={24} height={24} />
+          </NavLink>
+        </div>
+      </div>
 
-            <button className={"btn btn-circle btn-primary group-hover:rotate-45"}>
-                <Plus width={32} height={32} />
-            </button>
-            {/* <button
-                type="button"
-                data-dial-toggle="speed-dial-menu-default"
-                aria-controls="speed-dial-menu-default"
-                aria-expanded="false"
-                className="flex items-center justify-center text-white bg-blue-700 rounded-full w-14 h-14 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 focus:outline-none dark:focus:ring-blue-800"
-            >
-                <svg
-                    className="w-5 h-5 transition-transform group-hover:rotate-45"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 18 18"
-                >
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 1v16M1 9h16" />
-                </svg>
-                <span className="sr-only">Open actions menu</span>
-            </button> */}
-        </div >
-    );
+      <button
+        type="button"
+        aria-label="Actions rapides"
+        aria-expanded={isOpen}
+        className="btn btn-circle btn-primary group-hover:rotate-45"
+      >
+        <Plus width={32} height={32} />
+      </button>
+    </div>
+  );
 };
