@@ -18,7 +18,7 @@ export interface Alert {
 }
 
 const isProductionPerson = (p: Person): p is ProductionPerson =>
-  typeof (p as ProductionPerson).frontStat === "number";
+  typeof (p as ProductionPerson).codeStat === "number";
 
 export const useAlerts = (): Alert[] => {
   const money = useAppSelector((s) => s.company.money);

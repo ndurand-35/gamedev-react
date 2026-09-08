@@ -42,22 +42,26 @@ const requirementsForType = (
   difficulty: number,
 ): ComponentRequirement[] => {
   const qty = (multiplier: number) =>
-    Math.max(1, Math.round((difficulty / 10) * multiplier) + randomIntFromInterval(0, 2));
+    Math.max(1, Math.round((difficulty / 10) * multiplier) + randomIntFromInterval(1, 3));
   const minQuality = minQualityForDifficulty(difficulty);
 
   switch (contractType) {
     case ContractType.DEV:
-      return [{ type: ComponentType.CODE, quantity: qty(1), minQuality }];
+      return [
+        { type: ComponentType.CODE, quantity: qty(1.4), minQuality },
+        { type: ComponentType.UX, quantity: qty(0.4), minQuality },
+      ];
     case ContractType.DESIGN:
       return [
-        { type: ComponentType.VISUEL, quantity: qty(0.7), minQuality },
-        { type: ComponentType.UX, quantity: qty(0.5), minQuality },
+        { type: ComponentType.VISUEL, quantity: qty(1), minQuality },
+        { type: ComponentType.UX, quantity: qty(0.7), minQuality },
+        { type: ComponentType.CODE, quantity: qty(0.3), minQuality },
       ];
     case ContractType.FULL_STACK:
       return [
-        { type: ComponentType.CODE, quantity: qty(0.7), minQuality },
-        { type: ComponentType.VISUEL, quantity: qty(0.5), minQuality },
-        { type: ComponentType.UX, quantity: qty(0.4), minQuality },
+        { type: ComponentType.CODE, quantity: qty(1), minQuality },
+        { type: ComponentType.VISUEL, quantity: qty(0.8), minQuality },
+        { type: ComponentType.UX, quantity: qty(0.6), minQuality },
       ];
   }
 };
@@ -85,11 +89,9 @@ export const generateNewContract = (reputation: number): Contract[] => {
     let totalQty = totalRequirementQuantity(requirements);
     let complexity = totalQty * taskDifficulty;
 
-    let priceDeposit = randomIntFromInterval(complexity * 5, complexity * 8);
-    let priceAdditional = randomIntFromInterval(
-      complexity * 20,
-      complexity * 25,
-    );
+    let priceDeposit = 150 + randomIntFromInterval(complexity * 6, complexity * 9);
+    let priceAdditional =
+      600 + randomIntFromInterval(complexity * 22, complexity * 28);
     let priceMalus = randomIntFromInterval(priceDeposit * 2, priceDeposit * 3);
 
     generated.push({
@@ -115,16 +117,10 @@ export const generateNewContract = (reputation: number): Contract[] => {
 };
 
 const isProductionPerson = (p: Person): p is ProductionPerson =>
-  typeof (p as ProductionPerson).frontStat === "number";
+  typeof (p as ProductionPerson).codeStat === "number";
 
 const integrationStat = (employe: ProductionPerson): number =>
-  (employe.frontStat +
-    employe.backStat +
-    employe.debugStat +
-    employe.creativityStat +
-    employe.visualDesignStat +
-    employe.animationStat) /
-  6;
+  (employe.codeStat + employe.visualStat + employe.uxStat) / 3;
 
 export const calculateTaskProgression = (
   task: StartedContract,

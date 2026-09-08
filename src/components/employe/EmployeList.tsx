@@ -8,6 +8,7 @@ import {
   Building,
   ComponentType,
   Employe,
+  PersonType,
   ProductionPerson,
 } from "@/data/interface";
 import {
@@ -16,9 +17,21 @@ import {
   fired,
 } from "@/data/redux/employeSlice";
 import { clearEmployeProgress } from "@/data/redux/componentSlice";
+import { paySeverance } from "@/data/redux/companySlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { selectEmployesWithoutFondateur } from "@/data/redux/selectors";
 import { createColumnHelper } from "@tanstack/react-table";
+import { RoleBadge } from "@/components/employe/RoleBadge";
+import {
+  CAMPAIGN_PANEL_ID,
+  CampaignPanel,
+} from "@/components/employe/CampaignPanel";
+import { FireConfirmModal } from "@/components/employe/FireConfirmModal";
+
+const openCampaignPanel = () =>
+  (
+    document.getElementById(CAMPAIGN_PANEL_ID) as HTMLDialogElement | null
+  )?.showModal();
 
 export const EmployeList: React.FC = (): ReactElement => {
   const dispatch = useAppDispatch();
@@ -38,12 +51,35 @@ export const EmployeList: React.FC = (): ReactElement => {
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
+  // Cibles du licenciement en attente de confirmation (null = modale fermée).
+  // Renseigné par le bouton 🔥 (unitaire) ou l'action « Licencier » (batch) ;
+  // le licenciement effectif n'a lieu qu'à la confirmation de la modale.
+  const [fireTargets, setFireTargets] = useState<Employe[] | null>(null);
+  // Mémorise s'il faut purger la sélection après un licenciement batch.
+  const [fireWasBatch, setFireWasBatch] = useState(false);
+
   const fireSelected = () => {
-    const ids = Object.keys(rowSelection)
-      .map((index) => employes[parseInt(index)]?.id)
-      .filter((id): id is number => id != null);
-    ids.forEach((id) => dispatch(fired(id)));
-    setRowSelection({});
+    const targets = Object.keys(rowSelection)
+      .map((index) => employes[parseInt(index)])
+      .filter((e): e is Employe => e != null);
+    if (targets.length === 0) return;
+    setFireWasBatch(true);
+    setFireTargets(targets);
+  };
+
+  // Orchestration de la confirmation : indemnité one-shot (Σ salaires) →
+  // fired(id) → clearEmployeProgress(id) par employé (purge l'entrée orpheline
+  // de productionProgress, bug latent corrigé ici). Fondateur exclu.
+  const confirmFire = () => {
+    const targets = (fireTargets ?? []).filter((e) => e.id !== 1);
+    if (targets.length === 0) return;
+    const totalSalary = targets.reduce((sum, e) => sum + e.salary, 0);
+    dispatch(paySeverance(totalSalary));
+    targets.forEach((e) => {
+      dispatch(fired(e.id));
+      dispatch(clearEmployeProgress(e.id));
+    });
+    if (fireWasBatch) setRowSelection({});
   };
 
   const columns = useMemo(() => {
@@ -63,8 +99,11 @@ export const EmployeList: React.FC = (): ReactElement => {
                 </span>
               </div>
             </div>
-            <div className="font-bold">
-              {props.row.original.firstName} {props.row.original.lastName}
+            <div>
+              <div className="font-bold">
+                {props.row.original.firstName} {props.row.original.lastName}
+              </div>
+              <RoleBadge personType={props.row.original.personType} />
             </div>
           </div>
         ),
@@ -115,11 +154,34 @@ export const EmployeList: React.FC = (): ReactElement => {
         },
       },
       {
-        header: "Production",
+        header: "Production / Rôle",
         accessorFn: (row: Employe) =>
           (row as ProductionPerson).assignedComponentType ?? "",
         cell: (info: any) => {
           const e = info.row.original as ProductionPerson;
+          // QA / Marketing ne s'assignent pas par ComponentType : libellé de
+          // couverture (QA) ou accès au panneau campagne (Marketing).
+          if (e.personType === PersonType.QA) {
+            return (
+              <span className="badge badge-info badge-outline badge-sm">
+                Couvre : Détection bugs
+              </span>
+            );
+          }
+          if (e.personType === PersonType.MARKETING) {
+            return (
+              <button
+                type="button"
+                className="btn btn-xs btn-warning btn-outline"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  openCampaignPanel();
+                }}
+              >
+                Gérer campagne
+              </button>
+            );
+          }
           return (
             <select
               className="select select-xs select-bordered"
@@ -175,7 +237,8 @@ export const EmployeList: React.FC = (): ReactElement => {
                 className="btn btn-xs btn-warning btn-square"
                 onClick={(ev) => {
                   ev.stopPropagation();
-                  dispatch(fired(props.row.original.id));
+                  setFireWasBatch(false);
+                  setFireTargets([props.row.original]);
                 }}
               >
                 <FireFlame />
@@ -210,6 +273,12 @@ export const EmployeList: React.FC = (): ReactElement => {
           }
         />
       </div>
+      <CampaignPanel />
+      <FireConfirmModal
+        targets={fireTargets}
+        onConfirm={confirmFire}
+        onClose={() => setFireTargets(null)}
+      />
     </div>
   );
 };

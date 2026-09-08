@@ -59,7 +59,7 @@ const QUALITY_DOT_CLASS: Record<ComponentQuality, string> = {
 };
 
 const isProductionPerson = (p: any): p is ProductionPerson =>
-  typeof p.frontStat === "number";
+  typeof p.codeStat === "number";
 
 export const ComponentPage: React.FC = (): ReactElement => {
   const stock = useAppSelector((state) => state.component.stock);

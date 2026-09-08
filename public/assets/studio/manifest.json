@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0-candidate-card-only",
+  "note": "La scène isométrique (MYL-17) a été retirée : il ne reste que la carte candidat. Voir README.md.",
+  "recolor": {
+    "mechanism": "CSS custom properties on the host element (inline <svg>; an <img> does not inherit CSS vars).",
+    "accent": {
+      "var": "--accent",
+      "source": "specialty (prod) / rôle par défaut",
+      "values": {
+        "Code": "#3B82F6",
+        "Visuel": "#8B5CF6",
+        "UX": "#14B8A6"
+      },
+      "roleDefaults": {
+        "dev": "#3B82F6",
+        "designer": "#8B5CF6",
+        "qa": "#F59E0B",
+        "marketing": "#EC4899"
+      }
+    }
+  },
+  "assets": {
+    "hud": [
+      {
+        "id": "candidate-card",
+        "file": "hud/candidate-card.svg",
+        "size": [
+          190,
+          112
+        ],
+        "vars": [
+          "--accent"
+        ],
+        "slots": [
+          "#name",
+          "#role",
+          "#expected",
+          "#interview (Requis/Fait)",
+          "#avatar"
+        ],
+        "use": "vue recrutement (Pole Emploi)"
+      }
+    ]
+  }
+}

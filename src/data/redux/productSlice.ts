@@ -13,11 +13,14 @@ import {
 export interface ProductState {
   products: Product[];
   nextProductId: number;
+  // Compteur cumulé de produits lancés (stat de l'écran de bilan WF-3).
+  productsLaunched: number;
 }
 
 const initialState: ProductState = {
   products: [],
   nextProductId: 1,
+  productsLaunched: 0,
 };
 
 const blankInvested = (): Record<ComponentType, number> => ({
@@ -33,6 +36,7 @@ export const productSlice = createSlice({
     initializeProductState(state) {
       state.products = [];
       state.nextProductId = 1;
+      state.productsLaunched = 0;
     },
     createProduct(
       state,
@@ -75,6 +79,7 @@ export const productSlice = createSlice({
       p.status = ProductStatus.LAUNCHED;
       p.launchTime = action.payload.time;
       p.monthlyRevenue = computeMonthlyRevenue(p);
+      state.productsLaunched += 1;
     },
     retireProduct(state, action: PayloadAction<number>) {
       const p = state.products.find((p) => p.id === action.payload);

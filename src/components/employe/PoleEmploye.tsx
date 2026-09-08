@@ -1,18 +1,28 @@
 import { ReactElement, useEffect, useMemo, useState } from "react";
 
-import { UserPlus } from "iconoir-react";
+import { UserPlus, WarningTriangle } from "iconoir-react";
 
 import {
   Candidate,
   ComponentType,
+  PersonType,
   ProductionPerson,
   Specialty,
 } from "@/data/interface";
-import { hire, setStopCandidateGeneration } from "@/data/redux/employeSlice";
+import { setStopCandidateGeneration } from "@/data/redux/employeSlice";
+import { hireCandidate } from "@/data/redux/recruitmentThunks";
+import {
+  selectRecruitmentCap,
+  selectRemainingSlots,
+} from "@/data/redux/selectors";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { createColumnHelper } from "@tanstack/react-table";
 import { MyTable } from "@/components/Table";
 import { ComponentTypeBadge } from "@/components/component";
+import { RoleBadge } from "@/components/employe/RoleBadge";
+import { HireNegotiationModal } from "@/components/employe/HireNegotiationModal";
+import { CandidateCard } from "@/components/studio";
+import { formatPrice } from "@/data/utils";
 
 const SpecialtyBadge = ({ specialty }: { specialty: Specialty }) => {
   if (specialty === "FULLSTACK") {
@@ -21,17 +31,44 @@ const SpecialtyBadge = ({ specialty }: { specialty: Specialty }) => {
   return <ComponentTypeBadge type={specialty as ComponentType} variant="badge" />;
 };
 
+// Production : badge de spécialité (Code/Visuel/UX/Fullstack). QA / Marketing :
+// badge de rôle coloré. Affichés au même endroit (cf. spec UX §2).
+const CandidateRoleBadge = ({ candidate }: { candidate: Candidate }) => {
+  if (candidate.personType === PersonType.PROD) {
+    return (
+      <SpecialtyBadge
+        specialty={(candidate as ProductionPerson).specialty ?? "FULLSTACK"}
+      />
+    );
+  }
+  return <RoleBadge personType={candidate.personType} />;
+};
+
 export const PoleEmploye: React.FC = (): ReactElement => {
   const dispatch = useAppDispatch();
   const candidateList = useAppSelector((state) => state.employe.candidateList);
+  // Plafond de recrutement §6.1 (cross-slice : cap = somme des studios débloqués).
+  const recruitmentCap = useAppSelector(selectRecruitmentCap);
+  const remainingSlots = useAppSelector(selectRemainingSlots);
+  const capReached = remainingSlots <= 0;
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  // Id du candidat en cours d'entretien / négociation (null = modale fermée).
+  // On garde l'id et on relit l'objet live pour refléter `revealedStats`.
+  const [negotiatingId, setNegotiatingId] = useState<number | null>(null);
+  const negotiating =
+    candidateList.find((c) => c.id === negotiatingId) ?? null;
 
   const hireSelected = () => {
     const ids = Object.keys(rowSelection)
       .map((index) => candidateList[parseInt(index)]?.id)
       .filter((id): id is number => id != null);
-    ids.forEach((id) => dispatch(hire(id)));
+    // Garde-fou plafond (§6.1) : on s'arrête net dès qu'une embauche est refusée
+    // faute de place (le thunk relit le plafond à chaque appel + pousse le toast).
+    for (const id of ids) {
+      const result = dispatch(hireCandidate(id));
+      if (!result.ok) break;
+    }
     setRowSelection({});
   };
 
@@ -50,7 +87,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
         accessorFn: (row: Candidate) => row.lastName + " " + row.firstName,
         enableColumnFilter: false,
         cell: (props: any) => (
-          <div className="flex items-center space-x-3">
+          <div className="group relative flex items-center space-x-3">
             <div className="avatar avatar-placeholder">
               <div className="bg-neutral text-neutral-content rounded-full w-8">
                 <span className="text-xs uppercase">
@@ -62,35 +99,71 @@ export const PoleEmploye: React.FC = (): ReactElement => {
             <div className="font-bold">
               {props.row.original.firstName} {props.row.original.lastName}
             </div>
+            {/* Aperçu carte candidat au survol (panneau table inchangé) */}
+            <div className="pointer-events-none absolute left-0 top-full z-50 mt-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+              <CandidateCard
+                candidate={props.row.original as Candidate}
+                style={{
+                  filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.3))",
+                }}
+              />
+            </div>
           </div>
         ),
       },
       {
-        header: "Spécialité",
+        header: "Rôle",
         accessorFn: (row: Candidate) =>
-          (row as ProductionPerson).specialty ?? "FULLSTACK",
+          row.personType === PersonType.PROD
+            ? (row as ProductionPerson).specialty ?? "FULLSTACK"
+            : row.personType,
         cell: (info: any) => (
-          <SpecialtyBadge
-            specialty={
-              (info.row.original as ProductionPerson).specialty ?? "FULLSTACK"
-            }
-          />
+          <CandidateRoleBadge candidate={info.row.original as Candidate} />
         ),
       },
-      columnHelper.accessor("salary", {
-        header: "Salaire",
-        cell: (info) => info.renderValue() + " / Mois",
-      }),
+      {
+        header: "Salaire attendu",
+        accessorFn: (row: Candidate) => row.expectedSalary ?? row.salary,
+        cell: (info: any) => {
+          const c = info.row.original as Candidate;
+          const value = c.expectedSalary ?? c.salary;
+          return (
+            <span className="tabular-nums">
+              {c.revealedStats ? (
+                formatPrice(value) + " / Mois"
+              ) : (
+                <span className="opacity-70">≈ {formatPrice(value)} / Mois</span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        header: "Entretien",
+        accessorFn: (row: Candidate) => (row.revealedStats ? "Fait" : "Requis"),
+        cell: (info: any) => {
+          const c = info.row.original as Candidate;
+          return c.revealedStats ? (
+            <span className="badge badge-success badge-sm badge-outline">
+              Profil vérifié
+            </span>
+          ) : (
+            <span className="badge badge-warning badge-sm badge-outline">
+              Entretien requis
+            </span>
+          );
+        },
+      },
       columnHelper.display({
         header: "Action",
         cell: (props) => (
-          <div className="tooltip" data-tip="Embaucher">
+          <div className="tooltip" data-tip="Entretien / Négociation">
             <button
-              aria-label="Embaucher"
+              aria-label="Entretien et négociation"
               className="btn btn-xs btn-info btn-square"
               onClick={(ev) => {
                 ev.stopPropagation();
-                dispatch(hire(props.row.original.id));
+                setNegotiatingId(props.row.original.id);
               }}
             >
               <UserPlus />
@@ -103,6 +176,25 @@ export const PoleEmploye: React.FC = (): ReactElement => {
 
   return (
     <div className="space-y-4">
+      {/* Feedback plafond recrutement §6.1 : places restantes toujours visibles,
+          et message d'orientation quand l'effectif a atteint le plafond. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm">
+          Places de recrutement :{" "}
+          <strong className="tabular-nums">{Math.max(0, remainingSlots)}</strong>{" "}
+          <span className="opacity-60">/ {recruitmentCap}</span>
+        </span>
+      </div>
+      {capReached && (
+        <div className="alert alert-warning py-2 text-sm">
+          <WarningTriangle width={18} height={18} />
+          <span>
+            Plafond d'effectif atteint — ouvre un nouveau studio pour recruter
+            davantage.
+          </span>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <MyTable
           columns={columns}
@@ -117,9 +209,19 @@ export const PoleEmploye: React.FC = (): ReactElement => {
           setRowSelection={setRowSelection}
           action={
             Object.keys(rowSelection).length > 0 ? (
-              <button className="btn btn-xs btn-info" onClick={hireSelected}>
+              <button
+                className="btn btn-xs btn-info"
+                onClick={hireSelected}
+                disabled={capReached}
+                aria-disabled={capReached}
+                title={
+                  capReached
+                    ? "Plafond d'effectif atteint — ouvre un nouveau studio"
+                    : undefined
+                }
+              >
                 <UserPlus />
-                <p>Embaucher</p>
+                <p>Embaucher (à l'aveugle)</p>
               </button>
             ) : (
               <></>
@@ -127,6 +229,10 @@ export const PoleEmploye: React.FC = (): ReactElement => {
           }
         />
       </div>
+      <HireNegotiationModal
+        candidate={negotiating}
+        onClose={() => setNegotiatingId(null)}
+      />
     </div>
   );
 };

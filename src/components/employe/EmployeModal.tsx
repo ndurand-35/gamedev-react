@@ -1,10 +1,12 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 
 import {
   ComponentType,
+  Marketing,
   MAX_MORALE,
   PersonType,
   ProductionPerson,
+  QA,
   Specialty,
 } from "@/data/interface";
 import {
@@ -14,11 +16,20 @@ import {
 import { clearEmployeProgress } from "@/data/redux/componentSlice";
 import { TRAINING_THRESHOLD } from "@/data/utils/training";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
-import { selectEmployeById } from "@/data/redux/selectors";
+import {
+  selectActiveCampaign,
+  selectEmployeById,
+} from "@/data/redux/selectors";
 import {
   COMPONENT_BTN_CLASS,
   COMPONENT_ICON,
 } from "@/components/component";
+import { qaLossReductionRatio } from "@/data/utils/economy";
+import { RoleBadge } from "@/components/employe/RoleBadge";
+import {
+  PendingTraining,
+  TrainingConfirmModal,
+} from "@/components/employe/TrainingConfirmModal";
 
 export const EMPLOYE_MODAL_ID = "employe_modal";
 
@@ -73,6 +84,12 @@ export const EmployeModal: FC<EmployeModalProps> = ({
 }) => {
   const dispatch = useAppDispatch();
   const employe = useAppSelector((s) => selectEmployeById(s, employeId));
+  const activeCampaign = useAppSelector(selectActiveCampaign);
+  const productionProgress = useAppSelector(
+    (s) => s.component.productionProgress,
+  );
+  const [pendingTraining, setPendingTraining] =
+    useState<PendingTraining | null>(null);
 
   const close = () => {
     (
@@ -85,6 +102,12 @@ export const EmployeModal: FC<EmployeModalProps> = ({
     employe?.personType === PersonType.PROD
       ? (employe as ProductionPerson)
       : null;
+  const qa =
+    employe?.personType === PersonType.QA ? (employe as QA) : null;
+  const marketing =
+    employe?.personType === PersonType.MARKETING
+      ? (employe as Marketing)
+      : null;
 
   const handleAssign = (type: ComponentType | null) => {
     if (!employe) return;
@@ -96,7 +119,7 @@ export const EmployeModal: FC<EmployeModalProps> = ({
     }
   };
 
-  const handleTraining = (type: ComponentType | null) => {
+  const runTraining = (type: ComponentType | null) => {
     if (!employe) return;
     dispatch(
       setTraining({ employeId: employe.id, trainingType: type }),
@@ -106,7 +129,24 @@ export const EmployeModal: FC<EmployeModalProps> = ({
     }
   };
 
+  const handleTraining = (type: ComponentType | null) => {
+    if (!prod) return;
+    // Stopper une formation (« Aucune ») ne détruit rien : pas de friction.
+    // Démarrer une formation n'a de garde-fou que si quelque chose est en jeu :
+    // affectation active OU progrès de production > 0. Sinon lancement direct.
+    const needsConfirm =
+      type !== null &&
+      (prod.assignedComponentType != null ||
+        (productionProgress[prod.id] ?? 0) > 0);
+    if (needsConfirm) {
+      setPendingTraining({ employe: prod, trainingType: type });
+      return;
+    }
+    runTraining(type);
+  };
+
   return (
+    <>
     <dialog id={EMPLOYE_MODAL_ID} className="modal">
       <div className="modal-box max-w-lg">
         {employe && (
@@ -121,9 +161,12 @@ export const EmployeModal: FC<EmployeModalProps> = ({
                 </div>
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-lg">
-                  {employe.firstName} {employe.lastName}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg">
+                    {employe.firstName} {employe.lastName}
+                  </h3>
+                  <RoleBadge personType={employe.personType} />
+                </div>
                 <p className="text-sm opacity-70">
                   {prod?.productionType ?? employe.personType} · Salaire{" "}
                   {employe.salary} / mois
@@ -150,34 +193,19 @@ export const EmployeModal: FC<EmployeModalProps> = ({
                 <h4 className="font-semibold text-sm mb-2">Statistiques</h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4">
                   <StatBar
-                    label="Front"
-                    value={prod.frontStat}
-                    max={prod.frontMaxStat}
-                  />
-                  <StatBar
-                    label="Back"
-                    value={prod.backStat}
-                    max={prod.backMaxStat}
-                  />
-                  <StatBar
-                    label="Debug"
-                    value={prod.debugStat}
-                    max={prod.debugMaxStat}
-                  />
-                  <StatBar
-                    label="Créativité"
-                    value={prod.creativityStat}
-                    max={prod.creativityMaxStat}
+                    label="Code"
+                    value={prod.codeStat}
+                    max={prod.codeMaxStat}
                   />
                   <StatBar
                     label="Visuel"
-                    value={prod.visualDesignStat}
-                    max={prod.visualDesignMaxStat}
+                    value={prod.visualStat}
+                    max={prod.visualMaxStat}
                   />
                   <StatBar
-                    label="Animation"
-                    value={prod.animationStat}
-                    max={prod.animationMaxStat}
+                    label="UX"
+                    value={prod.uxStat}
+                    max={prod.uxMaxStat}
                   />
                 </div>
 
@@ -266,6 +294,54 @@ export const EmployeModal: FC<EmployeModalProps> = ({
               </>
             )}
 
+            {qa && (
+              <>
+                <h4 className="font-semibold text-sm mb-2">Statistiques</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4">
+                  <StatBar
+                    label="Test"
+                    value={qa.testStat}
+                    max={qa.testMaxStat}
+                  />
+                  <StatBar
+                    label="Détection de bugs"
+                    value={qa.bugDetectionStat}
+                    max={qa.bugDetectionMaxStat}
+                  />
+                </div>
+                <h4 className="font-semibold text-sm mb-2">Effet actuel</h4>
+                <p className="text-sm opacity-80 mb-4">
+                  Réduit l'impact des bugs critiques de ~
+                  {Math.round(qaLossReductionRatio(qa.bugDetectionStat) * 100)}%
+                  (couverture cumulée avec les autres testeurs).
+                </p>
+              </>
+            )}
+
+            {marketing && (
+              <>
+                <h4 className="font-semibold text-sm mb-2">Statistiques</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4">
+                  <StatBar
+                    label="Communication"
+                    value={marketing.communicationStat}
+                    max={marketing.communicationMaxStat}
+                  />
+                  <StatBar
+                    label="Gestion de campagne"
+                    value={marketing.campaignManagementStat}
+                    max={marketing.campaignManagementMaxStat}
+                  />
+                </div>
+                <h4 className="font-semibold text-sm mb-2">Effet actuel</h4>
+                <p className="text-sm opacity-80 mb-4">
+                  {activeCampaign
+                    ? `Campagne ${activeCampaign.type} en cours.`
+                    : "Aucune campagne active. Lancez-en une depuis la liste des employés."}
+                </p>
+              </>
+            )}
+
             <div className="modal-action">
               <button type="button" onClick={close} className="btn">
                 Fermer
@@ -280,5 +356,13 @@ export const EmployeModal: FC<EmployeModalProps> = ({
         </button>
       </form>
     </dialog>
+    <TrainingConfirmModal
+      pending={pendingTraining}
+      onConfirm={() => {
+        if (pendingTraining) runTraining(pendingTraining.trainingType);
+      }}
+      onClose={() => setPendingTraining(null)}
+    />
+    </>
   );
 };

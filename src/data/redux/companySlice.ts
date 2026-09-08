@@ -7,6 +7,12 @@ import {
   DEFAULT_COMPANY_STATE,
   buildDefaultCompanyState,
 } from "@/data/utils/constant";
+import {
+  ActiveCampaign,
+  CAMPAIGN_DURATION_HOURS,
+  CAMPAIGNS,
+  CampaignType,
+} from "@/data/utils/economy";
 
 export type ReputationByType = Record<ComponentType, number>;
 
@@ -18,6 +24,8 @@ export interface CompanyState {
   availableBuildingList: Building[];
   lastBuildingGeneration: number;
   nextBuildingId: number;
+  // Phase 2 — campagne marketing en cours (une seule à la fois).
+  activeCampaign?: ActiveCampaign;
 }
 
 const initialState: CompanyState = DEFAULT_COMPANY_STATE;
@@ -35,6 +43,7 @@ export const companySlice = createSlice({
       state.buildingList = fresh.buildingList;
       state.lastBuildingGeneration = fresh.lastBuildingGeneration;
       state.nextBuildingId = fresh.nextBuildingId;
+      state.activeCampaign = fresh.activeCampaign;
     },
     addReputation(state, action: PayloadAction<number>) {
       state.reputation = Math.max(
@@ -53,6 +62,11 @@ export const companySlice = createSlice({
       );
     },
     applyContractMalus(state, action: PayloadAction<number>) {
+      state.money -= action.payload;
+    },
+    // Indemnité de licenciement (one-shot) prélevée à la confirmation de la
+    // modale WF-1. Distinct d'applyContractMalus (pénalité contractuelle).
+    paySeverance(state, action: PayloadAction<number>) {
       state.money -= action.payload;
     },
     renameBuilding(state, action: PayloadAction<{ id: number; name: string }>) {
@@ -76,6 +90,29 @@ export const companySlice = createSlice({
           id: state.nextBuildingId++,
         }));
       }
+    },
+    launchCampaign(
+      state,
+      action: PayloadAction<{
+        type: CampaignType;
+        effectiveness: number;
+        time: number;
+      }>,
+    ) {
+      // Une seule campagne à la fois (cf. spec UX §8).
+      if (state.activeCampaign) return;
+      const def = CAMPAIGNS[action.payload.type];
+      if (!def || state.money < def.cost) return;
+      state.money -= def.cost;
+      state.activeCampaign = {
+        type: action.payload.type,
+        effectiveness: action.payload.effectiveness,
+        startTime: action.payload.time,
+        endTime: action.payload.time + CAMPAIGN_DURATION_HOURS,
+      };
+    },
+    clearCampaign(state) {
+      state.activeCampaign = undefined;
     },
     buyBuilding(state, action: PayloadAction<number>) {
       const building = state.availableBuildingList.find(
@@ -101,7 +138,10 @@ export const {
   addReputation,
   addReputationByType,
   applyContractMalus,
+  paySeverance,
   renameBuilding,
+  launchCampaign,
+  clearCampaign,
 } = companySlice.actions;
 
 export default companySlice.reducer;

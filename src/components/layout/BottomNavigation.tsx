@@ -1,8 +1,12 @@
 import dayjs from "dayjs";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 
+import { TopMenuItem } from "@/data/interface";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setGameSpeed } from "@/data/redux/engineSlice";
+import { selectLoanSummary } from "@/data/redux/selectors";
+import { BANK_PANEL_ID } from "@/components/layout/BankPanel";
 
 import {
   Timer,
@@ -15,7 +19,62 @@ import {
   Building,
   Packages,
   Rocket,
+  Bank,
 } from "iconoir-react";
+
+const openBankPanel = () =>
+  (
+    document.getElementById(BANK_PANEL_ID) as HTMLDialogElement | null
+  )?.showModal();
+
+const NAV_ITEMS: {
+  to: string;
+  end?: boolean;
+  ariaLabel: string;
+  icon: JSX.Element;
+  subMenu: TopMenuItem[];
+}[] = [
+  {
+    to: "/game",
+    end: true,
+    ariaLabel: "Accueil",
+    icon: <Home className="h-6 w-6" />,
+    subMenu: [],
+  },
+  {
+    to: "/game/employe",
+    ariaLabel: "Employés",
+    icon: <User className="h-6 w-6" />,
+    subMenu: [
+      { name: "Accueil", link: "/game/employe" },
+      { name: "Fondateur", link: "/game/employe/me" },
+      { name: "Employé", link: "/game/employe/list" },
+      { name: "Pole Emploi", link: "/game/employe/recruit" },
+    ],
+  },
+  {
+    to: "/game/component",
+    ariaLabel: "Composants",
+    icon: <Packages className="h-6 w-6" />,
+    subMenu: [],
+  },
+  {
+    to: "/game/product",
+    ariaLabel: "Produits",
+    icon: <Rocket className="h-6 w-6" />,
+    subMenu: [],
+  },
+  {
+    to: "/game/building",
+    ariaLabel: "Bâtiments",
+    icon: <Building className="h-6 w-6" />,
+    subMenu: [
+      { name: "Accueil", link: "/game/building" },
+      { name: "Mes bâtiments", link: "/game/building/owned" },
+      { name: "SeLoger", link: "/game/building/buy" },
+    ],
+  },
+];
 
 const SPEED_BUTTONS: {
   speed: number;
@@ -54,13 +113,41 @@ export const BottomNavigation = () => {
 
   const time = useAppSelector((state) => state.engine.time);
   const gameSpeed = useAppSelector((state) => state.engine.gameSpeed);
+  const currentTopMenu = useAppSelector((state) => state.engine.currentTopMenu);
+  const loanSummary = useAppSelector(selectLoanSummary);
+
+  const [hoveredSubMenu, setHoveredSubMenu] = useState<TopMenuItem[] | null>(
+    null,
+  );
+
+  const displayedSubMenu = hoveredSubMenu ?? currentTopMenu;
 
   const displayTime = dayjs("1970-01-01")
     .add(time, "h")
     .format("DD/MM/YYYY HH[H]");
 
   return (
-    <div className="fixed bottom-0 left-0 z-40 grid w-full h-14 grid-cols-2 px-4 sm:px-8 border-t md:grid-cols-3 border-base-content/20 bg-base-300">
+    <div
+      className="group fixed bottom-0 left-0 z-40 grid w-full h-14 grid-cols-2 px-4 sm:px-8 border-t md:grid-cols-3 border-base-content/20 bg-base-300"
+      onMouseLeave={() => setHoveredSubMenu(null)}
+    >
+      {displayedSubMenu && displayedSubMenu.length > 0 && (
+        <div className="absolute bottom-full left-0 w-full pointer-events-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto">
+          <ul className="menu menu-horizontal w-full justify-center flex-nowrap h-12 px-4 sm:px-8 border-t border-base-content/20 bg-base-300 space-x-2">
+            {displayedSubMenu.map((menu) => (
+              <li key={`topmenu_item_${menu.name}`}>
+                <NavLink
+                  className={({ isActive }) => (isActive ? "active" : "")}
+                  to={menu.link}
+                  end
+                >
+                  {menu.name}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="items-center justify-start text-base-content flex flex-wrap">
         <div className="hidden sm:flex items-center p-2 border-r border-base-content/20">
           <Timer height={14} width={14} aria-label="Temps" />
@@ -89,61 +176,40 @@ export const BottomNavigation = () => {
       </div>
 
       <div className="flex items-center justify-center mx-auto space-x-4">
-        <div className="tooltip" data-tip="Accueil">
+        {NAV_ITEMS.map((item) => (
           <NavLink
-            to="/game"
-            end
-            aria-label="Accueil"
+            key={`nav_${item.to}`}
+            to={item.to}
+            end={item.end}
+            aria-label={item.ariaLabel}
+            onMouseEnter={() => setHoveredSubMenu(item.subMenu)}
             className={({ isActive }) =>
               isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
             }
           >
-            <Home className="h-6 w-6" />
+            {item.icon}
           </NavLink>
-        </div>
-        <div className="tooltip" data-tip="Employé">
-          <NavLink
-            to="/game/employe"
-            aria-label="Employés"
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
+        ))}
+        <div className="tooltip" data-tip="Banque">
+          <button
+            type="button"
+            onClick={openBankPanel}
+            onMouseEnter={() => setHoveredSubMenu([])}
+            aria-label="Banque"
+            className="relative btn btn-circle"
           >
-            <User className="h-6 w-6" />
-          </NavLink>
-        </div>
-        <div className="tooltip" data-tip="Composants">
-          <NavLink
-            to="/game/component"
-            aria-label="Composants"
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
-          >
-            <Packages className="h-6 w-6" />
-          </NavLink>
-        </div>
-        <div className="tooltip" data-tip="Produits">
-          <NavLink
-            to="/game/product"
-            aria-label="Produits"
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
-          >
-            <Rocket className="h-6 w-6" />
-          </NavLink>
-        </div>
-        <div className="tooltip" data-tip="Bureau">
-          <NavLink
-            to="/game/building"
-            aria-label="Bâtiments"
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
-          >
-            <Building className="h-6 w-6" />
-          </NavLink>
+            <Bank className="h-6 w-6" />
+            {loanSummary.count > 0 && (
+              <span
+                className={
+                  "absolute -top-1 -right-1 min-w-4 h-4 px-1 flex items-center justify-center rounded-full text-[10px] font-bold text-white " +
+                  (loanSummary.hasMissed ? "bg-error" : "bg-neutral")
+                }
+              >
+                {loanSummary.count}
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </div>

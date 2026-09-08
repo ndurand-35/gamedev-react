@@ -6,6 +6,7 @@ import {
   ConsumedComponent,
   Person,
   ProductionPerson,
+  STAT_KEY_BY_TYPE,
   buildingSynergyMultiplier,
   moraleProductivityMultiplier,
 } from "@/data/interface";
@@ -17,21 +18,12 @@ import { AppDispatch, RootState } from "@/data/redux/store";
 import { applyProductionTick } from "@/data/redux/componentSlice";
 
 const isProductionPerson = (p: Person): p is ProductionPerson =>
-  typeof (p as ProductionPerson).frontStat === "number";
+  typeof (p as ProductionPerson).codeStat === "number";
 
 export const getRelevantStat = (
   employe: ProductionPerson,
   type: ComponentType,
-): number => {
-  switch (type) {
-    case ComponentType.CODE:
-      return (employe.frontStat + employe.backStat + employe.debugStat) / 3;
-    case ComponentType.VISUEL:
-      return (employe.visualDesignStat + employe.animationStat) / 2;
-    case ComponentType.UX:
-      return employe.creativityStat;
-  }
-};
+): number => employe[STAT_KEY_BY_TYPE[type]];
 
 const RARE_BONUS_CHANCE = 0.03;
 

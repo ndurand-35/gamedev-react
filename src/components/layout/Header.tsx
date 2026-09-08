@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import { shallowEqual } from "react-redux";
 
 import { Coins, Star } from "iconoir-react";
-import { ComponentType, TopMenuItem } from "@/data/interface";
+import { ComponentType } from "@/data/interface";
 import { NavLink } from "react-router-dom";
 
 import { useAppSelector } from "@/data/redux/hooks";
@@ -19,10 +18,6 @@ const COMPONENT_TYPES: ComponentType[] = [
 ];
 
 export const Header = () => {
-  const currentTopMenu = useAppSelector(
-    (state) => state.engine.currentTopMenu,
-    shallowEqual,
-  );
   const money = useAppSelector((state) => state.company.money);
   const reputation = useAppSelector((state) => state.company.reputation);
   const stock = useAppSelector((state) => state.component.stock);
@@ -78,22 +73,6 @@ export const Header = () => {
               );
             })}
           </NavLink>
-        </div>
-        <div className="md:items-center justify-between items-right flex w-auto md:order-1">
-          <ul className="menu menu-horizontal px-4 border-base-content/20 bg-base-300 border-b border-l rounded-bl space-x-4">
-            {currentTopMenu &&
-              currentTopMenu.map((menu: TopMenuItem) => (
-                <li key={`topmenu_item_${menu.name}`}>
-                  <NavLink
-                    className={menu.active ? "active" : ""}
-                    to={menu.link}
-                    end
-                  >
-                    {menu.name}
-                  </NavLink>
-                </li>
-              ))}
-          </ul>
         </div>
       </div>
     </nav>

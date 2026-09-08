@@ -1,32 +1,25 @@
 import {
   ComponentType,
   DEFAULT_MORALE,
+  Marketing,
+  Person,
   PersonType,
   ProductionPerson,
+  ProductionStatKey,
   ProductionType,
+  QA,
+  STAT_KEY_BY_TYPE,
   Specialty,
 } from "@/data/interface";
 import { SexType, faker } from "@faker-js/faker";
 import { randomIntFromInterval } from "@/data/utils";
+import {
+  TEMPERAMENTS,
+  Temperament,
+  computeExpectedSalary,
+} from "@/data/utils/recruitment";
 
 export const MAX_STAT_POSSIBLE = 20;
-
-const STATS_BY_TYPE: Record<
-  ComponentType,
-  Array<keyof Pick<
-    ProductionPerson,
-    | "frontStat"
-    | "backStat"
-    | "debugStat"
-    | "creativityStat"
-    | "visualDesignStat"
-    | "animationStat"
-  >>
-> = {
-  [ComponentType.CODE]: ["frontStat", "backStat", "debugStat"],
-  [ComponentType.VISUEL]: ["visualDesignStat", "animationStat"],
-  [ComponentType.UX]: ["creativityStat"],
-};
 
 const pickSpecialty = (): Specialty => {
   const r = Math.random();
@@ -35,12 +28,13 @@ const pickSpecialty = (): Specialty => {
   return types[Math.floor(Math.random() * types.length)] as ComponentType;
 };
 
-const rollStat = (specialty: Specialty, statKey: string): number => {
+// Un spécialiste est fort (14..20) sur la stat de sa tâche, faible ailleurs ;
+// un fullstack est moyen partout (7..13).
+const rollStat = (specialty: Specialty, statKey: ProductionStatKey): number => {
   if (specialty === "FULLSTACK") {
     return randomIntFromInterval(7, 13);
   }
-  const focusStats = STATS_BY_TYPE[specialty as ComponentType];
-  if (focusStats.includes(statKey as any)) {
+  if (STAT_KEY_BY_TYPE[specialty as ComponentType] === statKey) {
     return randomIntFromInterval(14, MAX_STAT_POSSIBLE);
   }
   return randomIntFromInterval(1, 8);
@@ -51,42 +45,107 @@ const salaryForSpecialty = (specialty: Specialty): number => {
   return randomIntFromInterval(1600, 2600);
 };
 
-export const generateNewEmploye = (reputation: number): ProductionPerson[] => {
+// Attributs communs à tout candidat (identité, salaire, moral de départ).
+const baseCandidate = (salary: number): Person => {
+  const sex = faker.person.sex();
+  return {
+    id: 0, // assigné par le slice via nextCandidateId
+    sex,
+    firstName: faker.person.firstName(sex as SexType),
+    lastName: faker.person.lastName(sex as SexType),
+    salary,
+    personType: PersonType.PROD,
+    morale: DEFAULT_MORALE + randomIntFromInterval(-10, 10),
+  };
+};
+
+const generateProductionCandidate = (): ProductionPerson => {
+  const specialty = pickSpecialty();
+  const productionType =
+    Math.random() < 0.5 ? ProductionType.DEV : ProductionType.DESIGNER;
+  return {
+    ...baseCandidate(salaryForSpecialty(specialty)),
+    personType: PersonType.PROD,
+    productionType,
+    specialty,
+    codeStat: rollStat(specialty, "codeStat"),
+    codeMaxStat: MAX_STAT_POSSIBLE,
+    visualStat: rollStat(specialty, "visualStat"),
+    visualMaxStat: MAX_STAT_POSSIBLE,
+    uxStat: rollStat(specialty, "uxStat"),
+    uxMaxStat: MAX_STAT_POSSIBLE,
+  };
+};
+
+// Un stat « métier » (QA / Marketing) : 8..20, l'un des deux étant la spécialité
+// dominante (14..20) pour donner du relief aux candidats.
+const rollRoleStat = (dominant: boolean): number =>
+  dominant
+    ? randomIntFromInterval(14, MAX_STAT_POSSIBLE)
+    : randomIntFromInterval(6, 13);
+
+const generateQaCandidate = (): QA => {
+  const detectionDominant = Math.random() < 0.6;
+  return {
+    ...baseCandidate(randomIntFromInterval(1500, 2400)),
+    personType: PersonType.QA,
+    testStat: rollRoleStat(!detectionDominant),
+    testMaxStat: MAX_STAT_POSSIBLE,
+    bugDetectionStat: rollRoleStat(detectionDominant),
+    bugDetectionMaxStat: MAX_STAT_POSSIBLE,
+  };
+};
+
+const generateMarketingCandidate = (): Marketing => {
+  const commDominant = Math.random() < 0.5;
+  return {
+    ...baseCandidate(randomIntFromInterval(1500, 2400)),
+    personType: PersonType.MARKETING,
+    communicationStat: rollRoleStat(commDominant),
+    communicationMaxStat: MAX_STAT_POSSIBLE,
+    campaignManagementStat: rollRoleStat(!commDominant),
+    campaignManagementMaxStat: MAX_STAT_POSSIBLE,
+  };
+};
+
+// Mix des profils générés : majorité Production, le reste réparti QA / Marketing
+// (les deux rôles ouverts en Phase 2).
+const pickCandidate = (): Person => {
+  const r = Math.random();
+  if (r < 0.65) return generateProductionCandidate();
+  if (r < 0.83) return generateQaCandidate();
+  return generateMarketingCandidate();
+};
+
+const pickTemperament = (): Temperament =>
+  TEMPERAMENTS[Math.floor(Math.random() * TEMPERAMENTS.length)];
+
+// Recrutement enrichi (MYL-13) : on dérive `expectedSalary` du niveau du candidat
+// (borné dans l'enveloppe du rôle → masse salariale de départ inchangée en
+// espérance), on tire un tempérament et on masque les stats tant que l'entretien
+// n'a pas eu lieu. `salary` affiché = `expectedSalary` (prix demandé de départ).
+const enrichCandidate = (candidate: Person, reputation: number): Person => {
+  const noise = Math.random() * 2 - 1; // U(-1,1) → ±SALARY_NOISE dans le calcul
+  const expectedSalary = computeExpectedSalary(candidate, reputation, noise);
+  return {
+    ...candidate,
+    expectedSalary,
+    salary: expectedSalary,
+    temperament: pickTemperament(),
+    revealedStats: false,
+  };
+};
+
+export const generateNewEmploye = (reputation: number): Person[] => {
   let nbGenerated = 3;
   if (reputation > 25) nbGenerated = 5;
   if (reputation > 50) nbGenerated = 7;
   if (reputation > 75) nbGenerated = 9;
   if (reputation === 100) nbGenerated = 15;
 
-  let generated: ProductionPerson[] = [];
+  const generated: Person[] = [];
   for (let i = 0; i < nbGenerated; i++) {
-    let sex = faker.person.sex();
-    let productionType =
-      Math.random() < 0.5 ? ProductionType.DEV : ProductionType.DESIGNER;
-    const specialty = pickSpecialty();
-    generated.push({
-      id: 0, // assigné par le slice via nextCandidateId
-      sex,
-      firstName: faker.person.firstName(sex as SexType),
-      lastName: faker.person.lastName(sex as SexType),
-      salary: salaryForSpecialty(specialty),
-      personType: PersonType.PROD,
-      morale: DEFAULT_MORALE + randomIntFromInterval(-10, 10),
-      productionType,
-      specialty,
-      frontStat: rollStat(specialty, "frontStat"),
-      frontMaxStat: MAX_STAT_POSSIBLE,
-      backStat: rollStat(specialty, "backStat"),
-      backMaxStat: MAX_STAT_POSSIBLE,
-      debugStat: rollStat(specialty, "debugStat"),
-      debugMaxStat: MAX_STAT_POSSIBLE,
-      creativityStat: rollStat(specialty, "creativityStat"),
-      creativityMaxStat: MAX_STAT_POSSIBLE,
-      visualDesignStat: rollStat(specialty, "visualDesignStat"),
-      visualDesignMaxStat: MAX_STAT_POSSIBLE,
-      animationStat: rollStat(specialty, "animationStat"),
-      animationMaxStat: MAX_STAT_POSSIBLE,
-    });
+    generated.push(enrichCandidate(pickCandidate(), reputation));
   }
   return generated;
 };

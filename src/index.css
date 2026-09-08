@@ -15,3 +15,62 @@
     border-color: var(--color-gray-200, currentColor);
   }
 }
+
+/* ── MapMonde §4.2 / §7 — animations des panneaux studio (MYL-21) ────────────
+   Toutes gardées par prefers-reduced-motion : la variante Reduce Motion supprime
+   tout déplacement (pulse du cadre + slide du bandeau), garde le fondu / le texte.
+   La micro-révélation §7 honore aussi le flag `reduceMotion` côté composant via
+   la classe `reveal-banner--fade` (fondu sans slide). */
+
+/* §4.2 — pulse une fois quand la jauge réputation atteint 100 % (studio ouvrable). */
+@keyframes studio-frame-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 0.6rem color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+}
+.studio-frame-pulse {
+  animation: studio-frame-pulse 0.7s ease-out 1;
+}
+
+/* §7 — entrée du bandeau de révélation : slide + fondu (motion complète). */
+@keyframes reveal-banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* §7 — variante Reduce Motion : fondu seul, aucun déplacement. */
+@keyframes reveal-banner-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.reveal-banner--slide {
+  animation: reveal-banner-slide-in 0.4s ease-out 1;
+}
+.reveal-banner--fade {
+  animation: reveal-banner-fade-in 0.4s ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Plus aucun déplacement : pulse coupé, bandeau en fondu quoi qu'il arrive. */
+  .studio-frame-pulse {
+    animation: none;
+  }
+  .reveal-banner--slide {
+    animation: reveal-banner-fade-in 0.4s ease-out 1;
+  }
+}

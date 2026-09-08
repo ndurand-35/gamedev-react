@@ -15,3 +15,20 @@ export const hourToWeek = (hour: number): string => {
 export const hourToDay = (hour: number): string => {
   return (hour / 24).toFixed(0);
 };
+
+// Durée de survie lisible dérivée de `engine.time` (heures de jeu), pour
+// l'écran de bilan (WF-3). Ex. « 3 mois et 12 j », « 18 j », « 5 h ».
+export const formatSurvival = (time: number): string => {
+  const start = dayjs("1970-01-01");
+  const end = getTimeAsDate(time);
+  const months = end.diff(start, "month");
+  const afterMonths = start.add(months, "month");
+  const days = end.diff(afterMonths, "day");
+
+  if (months > 0) {
+    const m = `${months} mois`;
+    return days > 0 ? `${m} et ${days} j` : m;
+  }
+  if (days > 0) return `${days} j`;
+  return `${Math.max(0, Math.floor(time))} h`;
+};

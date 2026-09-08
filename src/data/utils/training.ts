@@ -1,7 +1,8 @@
 import {
-  ComponentType,
+  MAX_STAT_KEY_BY_TYPE,
   Person,
   ProductionPerson,
+  STAT_KEY_BY_TYPE,
 } from "@/data/interface";
 import { applyTrainingTick } from "@/data/redux/employeSlice";
 import { setMoney } from "@/data/redux/companySlice";
@@ -12,26 +13,8 @@ export const TRAINING_THRESHOLD = 100;
 export const TRAINING_PROGRESS_PER_TICK = 1;
 export const TRAINING_COST_PER_TICK = 5;
 
-const STAT_KEYS_BY_TYPE: Record<
-  ComponentType,
-  Array<keyof ProductionPerson>
-> = {
-  [ComponentType.CODE]: ["frontStat", "backStat", "debugStat"],
-  [ComponentType.VISUEL]: ["visualDesignStat", "animationStat"],
-  [ComponentType.UX]: ["creativityStat"],
-};
-
-const MAX_KEYS_BY_TYPE: Record<
-  ComponentType,
-  Array<keyof ProductionPerson>
-> = {
-  [ComponentType.CODE]: ["frontMaxStat", "backMaxStat", "debugMaxStat"],
-  [ComponentType.VISUEL]: ["visualDesignMaxStat", "animationMaxStat"],
-  [ComponentType.UX]: ["creativityMaxStat"],
-};
-
 const isProductionPerson = (p: Person): p is ProductionPerson =>
-  typeof (p as ProductionPerson).frontStat === "number";
+  typeof (p as ProductionPerson).codeStat === "number";
 
 export const processTrainingTick = (
   dispatch: AppDispatch,
@@ -64,20 +47,10 @@ export const processTrainingTick = (
       continue;
     }
 
-    const statKeys = STAT_KEYS_BY_TYPE[e.trainingType];
-    const maxKeys = MAX_KEYS_BY_TYPE[e.trainingType];
-    const candidates = statKeys
-      .map((k, i) => ({
-        statKey: k,
-        maxKey: maxKeys[i],
-      }))
-      .filter(({ statKey, maxKey }) => {
-        const value = e[statKey] as number;
-        const max = e[maxKey] as number;
-        return value < max;
-      });
+    const statKey = STAT_KEY_BY_TYPE[e.trainingType];
+    const maxKey = MAX_STAT_KEY_BY_TYPE[e.trainingType];
 
-    if (candidates.length === 0) {
+    if (e[statKey] >= e[maxKey]) {
       // pas de marge : on stoppe la formation
       updates.push({
         employeId: e.id,
@@ -92,19 +65,17 @@ export const processTrainingTick = (
       continue;
     }
 
-    const picked =
-      candidates[Math.floor(Math.random() * candidates.length)];
-    const newValue = (e[picked.statKey] as number) + 1;
+    const newValue = e[statKey] + 1;
 
     updates.push({
       employeId: e.id,
       progressDelta: 0,
-      completed: { statKey: picked.statKey, newValue },
+      completed: { statKey, newValue },
     });
 
     dispatch(
       pushNotification({
-        message: `${e.firstName} ${e.lastName} progresse en ${e.trainingType} (${String(picked.statKey).replace("Stat", "")} +1).`,
+        message: `${e.firstName} ${e.lastName} progresse en ${e.trainingType} (+1).`,
         type: "success",
       }),
     );

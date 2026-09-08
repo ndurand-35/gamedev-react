@@ -6,6 +6,9 @@ export * from "@/data/utils/component";
 export * from "@/data/utils/billing";
 export * from "@/data/utils/training";
 export * from "@/data/utils/events";
+export * from "@/data/utils/milestone";
+export * from "@/data/utils/recruitment";
+export * from "@/data/utils/studios";
 
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);

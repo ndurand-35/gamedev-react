@@ -8,3 +8,5 @@ export * from "@/pages/employe";
 
 export * from "@/pages/BuildingPage";
 export * from "@/pages/building";
+
+export * from "@/pages/SaveManagerPage";

@@ -1,24 +1,15 @@
 import { ReactElement, useEffect, useState } from "react";
 import { Building as BuildingIcon, Xmark } from "iconoir-react";
 
-import { BuildingPicker } from "@/components/building";
-import { HomeDashboard, SpeedDial } from "@/components/layout";
-import {
-  Employe,
-  PersonType,
-  ProductionPerson,
-  TopMenuItem,
-} from "@/data/interface";
+import { BuildingEmployeView, BuildingPicker } from "@/components/building";
+import { SpeedDial } from "@/components/layout";
+import { TopMenuItem } from "@/data/interface";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
 import {
   selectBuildingById,
   selectEmployesByBuilding,
 } from "@/data/redux/selectors";
-import {
-  COMPONENT_BTN_CLASS,
-  COMPONENT_ICON,
-} from "@/components/component";
 import { EMPLOYE_MODAL_ID, EmployeModal } from "@/components/employe";
 
 const pageTopMenuItems: TopMenuItem[] = [];
@@ -63,10 +54,9 @@ export const HomePage: React.FC = (): ReactElement => {
   };
 
   return (
-    <div className="p-4 mt-14 mb-14 space-y-4">
-      <HomeDashboard />
-
-      <div className="flex flex-row items-center gap-3">
+    <div className="fixed inset-x-0 top-14 bottom-14 flex flex-col gap-2 p-3 overflow-hidden">
+      {/* Barre de navigation bâtiment */}
+      <div className="flex flex-row items-center gap-3 flex-wrap shrink-0">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -77,7 +67,9 @@ export const HomePage: React.FC = (): ReactElement => {
           Bâtiments
         </button>
         {building && (
-          <h1 className="text-2xl font-bold truncate">{building.name}</h1>
+          <h1 className="text-xl font-bold truncate max-w-[60%]">
+            {building.name}
+          </h1>
         )}
       </div>
 
@@ -110,69 +102,24 @@ export const HomePage: React.FC = (): ReactElement => {
         </>
       )}
 
-      {!building ? (
-        <div className="card bg-base-100 border border-base-content/20 p-8 text-center">
-          <p className="opacity-70">
+      {/* Effectif du bâtiment sélectionné : occupe l'espace restant de l'Accueil */}
+      <div className="flex flex-1 min-h-0 flex-col rounded-lg border border-base-content/20 bg-base-100">
+        {!building ? (
+          <p className="m-auto p-8 text-center opacity-70">
             Aucun bâtiment. Achetez-en un depuis SeLoger.
           </p>
-        </div>
-      ) : (
-        <div className="card bg-base-100 border border-base-content/20 p-4">
-          <h3 className="font-semibold mb-2">Employés ({employes.length})</h3>
-          {employes.length === 0 ? (
-            <p className="text-sm opacity-60">
-              Aucun employé affecté à ce bâtiment.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {employes.map((emp: Employe) => {
-                const prod =
-                  emp.personType === PersonType.PROD
-                    ? (emp as ProductionPerson)
-                    : null;
-                const assigned = prod?.assignedComponentType ?? null;
-                const AssignedIcon = assigned ? COMPONENT_ICON[assigned] : null;
-                return (
-                  <div
-                    key={`home_employe_${emp.id}`}
-                    className="flex items-center gap-2 p-2 rounded border border-base-content/10"
-                  >
-                    <div className="avatar avatar-placeholder">
-                      <div className="bg-neutral text-neutral-content rounded-full w-10">
-                        <span className="uppercase">
-                          {emp.firstName[0]}
-                          {emp.lastName[0]}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
-                        {emp.firstName} {emp.lastName}
-                      </p>
-                      <p className="text-xs opacity-70">
-                        {prod?.productionType ?? emp.personType}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openEmploye(emp.id)}
-                      className={
-                        "btn btn-xs gap-1 " +
-                        (assigned ? COMPONENT_BTN_CLASS[assigned] : "")
-                      }
-                    >
-                      {AssignedIcon ? (
-                        <AssignedIcon width={12} height={12} />
-                      ) : null}
-                      {assigned ?? (prod ? "Libre" : "Détails")}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+        ) : employes.length === 0 ? (
+          <p className="m-auto p-8 text-center text-sm opacity-60">
+            Aucun employé affecté à ce bâtiment.
+          </p>
+        ) : (
+          <BuildingEmployeView
+            building={building}
+            employes={employes}
+            onSelect={openEmploye}
+          />
+        )}
+      </div>
 
       <EmployeModal
         employeId={selectedEmployeId}

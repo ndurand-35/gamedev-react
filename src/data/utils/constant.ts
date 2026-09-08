@@ -14,6 +14,13 @@ export const DEFAULT_ENGINE_STATE: EngineState = {
   currentTopMenu: [],
   moneyHistory: [],
   lastSnapshotTime: -1,
+  gameOver: false,
+  negativeMonthsStreak: 0,
+  bankruptcyReason: undefined,
+  lastMonthlyRevenue: 0,
+  maxHeadcount: 0,
+  peakReputation: 0,
+  bestMonthlyBalance: null,
 };
 
 export const buildDefaultCompanyState = (): CompanyState => ({
@@ -46,6 +53,7 @@ export const buildDefaultCompanyState = (): CompanyState => ({
   availableBuildingList: [],
   lastBuildingGeneration: -168,
   nextBuildingId: 2,
+  activeCampaign: undefined,
 });
 
 export const DEFAULT_COMPANY_STATE: CompanyState = buildDefaultCompanyState();

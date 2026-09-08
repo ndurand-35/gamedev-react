@@ -59,10 +59,100 @@ export const employeSlice = createSlice({
       );
       if (!candidate) return;
       const newId = state.nextEmployeId++;
-      state.employeList.push({ ...candidate, id: newId, buildingId: undefined });
+      const signed = candidate.salary;
+      state.employeList.push({
+        ...candidate,
+        id: newId,
+        buildingId: undefined,
+        signedSalary: signed,
+        revealedStats: true,
+        pendingRaise: false,
+      });
       state.candidateList = state.candidateList.filter(
         (c: Person) => c.id !== action.payload,
       );
+    },
+    // Recrutement enrichi (MYL-13) : embauche après négociation. `salary` est
+    // l'offre signée (figée comme `signedSalary` pour le plafond cumulé des
+    // augmentations), `moraleDelta` l'effet d'arrivée (salaire vs attendu).
+    hireWithOffer(
+      state,
+      action: PayloadAction<{
+        candidateId: number;
+        salary: number;
+        moraleDelta: number;
+      }>,
+    ) {
+      const { candidateId, salary, moraleDelta } = action.payload;
+      const candidate = state.candidateList.find(
+        (c: Person) => c.id === candidateId,
+      );
+      if (!candidate) return;
+      const newId = state.nextEmployeId++;
+      state.employeList.push({
+        ...candidate,
+        id: newId,
+        buildingId: undefined,
+        salary,
+        signedSalary: salary,
+        revealedStats: true,
+        pendingRaise: false,
+        morale: Math.max(
+          0,
+          Math.min(MAX_MORALE, candidate.morale + moraleDelta),
+        ),
+      });
+      state.candidateList = state.candidateList.filter(
+        (c: Person) => c.id !== candidateId,
+      );
+    },
+    // Volet A : révèle les stats / salaire attendu d'un candidat (entretien fait
+    // ou frais RH express). Idempotent.
+    revealCandidate(state, action: PayloadAction<number>) {
+      const candidate = state.candidateList.find(
+        (c: Person) => c.id === action.payload,
+      );
+      if (candidate) candidate.revealedStats = true;
+    },
+    // Volet B : un candidat refusé garde rancune et réapparaît avec un attendu
+    // majoré (`GRUDGE_EXPECTED_MULT`). On le retire simplement du pool courant.
+    rejectCandidate(state, action: PayloadAction<number>) {
+      state.candidateList = state.candidateList.filter(
+        (c: Person) => c.id !== action.payload,
+      );
+    },
+    // Volet C : applique une augmentation (nouveau salaire mensuel).
+    setSalary(
+      state,
+      action: PayloadAction<{ employeId: number; salary: number }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (!employe) return;
+      employe.salary = Math.max(0, Math.round(action.payload.salary));
+    },
+    // Volet C : (ré)arme le cooldown anti-spam et lève le flag de demande.
+    setRaiseCooldown(
+      state,
+      action: PayloadAction<{ employeId: number; until: number }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (!employe) return;
+      employe.raiseCooldownUntil = action.payload.until;
+      employe.pendingRaise = false;
+    },
+    setPendingRaise(
+      state,
+      action: PayloadAction<{ employeId: number; pending: boolean }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (!employe) return;
+      employe.pendingRaise = action.payload.pending;
     },
     assignBuilding(
       state,
@@ -182,6 +272,12 @@ export const {
   setStopCandidateGeneration,
   fired,
   hire,
+  hireWithOffer,
+  revealCandidate,
+  rejectCandidate,
+  setSalary,
+  setRaiseCooldown,
+  setPendingRaise,
   assignBuilding,
   assignComponentType,
   adjustMorale,

@@ -1,6 +1,14 @@
 import { ReactElement, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Group, NavArrowRight, ShopFourTiles, Wallet } from "iconoir-react";
+import {
+  Group,
+  Megaphone,
+  NavArrowRight,
+  ShieldCheck,
+  ShopFourTiles,
+  UserPlus,
+  Wallet,
+} from "iconoir-react";
 
 import {
   ComponentType,
@@ -10,6 +18,12 @@ import {
 } from "@/data/interface";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
+import {
+  selectActiveCampaign,
+  selectQaCoverage,
+  selectRecruitmentCap,
+  selectRemainingSlots,
+} from "@/data/redux/selectors";
 import { formatPrice } from "@/data/utils";
 
 export const pageTopMenuItems: TopMenuItem[] = [
@@ -34,7 +48,7 @@ const TYPE_ORDER: ComponentType[] = [
 ];
 
 const isProductionPerson = (p: Person): p is ProductionPerson =>
-  typeof (p as ProductionPerson).frontStat === "number";
+  typeof (p as ProductionPerson).codeStat === "number";
 
 interface StatCardProps {
   label: string;
@@ -74,6 +88,15 @@ export const EmployePage: React.FC = (): ReactElement => {
     (state) => state.employe.lastCandidateGeneration,
   );
   const time = useAppSelector((state) => state.engine.time);
+  const qaCoverage = useAppSelector(selectQaCoverage);
+  const activeCampaign = useAppSelector(selectActiveCampaign);
+  // Plafond de recrutement §6.1 — croît à chaque studio ouvert (MapMonde).
+  const recruitmentCap = useAppSelector(selectRecruitmentCap);
+  const remainingSlots = useAppSelector(selectRemainingSlots);
+
+  const campaignDaysLeft = activeCampaign
+    ? Math.max(0, Math.ceil((activeCampaign.endTime - time) / 24))
+    : 0;
 
   const stats = useMemo(() => {
     const total = employeList.length;
@@ -140,6 +163,47 @@ export const EmployePage: React.FC = (): ReactElement => {
           hint="Disponibles pour les contrats"
           icon={<Group height={32} width={32} />}
           tone={stats.free === 0 && stats.total > 0 ? "warning" : "neutral"}
+        />
+        <StatCard
+          label="Places de recrutement"
+          value={`${Math.max(0, remainingSlots)} / ${recruitmentCap}`}
+          hint={
+            remainingSlots <= 0
+              ? "Plafond atteint — ouvre un nouveau studio"
+              : `${Math.max(0, remainingSlots)} embauche${
+                  remainingSlots > 1 ? "s" : ""
+                } possible${remainingSlots > 1 ? "s" : ""}`
+          }
+          icon={<UserPlus height={32} width={32} />}
+          tone={remainingSlots <= 0 ? "warning" : "neutral"}
+        />
+        <StatCard
+          label="Couverture QA"
+          value={
+            qaCoverage.count === 0
+              ? "Aucune"
+              : qaCoverage.count.toString() +
+                " testeur" +
+                (qaCoverage.count > 1 ? "s" : "")
+          }
+          hint={
+            qaCoverage.count === 0
+              ? "Aucune couverture QA"
+              : `-${Math.round(qaCoverage.lossReductionRatio * 100)}% d'impact · ${Math.round(qaCoverage.cancelProbability * 100)}% d'annulation`
+          }
+          icon={<ShieldCheck height={32} width={32} />}
+          tone={qaCoverage.count === 0 ? "warning" : "success"}
+        />
+        <StatCard
+          label="Campagne"
+          value={activeCampaign ? activeCampaign.type : "Aucune"}
+          hint={
+            activeCampaign
+              ? `${campaignDaysLeft} j restants`
+              : "Lancez une campagne depuis la liste des employés"
+          }
+          icon={<Megaphone height={32} width={32} />}
+          tone={activeCampaign ? "warning" : "neutral"}
         />
       </div>
 

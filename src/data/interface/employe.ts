@@ -2,12 +2,19 @@ import { ComponentType } from "@/data/interface/component";
 
 export enum PersonType {
   PROD = "Production",
+  QA = "QA",
+  MARKETING = "Marketing",
 }
 
 export enum ProductionType {
   DEV = "Développeur",
   DESIGNER = "Designer",
 }
+
+// Tempérament : modificateur minimal (3 valeurs) du recrutement enrichi (MYL-13).
+// Module la négociation à l'embauche et les demandes d'augmentation. Défini ici
+// pour éviter un cycle d'import avec utils/recruitment.
+export type Temperament = "loyal" | "ambitieux" | "cameleon";
 
 // Interface générique pour les attributs communs à tous les employés
 export interface Person {
@@ -19,6 +26,19 @@ export interface Person {
   buildingId?: number;
   personType: PersonType;
   morale: number;
+
+  // ── Recrutement enrichi (MYL-13) ──────────────────────────────────────────
+  // Salaire attendu (base de négociation, §3). Borné dans l'enveloppe du rôle.
+  expectedSalary?: number;
+  // Salaire signé à l'embauche, figé : plafond cumulé des augmentations (§6.3).
+  signedSalary?: number;
+  temperament?: Temperament;
+  // Volet A : tant que false, stats affichées en fourchette floue côté UI.
+  revealedStats?: boolean;
+  // Volet C : temps de jeu (heures) avant lequel l'employé ne peut pas réclamer.
+  raiseCooldownUntil?: number;
+  // Volet C : true tant qu'une demande d'augmentation est en attente de décision.
+  pendingRaise?: boolean;
 }
 
 export const DEFAULT_MORALE = 70;
@@ -44,24 +64,47 @@ export interface ProductionPerson extends Person {
   productionType: ProductionType;
   specialty: Specialty;
 
-  frontStat: number;
-  frontMaxStat: number;
-  backStat: number;
-  backMaxStat: number;
-  debugStat: number;
-  debugMaxStat: number;
-
-  creativityStat: number;
-  creativityMaxStat: number;
-  visualDesignStat: number;
-  visualDesignMaxStat: number;
-  animationStat: number;
-  animationMaxStat: number;
+  // Une stat par tâche produisible (ComponentType) : plus de chevauchement,
+  // la compétence lue est toujours celle du composant produit.
+  codeStat: number;
+  codeMaxStat: number;
+  visualStat: number;
+  visualMaxStat: number;
+  uxStat: number;
+  uxMaxStat: number;
 
   assignedComponentType?: ComponentType | null;
   trainingType?: ComponentType | null;
   trainingProgress?: number;
 }
+
+export type ProductionStatKey = "codeStat" | "visualStat" | "uxStat";
+export type ProductionMaxStatKey =
+  | "codeMaxStat"
+  | "visualMaxStat"
+  | "uxMaxStat";
+
+/** Stat lue pour produire un composant de ce type (1 tâche = 1 stat). */
+export const STAT_KEY_BY_TYPE: Record<ComponentType, ProductionStatKey> = {
+  [ComponentType.CODE]: "codeStat",
+  [ComponentType.VISUEL]: "visualStat",
+  [ComponentType.UX]: "uxStat",
+};
+
+export const MAX_STAT_KEY_BY_TYPE: Record<
+  ComponentType,
+  ProductionMaxStatKey
+> = {
+  [ComponentType.CODE]: "codeMaxStat",
+  [ComponentType.VISUEL]: "visualMaxStat",
+  [ComponentType.UX]: "uxMaxStat",
+};
+
+export const PRODUCTION_STAT_KEYS: ProductionStatKey[] = [
+  "codeStat",
+  "visualStat",
+  "uxStat",
+];
 
 // Interface spécifique pour le marketing (Marketing)
 export interface Marketing extends Person {

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="112" viewBox="0 0 190 112">
+  <!-- Carte candidat (vue recrutement / Pole Emploi, hors studio).
+       Zones pilotees par le Developer : #avatar, #name, #role-icon (icons/role-*.svg),
+       #expected (salaire attendu), #interview (etat Requis/Fait : toggle couleur + label).
+       Liseré accent = role vise via la CSS var "accent". Sample = QA, entretien Requis. -->
+  <rect x="1" y="1" width="188" height="110" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+  <rect x="1" y="1" width="188" height="30" rx="12" fill="var(--accent,#F59E0B)" opacity="0.16"/>
+  <!-- avatar + role accessory -->
+  <circle id="avatar" cx="28" cy="28" r="16" fill="#fff" stroke="var(--accent,#F59E0B)" stroke-width="2"/>
+  <circle cx="28" cy="24" r="6" fill="#F0C19A"/>
+  <path d="M18 40 a10 10 0 0 1 20 0 Z" fill="#5B6B82"/>
+  <text id="name" x="52" y="22" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#0F172A">Sacha Lemoine</text>
+  <text id="role" x="52" y="36" font-family="system-ui,sans-serif" font-size="9" fill="var(--accent,#B45309)">QA · Testeur</text>
+  <!-- salaire attendu -->
+  <line x1="12" y1="52" x2="178" y2="52" stroke="#E2E8F0" stroke-width="1"/>
+  <text x="14" y="68" font-family="system-ui,sans-serif" font-size="8" fill="#64748B">Salaire attendu</text>
+  <text id="expected" x="14" y="82" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="#0F172A">2 100 €</text>
+  <!-- etat entretien (toggle) -->
+  <g id="interview">
+    <rect x="108" y="62" width="70" height="22" rx="11" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.2"/>
+    <circle cx="120" cy="73" r="4" fill="#F59E0B"/>
+    <text x="129" y="76.5" font-family="system-ui,sans-serif" font-size="9" font-weight="600" fill="#B45309">Entretien requis</text>
+  </g>
+  <!-- action -->
+  <rect x="14" y="92" width="162" height="14" rx="7" fill="var(--accent,#F59E0B)"/>
+  <text x="95" y="102" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#fff" text-anchor="middle">VOIR LE PROFIL</text>
+</svg>
