@@ -23,14 +23,7 @@ export const BuildingTable = () => {
         header: "Nom",
         enableColumnFilter: false,
         cell: (props: any) => (
-          <div className="flex items-center space-x-3">
-            <div className="avatar">
-              <div className="w-16 rounded">
-                <img src={props.row.original.image} alt="" />
-              </div>
-            </div>
-            <div className="font-bold">{props.row.original.name}</div>
-          </div>
+          <div className="font-bold">{props.row.original.name}</div>
         ),
       },
       columnHelper.display({

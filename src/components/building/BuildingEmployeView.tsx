@@ -1,6 +1,6 @@
 import { ReactElement, useEffect, useMemo, useState } from "react";
 
-import { GraduationCap, List, Table, ViewGrid } from "iconoir-react";
+import { CoffeeCup, List, Table, ViewGrid } from "iconoir-react";
 import { createColumnHelper } from "@tanstack/react-table";
 
 import { MyTable } from "@/components/Table";
@@ -11,11 +11,17 @@ import {
   LOW_MORALE_THRESHOLD,
   PersonType,
   ProductionPerson,
-  ProductionType,
   RESIGNATION_MORALE_THRESHOLD,
+  jobLabel,
 } from "@/data/interface";
 import { formatPrice } from "@/data/utils";
+import { COMPONENT_ICON } from "@/components/component";
 import { RoleBadge } from "@/components/employe/RoleBadge";
+import {
+  ActivityBadge,
+  ActivityIcon,
+  employeActivity,
+} from "@/components/employe/ActivityBadge";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Effectif d'un bâtiment, en trois présentations au choix du joueur.
@@ -53,10 +59,11 @@ const moraleClass = (morale: number): string => {
   return "progress-success";
 };
 
-/** Libellé de poste : le type de production affine le rôle pour la prod. */
-const jobLabel = (emp: Employe): string => {
-  if (emp.personType !== PersonType.PROD) return emp.personType;
-  return (emp as ProductionPerson).productionType ?? ProductionType.DEV;
+/** Pastilles du résumé : même code couleur que les composants produits. */
+const COMPONENT_SUMMARY_CLASS: Record<ComponentType, string> = {
+  [ComponentType.CODE]: "border-primary/50 bg-primary/15 text-primary",
+  [ComponentType.VISUEL]: "border-secondary/50 bg-secondary/15 text-secondary",
+  [ComponentType.UX]: "border-accent/50 bg-accent/15 text-accent",
 };
 
 const asProd = (emp: Employe): ProductionPerson | null =>
@@ -64,20 +71,16 @@ const asProd = (emp: Employe): ProductionPerson | null =>
 
 const fullName = (emp: Employe): string => `${emp.firstName} ${emp.lastName}`;
 
-interface BuildingEmployeViewProps {
-  building: Building;
-  employes: Employe[];
-  /** Ouvre la fiche détaillée (modale employé). */
-  onSelect?: (id: number) => void;
-}
-
-export const BuildingEmployeView = ({
-  building,
-  employes,
-  onSelect,
-}: BuildingEmployeViewProps): ReactElement => {
-  // Le mode de vue est une préférence d'affichage : on la garde d'une session à
-  // l'autre, sans la faire entrer dans l'état de jeu (rien à sauvegarder).
+/**
+ * Le mode de vue est une préférence d'affichage : on la garde d'une session à
+ * l'autre, sans la faire entrer dans l'état de jeu (rien à sauvegarder).
+ * Exposé en hook pour que le sélecteur puisse vivre dans l'en-tête de page,
+ * sur la même ligne que le nom du bâtiment.
+ */
+export const useEmployeViewMode = (): [
+  EmployeViewMode,
+  (mode: EmployeViewMode) => void,
+] => {
   const [mode, setMode] = useState<EmployeViewMode>(() => {
     const saved =
       typeof localStorage === "undefined"
@@ -96,6 +99,49 @@ export const BuildingEmployeView = ({
     }
   }, [mode]);
 
+  return [mode, setMode];
+};
+
+interface EmployeViewSwitchProps {
+  mode: EmployeViewMode;
+  onMode: (mode: EmployeViewMode) => void;
+}
+
+export const EmployeViewSwitch = ({
+  mode,
+  onMode,
+}: EmployeViewSwitchProps): ReactElement => (
+  <div className="join" role="group" aria-label="Mode d'affichage">
+    {VIEW_OPTIONS.map(({ mode: m, label, Icon }) => (
+      <button
+        key={m}
+        type="button"
+        onClick={() => onMode(m)}
+        aria-pressed={mode === m}
+        className={`btn join-item btn-sm ${mode === m ? "btn-active btn-primary" : ""}`}
+      >
+        <Icon width={16} height={16} />
+        {label}
+      </button>
+    ))}
+  </div>
+);
+
+interface BuildingEmployeViewProps {
+  building: Building;
+  employes: Employe[];
+  /** Mode d'affichage, piloté depuis l'en-tête de page. */
+  mode: EmployeViewMode;
+  /** Ouvre la fiche détaillée (modale employé). */
+  onSelect?: (id: number) => void;
+}
+
+export const BuildingEmployeView = ({
+  building,
+  employes,
+  mode,
+  onSelect,
+}: BuildingEmployeViewProps): ReactElement => {
   const [role, setRole] = useState<PersonType | "all">("all");
   const [assignment, setAssignment] = useState<AssignmentFilter>("all");
   const [lowMoraleOnly, setLowMoraleOnly] = useState(false);
@@ -129,21 +175,7 @@ export const BuildingEmployeView = ({
           {" · "}
           {formatPrice(payroll)} / mois
         </p>
-
-        <div className="join" role="group" aria-label="Mode d'affichage">
-          {VIEW_OPTIONS.map(({ mode: m, label, Icon }) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              aria-pressed={mode === m}
-              className={`btn join-item btn-sm ${mode === m ? "btn-active btn-primary" : ""}`}
-            >
-              <Icon width={16} height={16} />
-              {label}
-            </button>
-          ))}
-        </div>
+        <ActivitySummary employes={filtered} />
       </header>
 
       <EmployeFilters
@@ -167,6 +199,61 @@ export const BuildingEmployeView = ({
         <TableView employes={filtered} onSelect={onSelect} />
       )}
     </div>
+  );
+};
+
+// ── Résumé d'activité ────────────────────────────────────────────────────────
+
+/**
+ * Répartition de l'effectif par activité : combien de mains sur le Code, le
+ * Visuel, l'UX, et combien n'ont rien à faire. C'est la lecture « d'un coup
+ * d'œil » du bâtiment, avant même de descendre dans les vignettes.
+ */
+const ActivitySummary = ({
+  employes,
+}: {
+  employes: Employe[];
+}): ReactElement | null => {
+  const { byType, idle } = useMemo(() => {
+    const byType = new Map<ComponentType, number>();
+    let idle = 0;
+    for (const emp of employes) {
+      const prod = asProd(emp);
+      if (!prod) continue;
+      const assigned = prod.assignedComponentType ?? null;
+      if (assigned) byType.set(assigned, (byType.get(assigned) ?? 0) + 1);
+      else idle += 1;
+    }
+    return { byType, idle };
+  }, [employes]);
+
+  if (byType.size === 0 && idle === 0) return null;
+
+  return (
+    <ul className="flex flex-wrap items-center gap-1.5">
+      {Object.values(ComponentType).map((type) => {
+        const count = byType.get(type) ?? 0;
+        if (count === 0) return null;
+        const Icon = COMPONENT_ICON[type];
+        return (
+          <li
+            key={type}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${COMPONENT_SUMMARY_CLASS[type]}`}
+          >
+            <Icon width={13} height={13} />
+            <span className="tabular-nums">{count}</span>
+            <span>{type}</span>
+          </li>
+        );
+      })}
+      {idle > 0 && (
+        <li className="inline-flex items-center gap-1 rounded-full border border-warning/50 bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+          <CoffeeCup width={13} height={13} />
+          <span className="tabular-nums">{idle}</span>
+          <span>inactif{idle > 1 ? "s" : ""}</span>
+        </li>
+      )}
+    </ul>
   );
 };
 
@@ -246,27 +333,6 @@ const MoraleBar = ({ morale }: { morale: number }): ReactElement => (
   </>
 );
 
-/** Badges d'affectation et de formation, communs aux vues cartes et liste. */
-const AssignmentBadges = ({ emp }: { emp: Employe }): ReactElement | null => {
-  const prod = asProd(emp);
-  const assigned = prod?.assignedComponentType ?? null;
-  const training = prod?.trainingType ?? null;
-  if (!assigned && !training) return null;
-  return (
-    <>
-      {assigned && (
-        <span className="badge badge-outline badge-sm">{assigned}</span>
-      )}
-      {training && (
-        <span className="badge badge-ghost badge-sm gap-1">
-          <GraduationCap width={11} height={11} />
-          {training} {Math.round(prod?.trainingProgress ?? 0)} %
-        </span>
-      )}
-    </>
-  );
-};
-
 interface ViewProps {
   employes: Employe[];
   onSelect?: (id: number) => void;
@@ -276,31 +342,45 @@ interface ViewProps {
 
 const CardsView = ({ employes, onSelect }: ViewProps): ReactElement => (
   <ul className="grid min-h-0 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3 overflow-y-auto">
-    {employes.map((emp) => (
-      <li key={emp.id}>
-        <button
-          type="button"
-          onClick={() => onSelect?.(emp.id)}
-          aria-label={`Ouvrir la fiche de ${fullName(emp)}`}
-          className="card w-full cursor-pointer border border-base-content/10 bg-base-200/50 text-left transition hover:border-primary/40 hover:shadow-md"
-        >
-          <div className="card-body gap-2 p-4">
-            <div className="flex items-start justify-between gap-2">
-              <span className="truncate font-medium">{fullName(emp)}</span>
-              <RoleBadge personType={emp.personType} />
+    {employes.map((emp) => {
+      const activity = employeActivity(emp);
+      return (
+        <li key={emp.id}>
+          <button
+            type="button"
+            onClick={() => onSelect?.(emp.id)}
+            aria-label={`Ouvrir la fiche de ${fullName(emp)} — ${activity.label}`}
+            className={`card w-full cursor-pointer border border-l-4 border-base-content/10 bg-base-200/50 text-left transition hover:shadow-md ${activity.accentBorderClass}`}
+          >
+            <div className="card-body gap-2 p-4">
+              {/* L'activité en cours passe devant : pastille colorée + libellé,
+                  lus avant même le nom. Le poste et le rôle restent en appui. */}
+              <div className="flex items-center gap-3">
+                <ActivityIcon activity={activity} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {fullName(emp)}
+                  </span>
+                  <span
+                    className={`block truncate text-xs font-medium ${activity.textClass}`}
+                  >
+                    {activity.label}
+                    {activity.detail && (
+                      <span className="opacity-70"> {activity.detail}</span>
+                    )}
+                  </span>
+                </span>
+                <RoleBadge personType={emp.personType} />
+              </div>
+              <MoraleBar morale={emp.morale} />
+              <p className="text-right text-sm tabular-nums opacity-80">
+                {formatPrice(emp.salary)} / mois
+              </p>
             </div>
-            <p className="text-xs opacity-70">{jobLabel(emp)}</p>
-            <div className="flex flex-wrap gap-1">
-              <AssignmentBadges emp={emp} />
-            </div>
-            <MoraleBar morale={emp.morale} />
-            <p className="text-right text-sm tabular-nums opacity-80">
-              {formatPrice(emp.salary)} / mois
-            </p>
-          </div>
-        </button>
-      </li>
-    ))}
+          </button>
+        </li>
+      );
+    })}
   </ul>
 );
 
@@ -308,33 +388,36 @@ const CardsView = ({ employes, onSelect }: ViewProps): ReactElement => (
 
 const ListView = ({ employes, onSelect }: ViewProps): ReactElement => (
   <ul className="menu w-full flex-nowrap gap-1 overflow-y-auto rounded-box bg-base-200/40 p-2">
-    {employes.map((emp) => (
-      <li key={emp.id}>
-        <button
-          type="button"
-          onClick={() => onSelect?.(emp.id)}
-          aria-label={`Ouvrir la fiche de ${fullName(emp)}`}
-          className="flex w-full items-center gap-3 text-left"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="truncate font-medium">{fullName(emp)}</span>
-              <RoleBadge personType={emp.personType} />
+    {employes.map((emp) => {
+      const activity = employeActivity(emp);
+      return (
+        <li key={emp.id}>
+          <button
+            type="button"
+            onClick={() => onSelect?.(emp.id)}
+            aria-label={`Ouvrir la fiche de ${fullName(emp)} — ${activity.label}`}
+            className="flex w-full items-center gap-3 text-left"
+          >
+            <ActivityIcon activity={activity} size={28} />
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="truncate font-medium">{fullName(emp)}</span>
+                <RoleBadge personType={emp.personType} />
+              </span>
+              <span className="flex flex-wrap items-center gap-2 text-xs">
+                <ActivityBadge employe={emp} variant="text" />
+              </span>
             </span>
-            <span className="flex flex-wrap items-center gap-2 text-xs opacity-70">
-              <span>{jobLabel(emp)}</span>
-              <AssignmentBadges emp={emp} />
+            <span className="w-24 shrink-0 text-right">
+              <MoraleBar morale={emp.morale} />
             </span>
-          </span>
-          <span className="w-24 shrink-0 text-right">
-            <MoraleBar morale={emp.morale} />
-          </span>
-          <span className="w-24 shrink-0 text-right text-sm tabular-nums">
-            {formatPrice(emp.salary)}
-          </span>
-        </button>
-      </li>
-    ))}
+            <span className="w-24 shrink-0 text-right text-sm tabular-nums">
+              {formatPrice(emp.salary)}
+            </span>
+          </button>
+        </li>
+      );
+    })}
   </ul>
 );
 
@@ -367,10 +450,13 @@ const TableView = ({ employes, onSelect }: ViewProps): ReactElement => {
         header: "Rôle",
         cell: (info) => <RoleBadge personType={info.getValue()} />,
       }),
-      columnHelper.accessor(
-        (emp) => asProd(emp)?.assignedComponentType ?? "—",
-        { id: "assignment", header: "Affectation" },
-      ),
+      columnHelper.accessor((emp) => employeActivity(emp).label, {
+        id: "assignment",
+        header: "Activité",
+        cell: (info) => (
+          <ActivityBadge employe={info.row.original} variant="text" />
+        ),
+      }),
       columnHelper.accessor((emp) => emp.morale, {
         id: "morale",
         header: "Moral",

@@ -6,14 +6,11 @@ import {
   Person,
   ProductionPerson,
 } from "@/data/interface";
-import { generateNewEmploye } from "@/data/utils/employe";
 import { DEFAULT_EMPLOYE_STATE } from "@/data/utils/constant";
 
 export interface EmployeState {
   employeList: Person[];
   candidateList: Person[];
-  stopCandidateGeneration: boolean;
-  lastCandidateGeneration: number;
   nextEmployeId: number;
   nextCandidateId: number;
 }
@@ -21,8 +18,6 @@ export interface EmployeState {
 const initialState: EmployeState = {
   employeList: [],
   candidateList: [],
-  stopCandidateGeneration: false,
-  lastCandidateGeneration: -168,
   nextEmployeId: 2,
   nextCandidateId: 1,
 };
@@ -37,15 +32,8 @@ export const employeSlice = createSlice({
         { ...action.payload, id: 1, buildingId: 1 },
       ];
       state.candidateList = DEFAULT_EMPLOYE_STATE.candidateList;
-      state.stopCandidateGeneration =
-        DEFAULT_EMPLOYE_STATE.stopCandidateGeneration;
-      state.lastCandidateGeneration =
-        DEFAULT_EMPLOYE_STATE.lastCandidateGeneration;
       state.nextEmployeId = 2;
       state.nextCandidateId = 1;
-    },
-    setStopCandidateGeneration(state, action: PayloadAction<boolean>) {
-      state.stopCandidateGeneration = action.payload;
     },
     fired(state, action: PayloadAction<number>) {
       if (action.payload === 1) return;
@@ -249,27 +237,28 @@ export const employeSlice = createSlice({
         }
       }
     },
-    generateCandidateList(
-      state,
-      action: PayloadAction<{ reputation: number; time: number }>,
-    ) {
-      if (
-        !state.stopCandidateGeneration &&
-        action.payload.time - state.lastCandidateGeneration > 168
-      ) {
-        state.lastCandidateGeneration = action.payload.time;
-        const candidates = generateNewEmploye(action.payload.reputation);
-        state.candidateList = candidates.map((c) => ({
-          ...c,
-          id: state.nextCandidateId++,
-        }));
+    // Pôle emploi (recherche à la demande) : ajoute au vivier les profils
+    // ramenés par une recherche commandée et payée par le joueur. Les candidats
+    // n'expirent plus tout seuls — ils restent jusqu'à embauche ou refus.
+    addCandidates(state, action: PayloadAction<Person[]>) {
+      for (const candidate of action.payload) {
+        state.candidateList.push({ ...candidate, id: state.nextCandidateId++ });
       }
+    },
+    // Un profil ramené ne patiente pas indéfiniment : passé son `expiresAt`
+    // (posé à la recherche), il quitte le vivier. Un candidat SANS échéance
+    // vient forcément d'un vivier auto-généré d'avant la recherche à la demande
+    // (partie en cours) : on le purge aussi, pour que la règle tienne partout —
+    // sans recherche, pas de candidat.
+    expireCandidates(state, action: PayloadAction<number>) {
+      state.candidateList = state.candidateList.filter(
+        (c: Person) => c.expiresAt != null && c.expiresAt > action.payload,
+      );
     },
   },
 });
 
 export const {
-  setStopCandidateGeneration,
   fired,
   hire,
   hireWithOffer,
@@ -284,7 +273,8 @@ export const {
   resignEmploye,
   setTraining,
   applyTrainingTick,
-  generateCandidateList,
+  addCandidates,
+  expireCandidates,
   initializeEmployeState,
 } = employeSlice.actions;
 

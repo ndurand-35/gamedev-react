@@ -7,7 +7,6 @@ import {
   PersonType,
   ProductionPerson,
   ProductionStatKey,
-  ProductionType,
   QUALITY_LABELS,
   Specialty,
   getBuildingMonthlyCharges,
@@ -20,6 +19,7 @@ import { initializeEngineState } from "@/data/redux/engineSlice";
 import { initializeTaskState } from "@/data/redux/taskSlice";
 import { initializeProductState } from "@/data/redux/productSlice";
 import { initializeLoanState } from "@/data/redux/loanSlice";
+import { initializeFinanceState } from "@/data/redux/financeSlice";
 import { initializeStudioState } from "@/data/redux/studioSlice";
 import { MAX_STAT_POSSIBLE } from "@/data/utils";
 import { getRelevantStat } from "@/data/utils/component";
@@ -51,13 +51,12 @@ const STAT_GROUPS: Array<{
 const ALL_STAT_KEYS: ProductionStatKey[] = STAT_GROUPS.map((g) => g.key);
 
 // ── Profil : choix unique (rôle + spécialité fusionnés) ─────────────────────
-// `specialty` (badge, enveloppe salariale) et `productionType` (libellé fiche,
-// avatar studio) décrivaient la même chose deux fois. Le joueur choisit un
-// profil, qui pose la répartition de départ ; les deux champs en sont dérivés.
+// La spécialité porte à elle seule le métier : badge, enveloppe salariale,
+// libellé de poste et avatar studio en sont tous dérivés. Le joueur choisit un
+// profil, qui pose la répartition de départ.
 interface ProfileDef {
   specialty: Specialty;
   label: string;
-  productionType: ProductionType;
   preset: Record<ProductionStatKey, number>;
 }
 
@@ -65,25 +64,21 @@ const PROFILES: ProfileDef[] = [
   {
     specialty: "FULLSTACK",
     label: "Polyvalent — à l'aise partout",
-    productionType: ProductionType.DEV,
     preset: { codeStat: 6, visualStat: 6, uxStat: 6 },
   },
   {
     specialty: ComponentType.CODE,
     label: "Développeur — spécialiste Code",
-    productionType: ProductionType.DEV,
     preset: { codeStat: 10, visualStat: 4, uxStat: 4 },
   },
   {
     specialty: ComponentType.VISUEL,
     label: "Graphiste — spécialiste Visuel",
-    productionType: ProductionType.DESIGNER,
     preset: { codeStat: 4, visualStat: 10, uxStat: 4 },
   },
   {
     specialty: ComponentType.UX,
     label: "Designer UX — spécialiste UX",
-    productionType: ProductionType.DESIGNER,
     preset: { codeStat: 4, visualStat: 4, uxStat: 10 },
   },
 ];
@@ -135,7 +130,6 @@ const NewGamePage: React.FC = () => {
       const director: ProductionPerson = {
         ...rest,
         specialty: profile.specialty,
-        productionType: profile.productionType,
       };
 
       dispatch(initializeEngineState({ director, gameName }));
@@ -145,6 +139,7 @@ const NewGamePage: React.FC = () => {
       dispatch(initializeComponentState());
       dispatch(initializeProductState());
       dispatch(initializeLoanState());
+      dispatch(initializeFinanceState());
       dispatch(initializeStudioState());
 
       navigate("/game");
@@ -152,7 +147,9 @@ const NewGamePage: React.FC = () => {
     defaultValues: {
       gameName: "",
       id: 1,
-      sex: "M",
+      // Plus demandé à la création : `sex` n'alimente que le morph de l'avatar
+      // isométrique, et une valeur vide y donne le morph neutre (normalizeSex).
+      sex: "",
       firstName: "",
       lastName: "",
       // Le fondateur ne se verse pas de salaire : il n'entre pas dans la
@@ -160,7 +157,6 @@ const NewGamePage: React.FC = () => {
       salary: 0,
       personType: PersonType.PROD,
       morale: DEFAULT_MORALE + 20,
-      productionType: FULLSTACK_PROFILE.productionType,
       specialty: FULLSTACK_PROFILE.specialty,
       ...FULLSTACK_PROFILE.preset,
       codeMaxStat: MAX_STAT_POSSIBLE,
@@ -231,16 +227,6 @@ const NewGamePage: React.FC = () => {
                     value.trim() ? undefined : "Nom requis",
                 }}
                 children={(field) => <TextInput field={field} label="Nom" />}
-              />
-              <form.Field
-                name="sex"
-                children={(field) => (
-                  <SelectInput field={field} label="Sexe">
-                    <option value="M">Masculin</option>
-                    <option value="F">Féminin</option>
-                    <option value="O">Autre</option>
-                  </SelectInput>
-                )}
               />
 
               {/* Profil : amorce la répartition, rôle et badge en découlent */}

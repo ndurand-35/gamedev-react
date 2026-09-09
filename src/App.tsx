@@ -11,13 +11,13 @@ import { setGameSpeed } from "@/data/redux/engineSlice";
 import { useStudioOpenChime } from "@/audio/useStudioOpenChime";
 
 import {
-  BankPanel,
   BottomNavigation,
   DecisionModal,
   GameOverIndicator,
   Header,
   NotificationCenter,
   PauseIndicator,
+  RescueLoanModal,
   SavePanel,
   ToastContainer,
 } from "@/components/layout/index";
@@ -33,6 +33,8 @@ import {
   ComponentPage,
   ProductPage,
   SaveManagerPage,
+  FinancePage,
+  BankPage,
 } from "@/pages";
 
 import { OwnedPage } from "@/pages/building/OwnedPage";
@@ -54,12 +56,14 @@ const router = createBrowserRouter([
       { path: "/game/employe/me", element: <FondateurPage /> },
       { path: "/game/employe/list", element: <EmployeListPage /> },
       { path: "/game/employe/recruit", element: <PoleEmploiPage /> },
-      { path: "/game/task", element: <TaskPage /> },
       { path: "/game/component", element: <ComponentPage /> },
       { path: "/game/product", element: <ProductPage /> },
+      { path: "/game/product/contract", element: <TaskPage /> },
       { path: "/game/building", element: <BuildingPage /> },
       { path: "/game/building/owned", element: <OwnedPage /> },
       { path: "/game/building/buy", element: <SelogerPage /> },
+      { path: "/game/finance", element: <FinancePage /> },
+      { path: "/game/finance/bank", element: <BankPage /> },
     ],
   },
 ]);
@@ -107,7 +111,7 @@ function Game() {
       <Outlet />
       <PauseIndicator />
       <DecisionModal />
-      <BankPanel />
+      <RescueLoanModal />
       <SavePanel />
       <GameOverIndicator />
       <ToastContainer />

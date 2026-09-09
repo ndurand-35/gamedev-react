@@ -17,6 +17,7 @@ export const DEFAULT_ENGINE_STATE: EngineState = {
   gameOver: false,
   negativeMonthsStreak: 0,
   bankruptcyReason: undefined,
+  pendingRescue: undefined,
   lastMonthlyRevenue: 0,
   maxHeadcount: 0,
   peakReputation: 0,
@@ -24,7 +25,7 @@ export const DEFAULT_ENGINE_STATE: EngineState = {
 };
 
 export const buildDefaultCompanyState = (): CompanyState => ({
-  money: 50000,
+  money: 10000,
   reputation: 0,
   reputationByType: {
     [ComponentType.CODE]: 0,
@@ -36,7 +37,7 @@ export const buildDefaultCompanyState = (): CompanyState => ({
       id: 1,
       name: "Garage",
       price: 0,
-      place: 1,
+      place: 3,
       rent: 60,
       electricity: 25,
       internet: 15,
@@ -67,8 +68,6 @@ export const DEFAULT_TASK_STATE: TaskState = {
 export const DEFAULT_EMPLOYE_STATE: EmployeState = {
   employeList: [],
   candidateList: [],
-  stopCandidateGeneration: false,
-  lastCandidateGeneration: -168,
   nextEmployeId: 2,
   nextCandidateId: 1,
 };

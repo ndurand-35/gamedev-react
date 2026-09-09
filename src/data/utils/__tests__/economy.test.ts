@@ -33,6 +33,7 @@ import {
   createLoanFromOffer,
   evaluateBankruptcy,
   evaluateLoanDefault,
+  findRescueOffer,
   getBuildingVariableCharges,
   isCampaignActive,
   isLoanOfferAvailable,
@@ -587,5 +588,43 @@ describe("garde-fous d'équilibrage (cohérence des constantes)", () => {
     // À pic max, un revenu de 10000 plafonne à 80000 si < palier.
     const cap = borrowingCapacity(25, 10000, 0);
     expect(cap.capaciteMax).toBe(Math.min(PME.tierCap, 8 * 10000));
+  });
+});
+
+describe("findRescueOffer", () => {
+  it("propose le micro-crédit pour un petit découvert à froid", () => {
+    // Studio sans revenu : seul le micro (exempté du ratio §1.3) est ouvert.
+    const offer = findRescueOffer(5000, 0, 2000, 0, []);
+    expect(offer?.id).toBe("micro");
+  });
+
+  it("écarte une offre dont le capital ne couvre pas aussi sa 1re échéance", () => {
+    // Micro : 10 000 € − mensualité (~1 735 €) ≈ 8 265 € < 9 500 € de découvert.
+    // L'accepter laisserait la trésorerie négative → sauvetage en boucle.
+    // Aucun palier supérieur n'est ouvert à froid → défaite.
+    expect(findRescueOffer(9500, 0, 2000, 0, [])).toBeNull();
+  });
+
+  it("monte au palier supérieur quand réputation et revenu le permettent", () => {
+    const offer = findRescueOffer(20000, 25, 50000, 10000, []);
+    expect(offer?.id).toBe("pme");
+  });
+
+  it("ne propose rien quand la capacité d'emprunt est saturée", () => {
+    // Dette déjà au socle micro (15 000 €) : plus de dette disponible → défaite.
+    const existing = loanFrom(MICRO, { outstandingBalance: 15000 });
+    expect(findRescueOffer(5000, 0, 2000, 0, [existing])).toBeNull();
+  });
+
+  it("ignore le cooldown d'octroi (le sauvetage ne dépend pas du timing)", () => {
+    // `isLoanOfferAvailable` refuserait pour « cooldown » juste après un octroi ;
+    // le sauvetage neutralise ce motif et ne garde que réputation/plafond/ratio.
+    const justGranted = isLoanOfferAvailable(MICRO, 0, 2000, 0, [], 0, 1);
+    expect(justGranted.reason).toBe("cooldown");
+    expect(findRescueOffer(5000, 0, 2000, 0, [])?.id).toBe("micro");
+  });
+
+  it("ne propose rien sans découvert", () => {
+    expect(findRescueOffer(0, 100, 999999, 100000, [])).toBeNull();
   });
 });

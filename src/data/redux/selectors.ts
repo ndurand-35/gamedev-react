@@ -6,7 +6,6 @@ import {
   type Marketing,
   type Person,
   type QA,
-  type StartedContract,
 } from "@/data/interface";
 import {
   aggregateQaDetection,
@@ -21,7 +20,6 @@ import { getStudioDef, type StudioStatus } from "@/data/utils/studios";
 
 const selectEmployeList = (state: RootState) => state.employe.employeList;
 const selectBuildingList = (state: RootState) => state.company.buildingList;
-const selectTaskList = (state: RootState) => state.task.taskList;
 
 export const selectFondateur = createSelector([selectEmployeList], (list) =>
   list.find((e: Person) => e.id === 1),
@@ -49,12 +47,6 @@ export const selectBuildingById = createSelector(
   ],
   (buildings, id) =>
     id == null ? undefined : buildings.find((b: Building) => b.id === id),
-);
-
-export const selectTasksForBuilding = createSelector(
-  [selectTaskList, (_: RootState, buildingId: number) => buildingId],
-  (tasks, buildingId) =>
-    tasks.filter((t: StartedContract) => t.buildingIds?.includes(buildingId)),
 );
 
 export const selectEmployesWithoutFondateur = createSelector(
@@ -156,13 +148,14 @@ export const selectStudioStatus = createSelector(
 );
 
 /**
- * Plafond de recrutement (§6.1) = somme des `employeeSlots` des studios débloqués.
- * Le Garage (seedé) fournit le quota de base.
+ * Plafond de recrutement = somme des places (`place`) des bâtiments possédés.
+ * Ce sont les bureaux qui limitent l'effectif : le Garage seedé donne le quota
+ * de base, chaque bâtiment loué en plus augmente le plafond.
  */
 export const selectRecruitmentCap = createSelector(
-  [selectUnlockedStudioIds],
-  (unlockedIds) =>
-    unlockedIds.reduce((sum, id) => sum + (getStudioDef(id)?.employeeSlots ?? 0), 0),
+  [selectBuildingList],
+  (buildingList) =>
+    buildingList.reduce((sum: number, b: Building) => sum + b.place, 0),
 );
 
 /** Places de recrutement restantes = plafond − effectif courant (≥ 0 affichable). */

@@ -7,17 +7,17 @@ import {
 } from "@/data/redux/engineSlice";
 import { getTimeAsDate } from "@/data/utils/time";
 import { generateCompanyList } from "@/data/redux/companySlice";
-import { generateCandidateList } from "@/data/redux/employeSlice";
+import { expireCandidates } from "@/data/redux/employeSlice";
 import { generateAvailableContractList } from "@/data/redux/taskSlice";
 import { treatTasks } from "@/data/utils/task";
-import { produceComponents } from "@/data/utils/component";
+import { decayComponents, produceComponents } from "@/data/utils/component";
 import {
   processCampaignTick,
   processMonthlyBilling,
   processMoraleTick,
 } from "@/data/utils/billing";
 import { processTrainingTick } from "@/data/utils/training";
-import { processRandomEvents, processRaiseTick } from "@/data/utils/events";
+import { processRaiseTick } from "@/data/utils/events";
 import { writeAutoSave } from "@/data/utils/saveStorage";
 import type { CompanyState } from "@/data/redux/companySlice";
 import type { EngineState } from "@/data/redux/engineSlice";
@@ -94,12 +94,12 @@ export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
           const state = store.getState();
           treatTasks(store.dispatch as any, state as any);
           produceComponents(store.dispatch as any, state as any);
+          decayComponents(store.dispatch as any, state as any);
           processTrainingTick(store.dispatch as any, state as any);
           processMonthlyBilling(store.dispatch as any, state as any);
           processCampaignTick(store.dispatch as any, state as any);
           processMoraleTick(store.dispatch as any, state as any);
           processRaiseTick(store.dispatch as any, state as any);
-          processRandomEvents(store.dispatch as any, state as any);
 
           // Snapshot quotidien de la trésorerie pour le graphique d'accueil
           const date = getTimeAsDate(state.engine.time);
@@ -137,12 +137,9 @@ export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
             );
           }
 
-          store.dispatch(
-            generateCandidateList({
-              time: state.engine.time,
-              reputation: state.company.reputation,
-            }),
-          );
+          // Les profils ramenés par une recherche ne patientent pas
+          // indéfiniment : on purge le vivier des candidats arrivés à échéance.
+          store.dispatch(expireCandidates(state.engine.time));
           store.dispatch(
             generateAvailableContractList({
               time: state.engine.time,

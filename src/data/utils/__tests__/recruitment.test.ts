@@ -1,8 +1,21 @@
 import { describe, it, expect } from "vitest";
 
-import { PersonType, type Person, type ProductionPerson } from "@/data/interface";
+import {
+  ComponentType,
+  PersonType,
+  type Person,
+  type ProductionPerson,
+} from "@/data/interface";
+import { generateCandidatesForRole } from "@/data/utils/employe";
 import {
   GRUDGE_EXPECTED_MULT,
+  SEARCH_MAX_CANDIDATES,
+  SEARCH_MIN_CANDIDATES,
+  SEARCH_REPUTATION_DISCOUNT_CAP,
+  SEARCH_ROLES,
+  SEARCH_ROLE_LABEL,
+  computeSearchCost,
+  searchSalaryRole,
   HOURS_PER_MONTH,
   MARKET_INDEX_CAP,
   RAISE_COOLDOWN_GRANTED,
@@ -185,7 +198,6 @@ describe("computeExpectedSalary — borné dans l'enveloppe (anti-régression fa
   const fullstack = (over: Partial<ProductionPerson>): ProductionPerson =>
     ({
       ...emp({ id: 1 }),
-      productionType: "Développeur" as never,
       specialty: "FULLSTACK",
       codeStat: 10,
       codeMaxStat: 20,
@@ -290,5 +302,86 @@ describe("selectRaiseDemand — sélection mensuelle (cœur du couplage)", () =>
 
   it("rancune : multiplicateur d'attendu après refus dur", () => {
     expect(GRUDGE_EXPECTED_MULT).toBeCloseTo(1.1);
+  });
+});
+
+// ── Recherche de candidats à la demande (pôle emploi) ───────────────────────
+
+describe("computeSearchCost", () => {
+  it("croît plus vite que le nombre de profils demandés", () => {
+    const one = computeSearchCost("FULLSTACK", 1, 0);
+    const two = computeSearchCost("FULLSTACK", 2, 0);
+    const four = computeSearchCost("FULLSTACK", 4, 0);
+    expect(two).toBeGreaterThan(one);
+    // Progressivité : doubler le volume coûte plus que doubler la note.
+    expect(four - two).toBeGreaterThan(two - one);
+  });
+
+  it("facture plus cher un poste spécialisé qu'un polyvalent", () => {
+    expect(computeSearchCost(ComponentType.CODE, 3, 0)).toBeGreaterThan(
+      computeSearchCost("FULLSTACK", 3, 0),
+    );
+    expect(computeSearchCost(PersonType.QA, 3, 0)).toBeGreaterThan(
+      computeSearchCost("FULLSTACK", 3, 0),
+    );
+  });
+
+  it("applique une remise de réputation plafonnée", () => {
+    const base = computeSearchCost("FULLSTACK", 3, 0);
+    const reputed = computeSearchCost("FULLSTACK", 3, 100);
+    expect(reputed).toBeLessThan(base);
+    // Plafond : au-delà de 100 de réputation, la remise ne bouge plus.
+    expect(computeSearchCost("FULLSTACK", 3, 500)).toBe(reputed);
+    expect(reputed).toBeGreaterThanOrEqual(
+      Math.round(base * (1 - SEARCH_REPUTATION_DISCOUNT_CAP)) - 10,
+    );
+  });
+
+  it("borne le volume dans [min, max] et reste positif", () => {
+    expect(computeSearchCost("FULLSTACK", 0, 0)).toBe(
+      computeSearchCost("FULLSTACK", SEARCH_MIN_CANDIDATES, 0),
+    );
+    expect(computeSearchCost("FULLSTACK", 99, 0)).toBe(
+      computeSearchCost("FULLSTACK", SEARCH_MAX_CANDIDATES, 0),
+    );
+  });
+
+  it("couvre tous les postes proposés (grille + libellé)", () => {
+    for (const role of SEARCH_ROLES) {
+      expect(SEARCH_ROLE_LABEL[role]).toBeTruthy();
+      expect(SALARY_ENVELOPE[searchSalaryRole(role)]).toBeDefined();
+      expect(computeSearchCost(role, 2, 10)).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("generateCandidatesForRole", () => {
+  it("ne ramène que des profils du poste commandé", () => {
+    for (const role of SEARCH_ROLES) {
+      const list = generateCandidatesForRole(role, 4, 20);
+      expect(list).toHaveLength(4);
+      for (const c of list) {
+        if (role === PersonType.QA) {
+          expect(c.personType).toBe(PersonType.QA);
+        } else if (role === PersonType.MARKETING) {
+          expect(c.personType).toBe(PersonType.MARKETING);
+        } else {
+          expect(c.personType).toBe(PersonType.PROD);
+          expect((c as ProductionPerson).specialty).toBe(role);
+        }
+        // Stats masquées tant que l'entretien n'a pas eu lieu (volet A).
+        expect(c.revealedStats).toBe(false);
+        expect(c.expectedSalary).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("borne le volume demandé", () => {
+    expect(generateCandidatesForRole("FULLSTACK", 0, 0)).toHaveLength(
+      SEARCH_MIN_CANDIDATES,
+    );
+    expect(generateCandidatesForRole("FULLSTACK", 99, 0)).toHaveLength(
+      SEARCH_MAX_CANDIDATES,
+    );
   });
 });

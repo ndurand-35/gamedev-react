@@ -1,6 +1,12 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
-import { WarningTriangle } from "iconoir-react";
+import { FC, ReactElement, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bank as BankIcon,
+  Coins,
+  SendEuros,
+  WarningTriangle,
+} from "iconoir-react";
 
+import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setMoney } from "@/data/redux/companySlice";
 import { grantLoan } from "@/data/redux/loanSlice";
@@ -21,10 +27,7 @@ import {
   isLoanOfferAvailable,
   loanTotalCost,
 } from "@/data/utils/economy";
-
-export const BANK_PANEL_ID = "bank_panel";
-
-type BankTab = "offers" | "debt";
+import { financeTopMenuItems } from "@/pages/finance/menu";
 
 const hoursToDays = (hours: number): number => Math.ceil(hours / 24);
 
@@ -33,7 +36,45 @@ const offerMonthly = (offer: LoanOffer): number =>
     computeMonthlyPayment(offer.principal, offer.annualRate, offer.termMonths),
   );
 
+interface StatCardProps {
+  label: string;
+  value: string;
+  icon: ReactElement;
+  hint?: string;
+  tone?: "neutral" | "success" | "warning" | "error";
+}
+
+const StatCard = ({
+  label,
+  value,
+  icon,
+  hint,
+  tone = "neutral",
+}: StatCardProps) => {
+  const toneClass =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning"
+        : tone === "error"
+          ? "text-error"
+          : "text-base-content";
+  return (
+    <div className="card bg-base-100 shadow-md border border-base-300">
+      <div className="p-4 flex flex-row items-center space-x-4">
+        <div className={"opacity-70 " + toneClass}>{icon}</div>
+        <div>
+          <p className="text-sm opacity-70">{label}</p>
+          <p className={"text-2xl font-semibold " + toneClass}>{value}</p>
+          {hint && <p className="text-xs opacity-60">{hint}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Sous-modale de simulation (échéancier avant validation, UX §3) ───────────
+// Seul élément resté en modale : c'est une confirmation d'action, pas un écran.
 const SimulationModal: FC<{
   offer: LoanOffer | null;
   available: boolean;
@@ -182,20 +223,19 @@ const SimulationModal: FC<{
   );
 };
 
-export const BankPanel: FC = () => {
+export const BankPage: FC = (): ReactElement => {
+  useTopMenu(financeTopMenuItems);
+
   const dispatch = useAppDispatch();
   const money = useAppSelector((s) => s.company.money);
   const peakReputation = useAppSelector((s) => s.engine.peakReputation);
-  const monthlyRevenue = useAppSelector(
-    (s) => s.engine.lastMonthlyRevenue ?? 0,
-  );
+  const monthlyRevenue = useAppSelector((s) => s.engine.lastMonthlyRevenue ?? 0);
   const time = useAppSelector((s) => s.engine.time);
   const loans = useAppSelector((s) => s.loan.loans);
   const lastLoanTime = useAppSelector((s) => s.loan.lastLoanTime);
   const capacity = useAppSelector(selectBorrowingCapacity);
   const summary = useAppSelector(selectLoanSummary);
 
-  const [tab, setTab] = useState<BankTab>("offers");
   const [simOffer, setSimOffer] = useState<LoanOffer | null>(null);
 
   const availabilities = useMemo(
@@ -267,72 +307,68 @@ export const BankPanel: FC = () => {
       }),
     );
     setSimOffer(null);
-    setTab("debt"); // bascule auto sur l'onglet Dette (UX §3)
   };
 
   const serviceRatioPct =
     monthlyRevenue + money / 12 > 0
-      ? Math.round(
-          (summary.monthly / (monthlyRevenue + money / 12)) * 100,
-        )
+      ? Math.round((summary.monthly / (monthlyRevenue + money / 12)) * 100)
       : 0;
 
+  const availableCount = availabilities.filter((a) => a.avail.available).length;
+
   return (
-    <>
-      <dialog
-        id={BANK_PANEL_ID}
-        className="modal"
-        role="dialog"
-        aria-label="Banque"
-      >
-        <div className="modal-box max-w-2xl">
-          <h3 className="font-bold text-lg mb-3">🏦 Banque</h3>
+    <div className="p-8 mt-14 mb-20 space-y-6">
+      <h1 className="mb-4">Banque</h1>
 
-          <div role="tablist" className="tabs tabs-boxed mb-3">
-            <button
-              type="button"
-              role="tab"
-              className={"tab" + (tab === "offers" ? " tab-active" : "")}
-              onClick={() => setTab("offers")}
-            >
-              Offres
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className={"tab" + (tab === "debt" ? " tab-active" : "")}
-              onClick={() => setTab("debt")}
-            >
-              Dette ({summary.count})
-              {summary.hasMissed && (
-                <span className="ml-1 inline-block w-2 h-2 rounded-full bg-error align-middle" />
+      <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-4">
+        <StatCard
+          label="Trésorerie"
+          value={formatPrice(money) + " €"}
+          icon={<Coins height={32} width={32} />}
+          tone={money < 0 ? "error" : "neutral"}
+        />
+        <StatCard
+          label="Dette en cours"
+          value={formatPrice(summary.outstanding) + " €"}
+          hint={
+            summary.count > 0
+              ? `${summary.count} prêt${summary.count > 1 ? "s" : ""} en cours`
+              : "Aucun prêt"
+          }
+          icon={<BankIcon height={32} width={32} />}
+          tone={summary.hasMissed ? "error" : "neutral"}
+        />
+        <StatCard
+          label="Mensualité totale"
+          value={formatPrice(summary.monthly) + " /mois"}
+          hint="Prélevée avant les salaires"
+          icon={<SendEuros height={32} width={32} />}
+          tone={summary.monthly > 0 ? "error" : "neutral"}
+        />
+        <StatCard
+          label="Capacité restante"
+          value={formatPrice(capacity.detteDisponible) + " €"}
+          hint={`${availableCount} offre${availableCount > 1 ? "s" : ""} accessible${
+            availableCount > 1 ? "s" : ""
+          }`}
+          icon={<BankIcon height={32} width={32} />}
+          tone={capacity.detteDisponible > 0 ? "success" : "warning"}
+        />
+      </div>
+
+      <div className="grid lg:grid-cols-2 grid-cols-1 gap-4 items-start">
+        <div className="card bg-base-100 shadow-md border border-base-300">
+          <div className="p-4 space-y-3">
+            <div className="flex flex-row items-center justify-between">
+              <h2 className="text-lg font-semibold">Offres de prêt</h2>
+              {cooldownRemainingHours > 0 && (
+                <span className="text-xs opacity-70">
+                  ⏳ Prochain emprunt dans{" "}
+                  {hoursToDays(cooldownRemainingHours)} j
+                </span>
               )}
-            </button>
-          </div>
+            </div>
 
-          {/* Bandeau trésorerie / capacité (commun aux deux onglets). */}
-          <div className="flex flex-wrap justify-between gap-2 text-sm border-b border-base-300 pb-2 mb-3">
-            <span>
-              Trésorerie :{" "}
-              <span className="font-medium tabular-nums">
-                {formatPrice(money)} €
-              </span>
-            </span>
-            <span>
-              Dette en cours :{" "}
-              <span className="font-medium tabular-nums">
-                {formatPrice(summary.outstanding)} €
-              </span>
-            </span>
-            <span className="opacity-70">
-              Capacité restante :{" "}
-              <span className="font-medium tabular-nums">
-                {formatPrice(capacity.detteDisponible)} €
-              </span>
-            </span>
-          </div>
-
-          {tab === "offers" ? (
             <div className="space-y-2">
               {availabilities.map(({ offer, avail }) => {
                 const monthly = offerMonthly(offer);
@@ -403,36 +439,27 @@ export const BankPanel: FC = () => {
                   </div>
                 );
               })}
-
-              {cooldownRemainingHours > 0 && (
-                <p className="text-xs text-center opacity-70 mt-1">
-                  ⏳ Prochain emprunt possible dans{" "}
-                  {hoursToDays(cooldownRemainingHours)} j (cooldown)
-                </p>
-              )}
             </div>
-          ) : (
-            <DebtTab
+          </div>
+        </div>
+
+        <div className="card bg-base-100 shadow-md border border-base-300">
+          <div className="p-4 space-y-3">
+            <div className="flex flex-row items-center justify-between">
+              <h2 className="text-lg font-semibold">Dette en cours</h2>
+              <span className="text-sm opacity-60 tabular-nums">
+                {summary.count} prêt{summary.count > 1 ? "s" : ""}
+              </span>
+            </div>
+            <DebtSection
               loans={loans}
               monthlyTotal={summary.monthly}
               outstandingTotal={summary.outstanding}
               serviceRatioPct={serviceRatioPct}
-              onGoToOffers={() => setTab("offers")}
             />
-          )}
-
-          <div className="modal-action">
-            <form method="dialog">
-              <button type="submit" className="btn">
-                Fermer
-              </button>
-            </form>
           </div>
         </div>
-        <form method="dialog" className="modal-backdrop">
-          <button type="submit">close</button>
-        </form>
-      </dialog>
+      </div>
 
       <SimulationModal
         offer={simOffer}
@@ -449,36 +476,22 @@ export const BankPanel: FC = () => {
         onConfirm={confirmBorrow}
         onClose={() => setSimOffer(null)}
       />
-    </>
+    </div>
   );
 };
 
-// ── Onglet Dette en cours (lecture seule, UX §4) ─────────────────────────────
-const DebtTab: FC<{
+// ── Dette en cours (lecture seule, UX §4) ────────────────────────────────────
+const DebtSection: FC<{
   loans: Loan[];
   monthlyTotal: number;
   outstandingTotal: number;
   serviceRatioPct: number;
-  onGoToOffers: () => void;
-}> = ({
-  loans,
-  monthlyTotal,
-  outstandingTotal,
-  serviceRatioPct,
-  onGoToOffers,
-}) => {
+}> = ({ loans, monthlyTotal, outstandingTotal, serviceRatioPct }) => {
   if (loans.length === 0) {
     return (
-      <div className="text-center py-6 space-y-2">
-        <p className="text-sm opacity-70">Aucun prêt en cours.</p>
-        <button
-          type="button"
-          className="btn btn-sm btn-outline"
-          onClick={onGoToOffers}
-        >
-          Voir les offres
-        </button>
-      </div>
+      <p className="text-sm opacity-60 py-4">
+        Aucun prêt en cours. Les offres accessibles sont listées à côté.
+      </p>
     );
   }
 
@@ -494,7 +507,9 @@ const DebtTab: FC<{
         </div>
         <div className="flex justify-between">
           <span className="opacity-70">Mensualité totale</span>
-          <span className="tabular-nums">{formatPrice(monthlyTotal)} €/mois</span>
+          <span className="tabular-nums">
+            {formatPrice(monthlyTotal)} €/mois
+          </span>
         </div>
         <div className="flex justify-between items-center">
           <span className="opacity-70">Part de la capacité</span>
@@ -531,7 +546,8 @@ const DebtTab: FC<{
               {inDefault ? (
                 <span
                   className={
-                    "badge badge-error badge-sm" + (atRisk ? " animate-pulse" : "")
+                    "badge badge-error badge-sm" +
+                    (atRisk ? " animate-pulse" : "")
                   }
                 >
                   ⛔ {loan.missedPayments} impayé

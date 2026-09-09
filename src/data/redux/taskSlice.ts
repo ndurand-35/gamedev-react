@@ -13,8 +13,6 @@ export interface TaskState {
 
 const initialState: TaskState = DEFAULT_TASK_STATE;
 
-export const MAX_TASK_PRIORITY = 5;
-
 export const taskSlice = createSlice({
   name: "task",
   initialState,
@@ -45,17 +43,11 @@ export const taskSlice = createSlice({
       state.taskList.push(action.payload);
     },
 
-    setTaskPriority(
-      state,
-      action: PayloadAction<{ task: Task; priority: number }>,
-    ) {
-      const taskIndex = state.taskList.findIndex(
-        (t: Task) => t.id === action.payload.task.id,
-      );
-      if (taskIndex === -1) return;
-      state.taskList[taskIndex].priority = Math.max(
-        1,
-        Math.min(MAX_TASK_PRIORITY, action.payload.priority),
+    // Retire un contrat livré. L'échec sur deadline passe par `setTaskList`,
+    // qui remplace la liste entière depuis le tick de jeu.
+    removeTask(state, action: PayloadAction<number>) {
+      state.taskList = state.taskList.filter(
+        (t: Task) => t.id !== action.payload,
       );
     },
 
@@ -69,7 +61,7 @@ export const taskSlice = createSlice({
 export const {
   generateAvailableContractList,
   acceptContract,
-  setTaskPriority,
+  removeTask,
   setTaskList,
   initializeTaskState,
 } = taskSlice.actions;

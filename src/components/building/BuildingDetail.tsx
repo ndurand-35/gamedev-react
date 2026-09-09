@@ -4,17 +4,15 @@ import {
   Employe,
   PersonType,
   ProductionPerson,
-  StartedContract,
   getBuildingMonthlyCharges,
+  jobLabel,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 import { formatPrice } from "@/data/utils";
 import {
   selectBuildingById,
   selectEmployesByBuilding,
-  selectTasksForBuilding,
 } from "@/data/redux/selectors";
-import { ContractProgress } from "@/components/contract";
 import { EMPLOYE_MODAL_ID, EmployeModal } from "@/components/employe";
 import {
   COMPONENT_BTN_CLASS,
@@ -31,9 +29,6 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
   const building = useAppSelector((s) => selectBuildingById(s, buildingId));
   const employes = useAppSelector((s) =>
     buildingId == null ? [] : selectEmployesByBuilding(s, buildingId),
-  );
-  const tasks = useAppSelector((s) =>
-    buildingId == null ? [] : selectTasksForBuilding(s, buildingId),
   );
   const [selectedEmployeId, setSelectedEmployeId] = useState<number | null>(
     null,
@@ -67,7 +62,6 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
           <span>
             {employes.length}/{building.place} places
           </span>
-          <span>{tasks.length} contrat(s) actif(s)</span>
         </div>
         <div className="mt-3 pt-3 border-t border-base-content/10">
           <div className="flex flex-row items-center justify-between text-sm">
@@ -95,21 +89,6 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="card bg-base-100 border border-base-content/20 p-4">
-        <h3 className="font-semibold mb-2">Contrats en cours</h3>
-        {tasks.length === 0 ? (
-          <p className="text-sm opacity-60">Aucun contrat actif.</p>
-        ) : (
-          <div className="flex flex-col divide-y divide-base-content/10">
-            {tasks.map((t: StartedContract) => (
-              <div key={`detail_task_${t.id}`}>
-                <ContractProgress contract={t} />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="card bg-base-100 border border-base-content/20 p-4">
@@ -145,7 +124,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
                       {emp.firstName} {emp.lastName}
                     </p>
                     <p className="text-xs opacity-70">
-                      {prod?.productionType ?? emp.personType}
+                      {jobLabel(emp)}
                     </p>
                   </div>
                   <button

@@ -10,7 +10,10 @@ export type EventEffect =
   | { kind: "money"; amount: number } // delta de trésorerie (négatif possible)
   | { kind: "reputation"; amount: number }
   | { kind: "morale"; employeId: number; delta: number }
-  | { kind: "taskProgression"; taskId: number; delta: number }
+  // Décale la deadline d'un contrat (delta en heures de jeu, négatif = client
+  // qui resserre le délai). Remplace l'ancien effet sur l'avancement, disparu
+  // avec le passage à la livraison sur stock.
+  | { kind: "taskDeadline"; taskId: number; delta: number }
   | { kind: "contractMalus"; amount: number } // coût ponctuel (money -= amount)
   // Recrutement enrichi (MYL-13) — augmentations (volet C)
   | { kind: "salary"; employeId: number; salary: number } // nouveau salaire mensuel

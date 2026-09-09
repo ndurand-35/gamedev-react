@@ -20,6 +20,7 @@ import notificationReducer from "@/data/redux/notificationSlice";
 import productReducer from "@/data/redux/productSlice";
 import eventsReducer from "@/data/redux/eventsSlice";
 import loanReducer from "@/data/redux/loanSlice";
+import financeReducer from "@/data/redux/financeSlice";
 import studioReducer from "@/data/redux/studioSlice";
 import saveReducer, { hydrateFromSave } from "@/data/redux/saveSlice";
 import { gameLoopMiddleware } from "@/data/redux/gameLoopMiddleware";
@@ -34,6 +35,7 @@ const reducers = combineReducers({
   product: productReducer,
   events: eventsReducer,
   loan: loanReducer,
+  finance: financeReducer,
   studio: studioReducer,
   // Vue de l'écran de sauvegarde (non persistée — reconstruite via `listSaves`).
   save: saveReducer,

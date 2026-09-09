@@ -10,6 +10,7 @@ export const PauseIndicator = () => {
   const gameSpeed = useAppSelector((state) => state.engine.gameSpeed);
   const gameOver = useAppSelector((state) => state.engine.gameOver);
   const pendingDecision = useAppSelector((state) => state.events.pending);
+  const pendingRescue = useAppSelector((state) => state.engine.pendingRescue);
   const dispatch = useAppDispatch();
 
   // La liste des slots est rafraîchie à chaque ouverture : la modale reste
@@ -25,6 +26,9 @@ export const PauseIndicator = () => {
   // Une décision en attente met aussi le jeu en pause (speed 0) : le
   // DecisionModal prend alors la main, on évite deux dialogues concurrents.
   if (pendingDecision) return null;
+  // Idem pour la proposition de prêt de sauvetage : la clôture du mois est
+  // suspendue, reprendre la partie n'a aucun sens tant qu'elle n'est pas tranchée.
+  if (pendingRescue) return null;
   if (gameSpeed !== 0) return null;
 
   return (

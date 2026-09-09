@@ -6,7 +6,10 @@ import { TopMenuItem } from "@/data/interface";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 import { selectLoanSummary } from "@/data/redux/selectors";
-import { BANK_PANEL_ID } from "@/components/layout/BankPanel";
+// Sous-menu de la section Finance : source unique partagée avec les pages
+// (elles le passent aussi à `useTopMenu`), pour éviter deux listes qui dérivent.
+import { financeTopMenuItems } from "@/pages/finance/menu";
+import { productTopMenuItems } from "@/pages/product/menu";
 
 import {
   Timer,
@@ -21,11 +24,6 @@ import {
   Rocket,
   Bank,
 } from "iconoir-react";
-
-const openBankPanel = () =>
-  (
-    document.getElementById(BANK_PANEL_ID) as HTMLDialogElement | null
-  )?.showModal();
 
 const NAV_ITEMS: {
   to: string;
@@ -62,7 +60,7 @@ const NAV_ITEMS: {
     to: "/game/product",
     ariaLabel: "Produits",
     icon: <Rocket className="h-6 w-6" />,
-    subMenu: [],
+    subMenu: productTopMenuItems,
   },
   {
     to: "/game/building",
@@ -190,13 +188,14 @@ export const BottomNavigation = () => {
             {item.icon}
           </NavLink>
         ))}
-        <div className="tooltip" data-tip="Banque">
-          <button
-            type="button"
-            onClick={openBankPanel}
-            onMouseEnter={() => setHoveredSubMenu([])}
-            aria-label="Banque"
-            className="relative btn btn-circle"
+        <div className="tooltip" data-tip="Finances">
+          <NavLink
+            to="/game/finance"
+            onMouseEnter={() => setHoveredSubMenu(financeTopMenuItems)}
+            aria-label="Finances"
+            className={({ isActive }) =>
+              "relative btn btn-circle" + (isActive ? " btn-neutral" : "")
+            }
           >
             <Bank className="h-6 w-6" />
             {loanSummary.count > 0 && (
@@ -209,7 +208,7 @@ export const BottomNavigation = () => {
                 {loanSummary.count}
               </span>
             )}
-          </button>
+          </NavLink>
         </div>
       </div>
     </div>

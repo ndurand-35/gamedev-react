@@ -2,10 +2,10 @@ import { ReactElement, useMemo, useState } from "react";
 import { Plus, Rocket, Trash } from "iconoir-react";
 
 import {
+  COMPONENT_TYPE_ORDER,
   ComponentType,
   Product,
   ProductStatus,
-  TopMenuItem,
   computeMonthlyRevenue,
   isProductReady,
   productAverageQuality,
@@ -26,17 +26,12 @@ import {
   ComponentTypeBadge,
   COMPONENT_BADGE_CLASS,
 } from "@/components/component";
+import { productTopMenuItems } from "@/pages/product/menu";
 
-const TYPES: ComponentType[] = [
-  ComponentType.CODE,
-  ComponentType.VISUEL,
-  ComponentType.UX,
-];
-
-const pageTopMenuItems: TopMenuItem[] = [];
+const TYPES = COMPONENT_TYPE_ORDER;
 
 export const ProductPage: React.FC = (): ReactElement => {
-  useTopMenu(pageTopMenuItems);
+  useTopMenu(productTopMenuItems);
   const dispatch = useAppDispatch();
   const products = useAppSelector((s) => s.product.products);
   const stock = useAppSelector((s) => s.component.stock);

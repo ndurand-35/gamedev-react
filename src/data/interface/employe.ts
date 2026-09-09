@@ -6,11 +6,6 @@ export enum PersonType {
   MARKETING = "Marketing",
 }
 
-export enum ProductionType {
-  DEV = "Développeur",
-  DESIGNER = "Designer",
-}
-
 // Tempérament : modificateur minimal (3 valeurs) du recrutement enrichi (MYL-13).
 // Module la négociation à l'embauche et les demandes d'augmentation. Défini ici
 // pour éviter un cycle d'import avec utils/recruitment.
@@ -39,13 +34,16 @@ export interface Person {
   raiseCooldownUntil?: number;
   // Volet C : true tant qu'une demande d'augmentation est en attente de décision.
   pendingRaise?: boolean;
+  // Candidat uniquement : temps de jeu (heures) au-delà duquel le profil quitte
+  // le vivier — un candidat ramené par une recherche ne patiente pas
+  // indéfiniment. Absent sur un employé embauché.
+  expiresAt?: number;
 }
 
 export const DEFAULT_MORALE = 70;
 export const MAX_MORALE = 100;
 export const RESIGNATION_MORALE_THRESHOLD = 20;
 export const LOW_MORALE_THRESHOLD = 50;
-export const UNPAID_MORALE_PENALTY = 20;
 export const PAID_MORALE_BONUS = 1;
 
 // Multiplier appliqué à la productivité selon le moral.
@@ -61,7 +59,6 @@ export type Candidate = Person;
 export type Specialty = ComponentType | "FULLSTACK";
 
 export interface ProductionPerson extends Person {
-  productionType: ProductionType;
   specialty: Specialty;
 
   // Une stat par tâche produisible (ComponentType) : plus de chevauchement,
@@ -77,6 +74,23 @@ export interface ProductionPerson extends Person {
   trainingType?: ComponentType | null;
   trainingProgress?: number;
 }
+
+// Libellé de poste : la spécialité suffit à le décrire. Le champ
+// `productionType` (Développeur / Designer) doublonnait avec elle et a été
+// retiré : un seul champ décrit le métier d'un employé de production.
+export const PRODUCTION_JOB_LABEL: Record<Specialty, string> = {
+  FULLSTACK: "Polyvalent",
+  [ComponentType.CODE]: "Développeur",
+  [ComponentType.VISUEL]: "Graphiste",
+  [ComponentType.UX]: "Designer UX",
+};
+
+/** Poste affiché : la spécialité pour la prod, le rôle sinon (QA / Marketing). */
+export const jobLabel = (emp: Employe): string => {
+  if (emp.personType !== PersonType.PROD) return emp.personType;
+  const specialty = (emp as ProductionPerson).specialty ?? "FULLSTACK";
+  return PRODUCTION_JOB_LABEL[specialty] ?? PRODUCTION_JOB_LABEL.FULLSTACK;
+};
 
 export type ProductionStatKey = "codeStat" | "visualStat" | "uxStat";
 export type ProductionMaxStatKey =

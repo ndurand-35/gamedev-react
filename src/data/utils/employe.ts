@@ -6,7 +6,6 @@ import {
   PersonType,
   ProductionPerson,
   ProductionStatKey,
-  ProductionType,
   QA,
   STAT_KEY_BY_TYPE,
   Specialty,
@@ -14,6 +13,9 @@ import {
 import { SexType, faker } from "@faker-js/faker";
 import { randomIntFromInterval } from "@/data/utils";
 import {
+  SEARCH_MAX_CANDIDATES,
+  SEARCH_MIN_CANDIDATES,
+  SearchRole,
   TEMPERAMENTS,
   Temperament,
   computeExpectedSalary,
@@ -59,14 +61,12 @@ const baseCandidate = (salary: number): Person => {
   };
 };
 
-const generateProductionCandidate = (): ProductionPerson => {
-  const specialty = pickSpecialty();
-  const productionType =
-    Math.random() < 0.5 ? ProductionType.DEV : ProductionType.DESIGNER;
+const generateProductionCandidate = (
+  specialty: Specialty = pickSpecialty(),
+): ProductionPerson => {
   return {
     ...baseCandidate(salaryForSpecialty(specialty)),
     personType: PersonType.PROD,
-    productionType,
     specialty,
     codeStat: rollStat(specialty, "codeStat"),
     codeMaxStat: MAX_STAT_POSSIBLE,
@@ -108,13 +108,13 @@ const generateMarketingCandidate = (): Marketing => {
   };
 };
 
-// Mix des profils générés : majorité Production, le reste réparti QA / Marketing
-// (les deux rôles ouverts en Phase 2).
-const pickCandidate = (): Person => {
-  const r = Math.random();
-  if (r < 0.65) return generateProductionCandidate();
-  if (r < 0.83) return generateQaCandidate();
-  return generateMarketingCandidate();
+// Profil brut correspondant au poste commandé par le joueur : la spécialité
+// n'est plus tirée au sort côté production, c'est la commande qui la fixe.
+// `pickSpecialty` ne sert donc plus que de repli (poste "Polyvalent" exclu).
+const generateCandidateForRole = (role: SearchRole): Person => {
+  if (role === PersonType.QA) return generateQaCandidate();
+  if (role === PersonType.MARKETING) return generateMarketingCandidate();
+  return generateProductionCandidate(role as Specialty);
 };
 
 const pickTemperament = (): Temperament =>
@@ -136,16 +136,24 @@ const enrichCandidate = (candidate: Person, reputation: number): Person => {
   };
 };
 
-export const generateNewEmploye = (reputation: number): Person[] => {
-  let nbGenerated = 3;
-  if (reputation > 25) nbGenerated = 5;
-  if (reputation > 50) nbGenerated = 7;
-  if (reputation > 75) nbGenerated = 9;
-  if (reputation === 100) nbGenerated = 15;
-
+/**
+ * Résultat d'une recherche commandée au pôle emploi : `count` candidats du poste
+ * demandé, générés et enrichis (attendu salarial, tempérament, stats masquées).
+ * Instantané côté jeu — la contrepartie est le coût de la prestation
+ * (`computeSearchCost`), débité par le thunk appelant.
+ */
+export const generateCandidatesForRole = (
+  role: SearchRole,
+  count: number,
+  reputation: number,
+): Person[] => {
+  const n = Math.max(
+    SEARCH_MIN_CANDIDATES,
+    Math.min(SEARCH_MAX_CANDIDATES, Math.floor(count)),
+  );
   const generated: Person[] = [];
-  for (let i = 0; i < nbGenerated; i++) {
-    generated.push(enrichCandidate(pickCandidate(), reputation));
+  for (let i = 0; i < n; i++) {
+    generated.push(enrichCandidate(generateCandidateForRole(role), reputation));
   }
   return generated;
 };

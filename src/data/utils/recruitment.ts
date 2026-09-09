@@ -10,8 +10,11 @@
 // branchés.
 
 import {
+  ComponentType,
   Marketing,
+  PRODUCTION_JOB_LABEL,
   Person,
+  PersonType,
   ProductionPerson,
   QA,
   Specialty,
@@ -98,6 +101,87 @@ export const RAISE_ULTIMATUM_FLOOR = 20; // 20–34 : ultimatum
 export const INTERVIEW_BASE_HOURS = 3;
 export const INTERVIEW_EXTRA_Q_HOURS = 2;
 export const INTERVIEW_EXPRESS_FEE = 150;
+
+// ── Recherche de candidats à la demande (pôle emploi) ───────────────────────
+// Le pôle emploi ne déverse plus une fournée aléatoire toutes les semaines : le
+// joueur commande une recherche (poste voulu + nombre de profils). Le résultat
+// est instantané, mais la prestation est facturée — un coût EN PLUS de celui du
+// recrutement lui-même. Cibler un poste précis et/ou demander beaucoup de
+// profils coûte plus cher ; la réputation joue le rôle de réseau (remise).
+
+/** Poste commandé : spécialité de production, ou rôle QA / Marketing. */
+export type SearchRole = Specialty | PersonType.QA | PersonType.MARKETING;
+
+export const SEARCH_ROLES: SearchRole[] = [
+  "FULLSTACK",
+  ComponentType.CODE,
+  ComponentType.VISUEL,
+  ComponentType.UX,
+  PersonType.QA,
+  PersonType.MARKETING,
+];
+
+export const SEARCH_ROLE_LABEL: Record<SearchRole, string> = {
+  ...PRODUCTION_JOB_LABEL,
+  [PersonType.QA]: "QA",
+  [PersonType.MARKETING]: "Marketing",
+};
+
+/** Durée (heures de jeu) pendant laquelle un profil ramené reste disponible. */
+export const SEARCH_CANDIDATE_LIFETIME = 168; // 7 jours
+export const SEARCH_MIN_CANDIDATES = 1;
+export const SEARCH_MAX_CANDIDATES = 8;
+/** Frais fixes d'ouverture de dossier (indépendants du volume demandé). */
+export const SEARCH_BASE_FEE = 400;
+/** Coût unitaire de sourcing, avant progressivité du volume. */
+export const SEARCH_FEE_PER_CANDIDATE = 300;
+/** > 1 → chaque profil supplémentaire coûte plus cher que le précédent. */
+export const SEARCH_VOLUME_EXPONENT = 1.25;
+/** Un poste spécialisé est plus dur à sourcer qu'un profil polyvalent. */
+export const SEARCH_ROLE_FEE_MULT: Record<SalaryRole, number> = {
+  FULLSTACK: 1,
+  PROD_SPE: 1.35,
+  QA: 1.15,
+  MKT: 1.15,
+};
+export const SEARCH_REPUTATION_DISCOUNT_PER_POINT = 0.0025;
+export const SEARCH_REPUTATION_DISCOUNT_CAP = 0.25;
+
+/** Enveloppe salariale (donc grille tarifaire) visée par un poste commandé. */
+export const searchSalaryRole = (role: SearchRole): SalaryRole => {
+  if (role === PersonType.QA) return "QA";
+  if (role === PersonType.MARKETING) return "MKT";
+  return role === "FULLSTACK" ? "FULLSTACK" : "PROD_SPE";
+};
+
+/**
+ * Coût de la prestation de recherche, débité immédiatement (avant toute
+ * embauche). Croît plus vite que le nombre demandé et se réduit avec la
+ * réputation (remise plafonnée à `SEARCH_REPUTATION_DISCOUNT_CAP`).
+ */
+export const computeSearchCost = (
+  role: SearchRole,
+  count: number,
+  reputation: number,
+): number => {
+  const n = clamp(
+    Math.floor(count),
+    SEARCH_MIN_CANDIDATES,
+    SEARCH_MAX_CANDIDATES,
+  );
+  const discount =
+    1 -
+    Math.min(
+      SEARCH_REPUTATION_DISCOUNT_CAP,
+      Math.max(0, reputation) * SEARCH_REPUTATION_DISCOUNT_PER_POINT,
+    );
+  const raw =
+    (SEARCH_BASE_FEE +
+      SEARCH_FEE_PER_CANDIDATE * Math.pow(n, SEARCH_VOLUME_EXPONENT)) *
+    SEARCH_ROLE_FEE_MULT[searchSalaryRole(role)] *
+    discount;
+  return round10(raw);
+};
 
 export const HOURS_PER_MONTH = 720; // ≈ cadence de la paie mensuelle
 

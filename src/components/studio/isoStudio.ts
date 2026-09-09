@@ -2,7 +2,6 @@ import {
   Employe,
   PersonType,
   ProductionPerson,
-  ProductionType,
   ComponentType,
 } from "@/data/interface";
 
@@ -21,7 +20,7 @@ export const STUDIO_ASSET_ROOT = `${import.meta.env.BASE_URL}assets/studio/`;
 // ── Rôles studio (dérivés du modèle réel) ────────────────────────────────────
 export type StudioRole = "dev" | "designer" | "qa" | "marketing";
 
-/** Dérive le rôle studio depuis PersonType (+ ProductionType pour la prod). */
+/** Dérive le rôle studio depuis PersonType (+ la spécialité pour la prod). */
 export const deriveRole = (emp: Employe): StudioRole => {
   switch (emp.personType) {
     case PersonType.QA:
@@ -29,11 +28,14 @@ export const deriveRole = (emp: Employe): StudioRole => {
     case PersonType.MARKETING:
       return "marketing";
     case PersonType.PROD:
-    default:
-      return (emp as ProductionPerson).productionType ===
-        ProductionType.DESIGNER
+    default: {
+      // Visuel et UX relèvent du design ; Code et polyvalent, du dev.
+      const specialty = (emp as ProductionPerson).specialty;
+      return specialty === ComponentType.VISUEL ||
+        specialty === ComponentType.UX
         ? "designer"
         : "dev";
+    }
   }
 };
 

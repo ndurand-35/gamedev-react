@@ -5,6 +5,7 @@ import {
   ComponentType,
   PersonType,
   ProductionPerson,
+  jobLabel,
 } from "@/data/interface";
 import { formatPrice } from "@/data/utils";
 import { InlineSvg } from "@/components/studio/InlineSvg";
@@ -13,13 +14,6 @@ import {
   ACCENT_BY_ROLE,
   deriveRole,
 } from "@/components/studio/isoStudio";
-
-const ROLE_LABEL = {
-  dev: "Développeur",
-  designer: "Designer",
-  qa: "QA",
-  marketing: "Marketing",
-} as const;
 
 export const CANDIDATE_CARD_W = 190;
 export const CANDIDATE_CARD_H = 112;
@@ -50,10 +44,7 @@ export const CandidateCard = ({
     specialty && specialty !== "FULLSTACK"
       ? ACCENT_BY_COMPONENT[specialty as ComponentType]
       : ACCENT_BY_ROLE[role];
-  const roleText =
-    role === "dev" || role === "designer"
-      ? `${ROLE_LABEL[role]} · ${specialty ?? "Fullstack"}`
-      : ROLE_LABEL[role];
+  const roleText = jobLabel(candidate);
   const done = !!candidate.revealedStats;
 
   const drive = (root: HTMLElement) => {

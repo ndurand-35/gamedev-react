@@ -14,20 +14,20 @@ import {
 } from "@/data/redux/selectors";
 import { hireCandidate } from "@/data/redux/recruitmentThunks";
 import type { RootState } from "@/data/redux/store";
-import { getStudioDef } from "@/data/utils/studios";
-
-const garageSlots = getStudioDef("garage")!.employeeSlots; // 5 (base)
-const atelierSlots = getStudioDef("atelier-nord")!.employeeSlots; // 8
-
-// État racine minimal pour les sélecteurs cross-slice testés ici.
+// État racine minimal pour les sélecteurs cross-slice testés ici. Le plafond
+// d'effectif vient des bâtiments : `places` = places cumulées des bureaux.
 const rootWith = (
   unlockedStudioIds: string[],
   headcount: number,
   peakReputation = 0,
+  places: number[] = [3],
 ): RootState =>
   ({
     studio: { unlockedStudioIds, pendingReveal: null },
     engine: { peakReputation },
+    company: {
+      buildingList: places.map((place, i) => ({ id: i + 1, place })),
+    },
     employe: {
       employeList: Array.from({ length: headcount }, (_, i) => ({ id: i + 1 })),
     },
@@ -59,17 +59,15 @@ describe("studioSlice / irréversibilité", () => {
   });
 });
 
-describe("sélecteurs cap / places (§6.1)", () => {
-  it("cap = somme des quotas des studios débloqués", () => {
-    expect(selectRecruitmentCap(rootWith(["garage"], 0))).toBe(garageSlots);
-    expect(selectRecruitmentCap(rootWith(["garage", "atelier-nord"], 0))).toBe(
-      garageSlots + atelierSlots,
-    );
+describe("sélecteurs cap / places", () => {
+  it("cap = somme des places des bâtiments possédés", () => {
+    expect(selectRecruitmentCap(rootWith(["garage"], 0))).toBe(3);
+    expect(selectRecruitmentCap(rootWith(["garage"], 0, 0, [3, 10]))).toBe(13);
   });
 
   it("places restantes = cap − effectif", () => {
-    expect(selectRemainingSlots(rootWith(["garage"], 2))).toBe(garageSlots - 2);
-    expect(selectRemainingSlots(rootWith(["garage"], garageSlots))).toBe(0);
+    expect(selectRemainingSlots(rootWith(["garage"], 2))).toBe(1);
+    expect(selectRemainingSlots(rootWith(["garage"], 3))).toBe(0);
   });
 });
 
@@ -91,7 +89,7 @@ describe("selectStudioStatus (§4.2)", () => {
 describe("garde-fou recrutement (refus à plafond atteint)", () => {
   it("refuse l'embauche et ne dispatch pas hire quand le plafond est atteint", () => {
     const dispatch = vi.fn((a) => a);
-    const getState = () => rootWith(["garage"], garageSlots); // plein
+    const getState = () => rootWith(["garage"], 3); // plein (3 places)
     const result = hireCandidate(5)(dispatch as any, getState as any);
     expect(result).toEqual({ ok: false, reason: "cap" });
     // Seul le toast est dispatché, jamais l'action `employe/hire`.
@@ -101,7 +99,7 @@ describe("garde-fou recrutement (refus à plafond atteint)", () => {
 
   it("autorise l'embauche tant qu'il reste des places", () => {
     const dispatch = vi.fn((a) => a);
-    const getState = () => rootWith(["garage"], 1); // 1 / 5
+    const getState = () => rootWith(["garage"], 1); // 1 / 3
     const result = hireCandidate(5)(dispatch as any, getState as any);
     expect(result).toEqual({ ok: true });
     const dispatched = dispatch.mock.calls.map((c) => c[0]);

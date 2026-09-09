@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ComponentType,
   PersonType,
-  ProductionType,
   type Employe,
   type ProductionPerson,
+  type Specialty,
 } from "@/data/interface";
 import {
   deriveRole,
@@ -12,9 +13,7 @@ import {
   normalizeSex,
 } from "@/components/studio/isoStudio";
 
-const baseProd = (
-  productionType: ProductionType,
-): ProductionPerson =>
+const baseProd = (specialty: Specialty): ProductionPerson =>
   ({
     id: 1,
     sex: "M",
@@ -23,8 +22,7 @@ const baseProd = (
     salary: 1000,
     personType: PersonType.PROD,
     morale: 70,
-    productionType,
-    specialty: "FULLSTACK",
+    specialty,
   }) as ProductionPerson;
 
 describe("normalizeSex", () => {
@@ -62,9 +60,11 @@ describe("moraleColor (5 paliers)", () => {
 });
 
 describe("deriveRole (modèle réel → rôle studio)", () => {
-  it("dérive dev / designer depuis ProductionType", () => {
-    expect(deriveRole(baseProd(ProductionType.DEV))).toBe("dev");
-    expect(deriveRole(baseProd(ProductionType.DESIGNER))).toBe("designer");
+  it("dérive dev / designer depuis la spécialité", () => {
+    expect(deriveRole(baseProd(ComponentType.CODE))).toBe("dev");
+    expect(deriveRole(baseProd("FULLSTACK"))).toBe("dev");
+    expect(deriveRole(baseProd(ComponentType.VISUEL))).toBe("designer");
+    expect(deriveRole(baseProd(ComponentType.UX))).toBe("designer");
   });
 
   it("dérive qa / marketing depuis PersonType", () => {

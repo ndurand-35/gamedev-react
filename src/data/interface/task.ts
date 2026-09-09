@@ -9,13 +9,14 @@ export interface Task {
   name: string;
 }
 
+/**
+ * Une tâche signée. Depuis le passage au modèle « livraison sur stock », un
+ * contrat en cours ne porte plus d'avancement : seule compte la date de
+ * signature, qui fixe la deadline (`startDate + time`) et l'éligibilité au
+ * bonus de livraison anticipée.
+ */
 export interface StartedTask extends Task {
   startDate: number;
-  paused: boolean;
-  progression: number;
-
-  priority: number;
-  buildingIds?: number[] | null;
 }
 
 export enum ContractType {
@@ -46,8 +47,4 @@ export interface ConsumedComponent {
   quality: ComponentQuality;
 }
 
-export interface StartedContract extends StartedTask, Contract {
-  assemblyPoints: number;
-  consumedComponents: ConsumedComponent[];
-  averageQuality: number;
-}
+export interface StartedContract extends StartedTask, Contract {}

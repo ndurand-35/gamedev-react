@@ -31,6 +31,7 @@ export const GameOverIndicator = () => {
   if (!gameOver) return null;
 
   const isSeizure = bankruptcyReason === "seizure";
+  const isInsolvency = bankruptcyReason === "insolvency";
 
   const rep = Math.round(reputation);
   const peak = Math.round(peakReputation);
@@ -50,12 +51,18 @@ export const GameOverIndicator = () => {
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-3xl font-bold text-error">
-          {isSeizure ? "Saisie bancaire" : "Faillite"}
+          {isSeizure
+            ? "Saisie bancaire"
+            : isInsolvency
+              ? "Dépôt de bilan"
+              : "Faillite"}
         </h2>
         <p className="text-gray-300">
           {isSeizure
             ? "Défaut de paiement répété : la banque a saisi le studio."
-            : "Votre trésorerie n'a pas tenu. Le studio met la clé sous la porte."}
+            : isInsolvency
+              ? "Les salaires ne pouvaient plus être versés et la banque ne suivait plus. Le studio dépose le bilan."
+              : "Votre trésorerie n'a pas tenu. Le studio met la clé sous la porte."}
         </p>
       </div>
 
@@ -92,7 +99,9 @@ export const GameOverIndicator = () => {
           )}
         </p>
         {peak > rep && (
-          <p className="text-xs text-gray-400">Pic de réputation : {peak}/100</p>
+          <p className="text-xs text-gray-400">
+            Pic de réputation : {peak}/100
+          </p>
         )}
       </div>
 

@@ -3,6 +3,20 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { ProductionPerson, TopMenuItem } from "@/data/interface";
 import { DEFAULT_ENGINE_STATE } from "@/data/utils/constant";
 
+export type BankruptcyReason = "treasury" | "seizure" | "insolvency";
+
+/** Proposition de prêt de sauvetage bloquant la clôture du mois. */
+export interface PendingRescue {
+  /** Offre bancaire retenue (la moins chère couvrant le découvert). */
+  offerId: string;
+  /** Montant manquant pour honorer charges, prêts et salaires du mois. */
+  shortfall: number;
+  /** Libellé du mois à clôturer, ex. « 03/1971 ». */
+  monthLabel: string;
+  /** Vitesse de jeu à restaurer une fois la décision prise. */
+  speedBefore: number;
+}
+
 export interface EngineState {
   gameName?: string;
   time: number;
@@ -13,9 +27,13 @@ export interface EngineState {
   // Pression économique : faillite déclenchée par la facturation mensuelle.
   gameOver: boolean;
   negativeMonthsStreak: number;
-  // Motif de la faillite (écran de bilan WF-3) : trésorerie intenable vs saisie
-  // bancaire (défaut de prêt, MYL-12). `undefined` tant que la partie tourne.
-  bankruptcyReason?: "treasury" | "seizure";
+  // Motif de la faillite (écran de bilan WF-3) : trésorerie intenable, saisie
+  // bancaire (défaut de prêt, MYL-12) ou insolvabilité de la paie sans prêt de
+  // sauvetage possible. `undefined` tant que la partie tourne.
+  bankruptcyReason?: BankruptcyReason;
+  // Prêt de sauvetage en attente de décision : la clôture du mois est suspendue
+  // (jeu en pause) tant que le joueur n'a pas accepté ou refusé.
+  pendingRescue?: PendingRescue;
   // Revenu produit passif du dernier mois facturé, exposé pour la capacité
   // d'emprunt (MYL-12 §1.2). 0 tant qu'aucun mois n'a été facturé.
   lastMonthlyRevenue: number;
@@ -51,6 +69,7 @@ export const engineSlice = createSlice({
       state.gameOver = false;
       state.negativeMonthsStreak = 0;
       state.bankruptcyReason = undefined;
+      state.pendingRescue = undefined;
       state.lastMonthlyRevenue = 0;
       state.maxHeadcount = DEFAULT_ENGINE_STATE.maxHeadcount;
       state.peakReputation = DEFAULT_ENGINE_STATE.peakReputation;
@@ -61,14 +80,22 @@ export const engineSlice = createSlice({
       action: PayloadAction<{
         negativeMonthsStreak: number;
         gameOver: boolean;
-        reason?: "treasury" | "seizure";
+        reason?: BankruptcyReason;
       }>,
     ) {
       state.negativeMonthsStreak = action.payload.negativeMonthsStreak;
       state.gameOver = action.payload.gameOver;
       if (action.payload.gameOver) {
         state.bankruptcyReason = action.payload.reason ?? "treasury";
+        state.pendingRescue = undefined;
       }
+    },
+    // Prêt de sauvetage : la clôture du mois attend la décision du joueur.
+    requestRescueLoan(state, action: PayloadAction<PendingRescue>) {
+      state.pendingRescue = action.payload;
+    },
+    clearRescueLoan(state) {
+      state.pendingRescue = undefined;
     },
     // Revenu produit passif du dernier mois facturé (MYL-12 §1.2).
     setLastMonthlyRevenue(state, action: PayloadAction<number>) {
@@ -136,6 +163,8 @@ export const {
   setLastMonthlyRevenue,
   trackRunPeaks,
   recordMonthlyNet,
+  requestRescueLoan,
+  clearRescueLoan,
 } = engineSlice.actions;
 
 export default engineSlice.reducer;

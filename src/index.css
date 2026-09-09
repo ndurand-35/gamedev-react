@@ -74,3 +74,11 @@
     animation: reveal-banner-fade-in 0.4s ease-out 1;
   }
 }
+
+/* Voile des modales assombri (daisyUI applique oklch(0% 0 0 / .4) par défaut). */
+.modal[open],
+.modal-open,
+.modal:target,
+.modal-toggle:checked + .modal {
+  background-color: oklch(0% 0 0 / 0.7);
+}

@@ -1,12 +1,16 @@
 import { ReactElement, useMemo } from "react";
 
 import {
+  COMPONENT_DECAY_PERIOD_HOURS,
+  COMPONENT_FRESHNESS_HOURS,
   Component,
   ComponentQuality,
+  COMPONENT_TYPE_ORDER,
   ComponentType,
   ProductionPerson,
   QUALITY_LABELS,
   QUALITY_TEXT_CLASS,
+  hoursBeforeNextDecay,
   qualityFromAverage,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
@@ -43,11 +47,7 @@ const ReputationByTypeCard = () => {
   );
 };
 
-const TYPE_ORDER: ComponentType[] = [
-  ComponentType.CODE,
-  ComponentType.VISUEL,
-  ComponentType.UX,
-];
+const TYPE_ORDER = COMPONENT_TYPE_ORDER;
 
 const QUALITY_DOT_CLASS: Record<ComponentQuality, string> = {
   [ComponentQuality.BACLE]: "bg-error",
@@ -64,6 +64,7 @@ const isProductionPerson = (p: any): p is ProductionPerson =>
 export const ComponentPage: React.FC = (): ReactElement => {
   const stock = useAppSelector((state) => state.component.stock);
   const employeList = useAppSelector((state) => state.employe.employeList);
+  const time = useAppSelector((state) => state.engine.time);
 
   const grouped = useMemo(() => {
     const map: Record<ComponentType, Component[]> = {
@@ -113,6 +114,10 @@ export const ComponentPage: React.FC = (): ReactElement => {
     return map;
   }, [employeList]);
 
+  // Composants qui perdront un niveau de qualité dans la semaine à venir.
+  const agingCount = (list: Component[]) =>
+    list.filter((c) => hoursBeforeNextDecay(c, time) <= 7 * 24).length;
+
   const averageQuality = (list: Component[]) => {
     if (list.length === 0) return 0;
     return list.reduce((acc, c) => acc + c.quality, 0) / list.length;
@@ -122,6 +127,13 @@ export const ComponentPage: React.FC = (): ReactElement => {
     <div className="p-8 mt-14 mb-20 space-y-6">
       <h1 className="mb-4">Stock de composants</h1>
 
+      <p className="text-sm opacity-70">
+        Un composant reste frais {COMPONENT_FRESHNESS_HOURS / 24} jours — la
+        durée d'un contrat moyen — puis perd un niveau de qualité tous les{" "}
+        {COMPONENT_DECAY_PERIOD_HOURS / 24} jours passés en stock. Mieux vaut
+        les livrer que les entasser.
+      </p>
+
       <ReputationByTypeCard />
 
       <div className="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-4">
@@ -130,6 +142,7 @@ export const ComponentPage: React.FC = (): ReactElement => {
           const avg = averageQuality(list);
           const rate = productionPerDay[type];
           const counts = countByQuality(list);
+          const aging = agingCount(list);
           return (
             <div
               key={`stock_${type}`}
@@ -150,6 +163,12 @@ export const ComponentPage: React.FC = (): ReactElement => {
                     Q moy. {QUALITY_LABELS[qualityFromAverage(avg)]}
                   </span>
                 </div>
+                {aging > 0 && (
+                  <div className="text-xs text-warning">
+                    {aging} composant{aging > 1 ? "s" : ""} perd
+                    {aging > 1 ? "ent" : ""} un niveau sous 7 jours
+                  </div>
+                )}
                 <div className="flex flex-row items-end justify-between pt-1">
                   {qualityOrder.map((q) => (
                     <div

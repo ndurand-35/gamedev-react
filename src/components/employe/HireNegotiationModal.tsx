@@ -56,7 +56,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const dispatch = useAppDispatch();
   const money = useAppSelector((s) => s.company.money);
-  // Plafond de recrutement §6.1 : embauche refusée si l'effectif est plein.
+  // Plafond de recrutement (places des bâtiments) : refusé si l'effectif est plein.
   const capReached = useAppSelector(selectRemainingSlots) <= 0;
 
   const open = candidate !== null;

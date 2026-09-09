@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import employeReducer, {
+  addCandidates,
   assignBuilding,
+  expireCandidates,
   fired,
   hire,
 } from "@/data/redux/employeSlice";
@@ -10,8 +12,6 @@ import { PersonType, type Person } from "@/data/interface";
 const baseState = (overrides: Partial<EmployeState> = {}): EmployeState => ({
   employeList: [],
   candidateList: [],
-  stopCandidateGeneration: false,
-  lastCandidateGeneration: 0,
   nextEmployeId: 2,
   nextCandidateId: 1,
   ...overrides,
@@ -75,5 +75,37 @@ describe("employeSlice / assignBuilding", () => {
       assignBuilding({ employeId: 2, buildingId: undefined }),
     );
     expect(next.employeList[0].buildingId).toBeUndefined();
+  });
+});
+
+describe("employeSlice / vivier de candidats", () => {
+  it("addCandidates empile les profils avec des IDs uniques", () => {
+    let state = baseState({ candidateList: [] });
+    state = employeReducer(
+      state,
+      addCandidates([candidate(0), candidate(0)]),
+    );
+    state = employeReducer(state, addCandidates([candidate(0)]));
+    const ids = state.candidateList.map((c) => c.id);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+    expect(state.nextCandidateId).toBe(4);
+  });
+
+  it("expireCandidates retire les profils arrivés à échéance", () => {
+    const state = baseState({
+      candidateList: [
+        { ...candidate(1), expiresAt: 100 },
+        { ...candidate(2), expiresAt: 200 },
+      ],
+    });
+    const next = employeReducer(state, expireCandidates(150));
+    expect(next.candidateList.map((c) => c.id)).toEqual([2]);
+  });
+
+  it("purge les candidats sans échéance (vivier auto-généré d'avant)", () => {
+    const state = baseState({ candidateList: [candidate(1), candidate(2)] });
+    const next = employeReducer(state, expireCandidates(0));
+    expect(next.candidateList).toHaveLength(0);
   });
 });

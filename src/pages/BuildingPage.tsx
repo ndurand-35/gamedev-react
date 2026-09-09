@@ -5,7 +5,6 @@ import {
   Community,
   NavArrowRight,
   SendEuros,
-  ShopFourTiles,
 } from "iconoir-react";
 
 import {
@@ -63,7 +62,6 @@ export const BuildingPage: React.FC = (): ReactElement => {
     (s) => s.company.availableBuildingList,
   );
   const employeList = useAppSelector((s) => s.employe.employeList);
-  const taskList = useAppSelector((s) => s.task.taskList);
 
   const stats = useMemo(() => {
     let totalPlaces = 0;
@@ -89,10 +87,6 @@ export const BuildingPage: React.FC = (): ReactElement => {
       if (!occupiedById[b.id]) emptyBuildings++;
     }
 
-    const activeContracts = taskList.filter(
-      (t) => t.buildingIds && t.buildingIds.length > 0,
-    ).length;
-
     const totalCharges = totalRent + totalElectricity + totalInternet;
 
     return {
@@ -104,10 +98,9 @@ export const BuildingPage: React.FC = (): ReactElement => {
       totalInternet,
       totalCharges,
       emptyBuildings,
-      activeContracts,
       occupiedById,
     };
-  }, [buildingList, employeList, taskList]);
+  }, [buildingList, employeList]);
 
   const occupancyPct =
     stats.totalPlaces === 0
@@ -164,12 +157,6 @@ export const BuildingPage: React.FC = (): ReactElement => {
           }
           icon={<SendEuros height={32} width={32} />}
           tone="error"
-        />
-        <StatCard
-          label="Contrats actifs"
-          value={stats.activeContracts.toString()}
-          hint="Tous bâtiments confondus"
-          icon={<ShopFourTiles height={32} width={32} />}
         />
       </div>
 

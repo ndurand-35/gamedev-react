@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 
-import { generateNewContract } from "@/data/utils/task";
+import {
+  CONTRACT_DEADLINE_MAX_MARGIN,
+  CONTRACT_DEADLINE_MIN_MARGIN,
+  CONTRACT_HOURS_PER_COMPONENT,
+  contractDeadlineHours,
+  generateNewContract,
+} from "@/data/utils/task";
+import { totalRequirementQuantity } from "@/data/utils/component";
 import { ComponentType, ContractType } from "@/data/interface";
 
 // Couvre la balance des contrats (MYL-11) : depuis le rééquilibrage, chaque
@@ -76,6 +83,36 @@ describe("balance des contrats — generateNewContract", () => {
         }
       }
     }
+  });
+
+  it("cale le délai sur la charge réelle du contrat", () => {
+    // ~110 h de travail par composant pour un développeur seul, plus la marge
+    // du client, arrondi au jour plein.
+    expect(contractDeadlineHours(10, 100)).toBe(1104); // 1100 h → 46 j
+    expect(contractDeadlineHours(1, 120)).toBe(144); // 132 h → 6 j pleins
+
+    for (let rep = 0; rep <= 100; rep += 10) {
+      for (const c of generateNewContract(rep)) {
+        const qty = totalRequirementQuantity(c.requirements);
+        const solo = qty * CONTRACT_HOURS_PER_COMPONENT;
+        expect(c.time).toBeGreaterThanOrEqual(
+          Math.round((solo * CONTRACT_DEADLINE_MIN_MARGIN) / 100 / 24) * 24 - 24,
+        );
+        expect(c.time).toBeLessThanOrEqual(
+          Math.round((solo * CONTRACT_DEADLINE_MAX_MARGIN) / 100 / 24) * 24 + 24,
+        );
+        // Toujours un nombre entier de jours.
+        expect(c.time % 24).toBe(0);
+      }
+    }
+  });
+
+  it("laisse ~2 mois sur un contrat de difficulté moyenne", () => {
+    // Difficulté 50 → ~13 composants selon `requirementsForType`, soit
+    // ~1430 h de travail solo et un délai de 1,2 à 1,6 fois cette charge.
+    const deadline = contractDeadlineHours(13, 100);
+    expect(deadline / 24).toBeGreaterThanOrEqual(55);
+    expect(deadline / 24).toBeLessThanOrEqual(65);
   });
 
   it("applique les planchers de prix forfaitaires même en early game", () => {

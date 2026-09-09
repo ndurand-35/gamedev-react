@@ -565,3 +565,49 @@ export const evaluateLoanDefault = (loan: Loan): LoanDefaultOutcome => {
     gameOver: missedPayments >= LOAN_MAX_MISSED,
   };
 };
+
+// ── Prêt de sauvetage (insolvabilité de la paie) ─────────────────────────────
+// La facturation mensuelle n'admet plus de salaire impayé : si la trésorerie
+// projetée passe sous zéro, le studio se voit proposer UN prêt de sauvetage.
+// Règles d'octroi identiques à la Banque (réputation, plafond de dette §1.2,
+// ratio de service §1.3) à une exception près : le cooldown entre deux octrois
+// est ignoré (`lastLoanTime = null`) — le sauvetage ne doit pas dépendre du
+// timing du dernier emprunt. Sans offre éligible, c'est la défaite.
+
+/**
+ * Offre la moins chère capable de couvrir `amountNeeded`. La mensualité du
+ * nouveau prêt est prélevée dès le mois facturé : on exige donc que le capital
+ * couvre le besoin ET sa propre première échéance, sinon l'octroi laisserait
+ * la trésorerie négative et redemanderait un sauvetage en boucle.
+ */
+export const findRescueOffer = (
+  amountNeeded: number,
+  peakReputation: number,
+  money: number,
+  monthlyRevenue: number,
+  activeLoans: Loan[],
+): LoanOffer | null => {
+  if (amountNeeded <= 0) return null;
+  const byPrincipal = [...LOAN_OFFERS].sort(
+    (a, b) => a.principal - b.principal,
+  );
+  for (const offer of byPrincipal) {
+    const firstPayment = computeMonthlyPayment(
+      offer.principal,
+      offer.annualRate,
+      offer.termMonths,
+    );
+    if (offer.principal - firstPayment < amountNeeded) continue;
+    const availability = isLoanOfferAvailable(
+      offer,
+      peakReputation,
+      Math.max(0, money),
+      monthlyRevenue,
+      activeLoans,
+      null, // cooldown neutralisé pour le sauvetage
+      0,
+    );
+    if (availability.available) return offer;
+  }
+  return null;
+};

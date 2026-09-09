@@ -1,5 +1,6 @@
 import {
   Component,
+  ComponentDecayUpdate,
   ComponentQuality,
   ComponentRequirement,
   ComponentType,
@@ -15,7 +16,11 @@ import {
   PendingComponent,
 } from "@/data/redux/componentSlice";
 import { AppDispatch, RootState } from "@/data/redux/store";
-import { applyProductionTick } from "@/data/redux/componentSlice";
+import {
+  applyDecayTick,
+  applyProductionTick,
+} from "@/data/redux/componentSlice";
+import { computeComponentDecay } from "@/data/interface";
 
 const isProductionPerson = (p: Person): p is ProductionPerson =>
   typeof (p as ProductionPerson).codeStat === "number";
@@ -150,4 +155,21 @@ export const produceComponents = (
   }
 
   dispatch(applyProductionTick({ progress, produced }));
+};
+
+// Vieillissement du stock : chaque composant non consommé perd un niveau de
+// qualité par palier écoulé après sa période de fraîcheur (cf.
+// `computeComponentDecay`). Appelé à chaque tick de la boucle de jeu ; ne
+// dispatche rien tant qu'aucun composant n'a franchi de palier.
+export const decayComponents = (dispatch: AppDispatch, state: RootState) => {
+  const time = state.engine.time;
+  const updates: ComponentDecayUpdate[] = [];
+
+  for (const c of state.component.stock) {
+    const update = computeComponentDecay(c, time);
+    if (update) updates.push(update);
+  }
+
+  if (updates.length === 0) return;
+  dispatch(applyDecayTick(updates));
 };

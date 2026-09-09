@@ -22,13 +22,6 @@ export interface StudioDef {
   reputationThreshold: number;
   /** Coût d'ouverture one-shot, débité sur `company.money` (€). */
   openingCost: number;
-  /**
-   * Quota de places de recrutement apporté par ce studio (§6.1). Le plafond
-   * d'embauche global est la somme des `employeeSlots` des studios débloqués.
-   * Placeholder CROISSANT avec le prestige — le Garage donne le quota de base.
-   * // TODO BALANCE éco : chiffrage de tuning à confirmer.
-   */
-  employeeSlots: number;
   /** Accroche carte-postale §4.1, 3ᵉ pers., ≤ ~70 car. (Lore §3). */
   tagline: string;
   /** Bandeau de micro-révélation §7. `undefined` pour le Garage (starter). */
@@ -45,7 +38,6 @@ export const STUDIO_DEFS: StudioDef[] = [
     coords: { lat: 48.85, lon: 2.35 }, // banlieue parisienne (FR)
     reputationThreshold: 0,
     openingCost: 0,
-    employeeSlots: 5, // base — // TODO BALANCE
     tagline: "Là où tout commence. Petit, mais c'est ici que naissent les grands.",
     // Pas de révélation : débloqué d'entrée (Lore §4, UX §7).
   },
@@ -56,7 +48,6 @@ export const STUDIO_DEFS: StudioDef[] = [
     coords: { lat: 60.17, lon: 24.94 }, // Helsinki (Nordiques)
     reputationThreshold: 20,
     openingCost: 75000,
-    employeeSlots: 8, // // TODO BALANCE
     tagline: "Au bord de l'eau, on fait des jeux qui ont une âme.",
     revealText:
       "L'Atelier Nord ouvre ses portes. Dehors il neige ; dedans, on rêve en grand.",
@@ -68,7 +59,6 @@ export const STUDIO_DEFS: StudioDef[] = [
     coords: { lat: 52.52, lon: 13.4 }, // Berlin (DE)
     reputationThreshold: 40,
     openingCost: 150000,
-    employeeSlots: 12, // // TODO BALANCE
     tagline: "Briques, moteurs et serveurs : ici on construit du solide.",
     revealText: "La Fonderie rallume ses fours. À toi de faire tourner la machine.",
   },
@@ -79,7 +69,6 @@ export const STUDIO_DEFS: StudioDef[] = [
     coords: { lat: 45.5, lon: -73.57 }, // Montréal (CA-QC)
     reputationThreshold: 60,
     openingCost: 300000,
-    employeeSlots: 18, // // TODO BALANCE
     tagline: "L'usine à grands jeux. On structure, on tient les délais.",
     revealText:
       "Le Bastion t'attendait. Ici, les jeux se comptent en équipes entières.",
@@ -91,7 +80,6 @@ export const STUDIO_DEFS: StudioDef[] = [
     coords: { lat: 34.05, lon: -118.24 }, // Los Angeles (US-CA)
     reputationThreshold: 80,
     openingCost: 600000,
-    employeeSlots: 25, // // TODO BALANCE
     tagline: "Soleil, trailers et grand frisson : le temple du AAA.",
     revealText:
       "Bienvenue à Cap Mirage. Les projecteurs sont braqués — ne les déçois pas.",
@@ -103,7 +91,6 @@ export const STUDIO_DEFS: StudioDef[] = [
     coords: { lat: 35.68, lon: 139.69 }, // Tokyo (JP)
     reputationThreshold: 95,
     openingCost: 1200000,
-    employeeSlots: 35, // // TODO BALANCE
     tagline: "Néons et arcades. Le culte du détail, finition au pixel.",
     revealText: "Néon-Ku s'illumine. Ici, le moindre pixel se mérite.",
   },

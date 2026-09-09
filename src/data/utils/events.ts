@@ -1,9 +1,4 @@
-import {
-  Person,
-  PersonType,
-  QA,
-  UNPAID_MORALE_PENALTY,
-} from "@/data/interface";
+import { Person } from "@/data/interface";
 import {
   addReputation,
   applyContractMalus,
@@ -25,12 +20,7 @@ import {
 import { pushNotification } from "@/data/redux/notificationSlice";
 import { setTaskList } from "@/data/redux/taskSlice";
 import { AppDispatch, RootState } from "@/data/redux/store";
-import { formatPrice, randomIntFromInterval } from "@/data/utils";
-import {
-  BUG_BASE_PROGRESSION_LOSS,
-  aggregateQaDetection,
-  computeQaBugOutcome,
-} from "@/data/utils/economy";
+import { formatPrice } from "@/data/utils";
 import {
   HOURS_PER_MONTH,
   RAISE_COOLDOWN_GRANTED,
@@ -44,12 +34,6 @@ import {
   raiseDemandType,
 } from "@/data/utils/recruitment";
 import { getTimeAsDate } from "@/data/utils/time";
-
-interface EventDef {
-  name: string;
-  chancePerTick: number;
-  trigger: (dispatch: AppDispatch, state: RootState) => boolean;
-}
 
 // ── Phase 3 — Résolution des effets déclaratifs ──────────────────────────────
 // Mapping pur effet→dispatch (réutilise les actions existantes). C'est la
@@ -75,12 +59,12 @@ export const resolveEffects = (
       case "contractMalus":
         dispatch(applyContractMalus(effect.amount));
         break;
-      case "taskProgression": {
+      case "taskDeadline": {
         const updatedList = state.task.taskList.map((t) =>
           t.id === effect.taskId
             ? {
                 ...t,
-                progression: Math.max(0, t.progression + effect.delta),
+                time: Math.max(0, t.time + effect.delta),
               }
             : t,
         );
@@ -132,265 +116,6 @@ const present = (
     presentDecision({ event, speedBeforeEvent: state.engine.gameSpeed }),
   );
   dispatch(setGameSpeed(0));
-};
-
-// Tire un coéquipier au hasard (hors fondateur, id 1) — utilisé pour modéliser
-// la « charge » d'une option qui mobilise l'équipe.
-const pickRandomTeammate = (state: RootState): Person | undefined => {
-  const list = state.employe.employeList.filter((e: Person) => e.id !== 1);
-  if (list.length === 0) return undefined;
-  return list[Math.floor(Math.random() * list.length)];
-};
-
-const EVENTS: EventDef[] = [
-  {
-    name: "Panne serveur",
-    chancePerTick: 0.0005,
-    trigger: (dispatch, state) => {
-      if (state.company.buildingList.length === 0) return false;
-      const cost = randomIntFromInterval(500, 1500);
-      // Tirage de l'issue de « Temporiser » figé au déclenchement : le joueur ne
-      // le voit pas et la boucle est en pause, donc aucune triche possible.
-      const worsens = Math.random() < 0.5;
-
-      present(dispatch, state, {
-        id: `panne-${state.engine.time}`,
-        title: "Panne serveur",
-        description:
-          "Un de vos serveurs vient de lâcher. Réparer tout de suite a un coût, mais temporiser risque d'aggraver l'incident.",
-        severity: "error",
-        options: [
-          {
-            id: "reparer",
-            label: "Réparer immédiatement",
-            outcomeHint: `-${formatPrice(cost)}, incident clos`,
-            effects: [{ kind: "contractMalus", amount: cost }],
-            toast: {
-              message: `Serveur réparé : ${formatPrice(cost)} de réparation.`,
-              type: "error",
-            },
-          },
-          {
-            id: "temporiser",
-            label: "Temporiser",
-            outcomeHint: "Gratuit, mais risque de panne aggravée",
-            effects: worsens
-              ? [
-                  { kind: "contractMalus", amount: cost * 2 },
-                  { kind: "reputation", amount: -1 },
-                ]
-              : [],
-            toast: worsens
-              ? {
-                  message: `Panne aggravée : ${formatPrice(
-                    cost * 2,
-                  )} et -1 réputation.`,
-                  type: "error",
-                }
-              : {
-                  message:
-                    "Panne temporisée sans dégât. Vous avez eu de la chance.",
-                  type: "success",
-                },
-          },
-        ],
-      });
-      return true;
-    },
-  },
-  {
-    name: "Employé malade",
-    chancePerTick: 0.001,
-    // Contre-exemple assumé : pas d'enjeu décisionnel → reste auto + toast.
-    trigger: (dispatch, state) => {
-      const list = state.employe.employeList.filter((e: Person) => e.id !== 1);
-      if (list.length === 0) return false;
-      const target = list[Math.floor(Math.random() * list.length)];
-      dispatch(
-        adjustMorale({
-          employeId: target.id,
-          delta: -Math.round(UNPAID_MORALE_PENALTY / 2),
-        }),
-      );
-      dispatch(
-        pushNotification({
-          message: `${target.firstName} ${target.lastName} est malade — moral affecté.`,
-          type: "warning",
-        }),
-      );
-      return true;
-    },
-  },
-  {
-    name: "Opportunité partenariat",
-    chancePerTick: 0.0006,
-    trigger: (dispatch, state) => {
-      const reward = randomIntFromInterval(500, 2500);
-      const teammate = pickRandomTeammate(state);
-
-      const seizeEffects: EventEffect[] = [
-        { kind: "money", amount: reward },
-        { kind: "reputation", amount: 1 },
-      ];
-      // Saisir l'opportunité mobilise une ressource : petit coût moral.
-      if (teammate) {
-        seizeEffects.push({
-          kind: "morale",
-          employeId: teammate.id,
-          delta: -3,
-        });
-      }
-
-      present(dispatch, state, {
-        id: `partenariat-${state.engine.time}`,
-        title: "Opportunité de partenariat",
-        description:
-          "Un partenaire propose une collaboration rémunératrice, mais elle mobilisera une partie de l'équipe.",
-        severity: "success",
-        options: [
-          {
-            id: "saisir",
-            label: "Saisir l'opportunité",
-            outcomeHint: `+${formatPrice(reward)} et +1 réputation${
-              teammate ? ", équipe sollicitée" : ""
-            }`,
-            effects: seizeEffects,
-            toast: {
-              message: `Partenariat conclu : +${formatPrice(
-                reward,
-              )} et +1 réputation.`,
-              type: "success",
-            },
-          },
-          {
-            id: "rester-concentre",
-            label: "Rester concentré sur la production",
-            outcomeHint: "Aucun gain immédiat, équipe sereine",
-            effects: [],
-            toast: {
-              message:
-                "Vous gardez l'équipe concentrée sur les projets en cours.",
-              type: "info",
-            },
-          },
-        ],
-      });
-      return true;
-    },
-  },
-  {
-    name: "Bug critique",
-    chancePerTick: 0.0008,
-    trigger: (dispatch, state) => {
-      if (state.task.taskList.length === 0) return false;
-      const idx = Math.floor(Math.random() * state.task.taskList.length);
-      const target = state.task.taskList[idx];
-
-      // Levier QA passif (Phase 2) : conservé pour l'option « Laisser passer ».
-      // Le tirage d'amortissement est figé au déclenchement (boucle en pause).
-      const testers = state.employe.employeList.filter(
-        (e: Person) => e.personType === PersonType.QA,
-      ) as QA[];
-      const outcome = computeQaBugOutcome(
-        aggregateQaDetection(testers),
-        Math.random(),
-      );
-
-      const letPassEffects: EventEffect[] = outcome.cancelled
-        ? []
-        : [
-            {
-              kind: "taskProgression",
-              taskId: target.id,
-              delta: -outcome.progressionLoss,
-            },
-          ];
-      const letPassToast = outcome.cancelled
-        ? {
-            message: `QA : bug détecté sur « ${target.name} » et neutralisé avant impact.`,
-            type: "success" as const,
-          }
-        : outcome.progressionLoss < BUG_BASE_PROGRESSION_LOSS
-          ? {
-              message: `QA : bug sur « ${target.name} » amorti — progression -${outcome.progressionLoss}% (au lieu de -${BUG_BASE_PROGRESSION_LOSS}%).`,
-              type: "success" as const,
-            }
-          : {
-              message: `Bug laissé en production sur « ${target.name} » : progression -${outcome.progressionLoss}%.`,
-              type: "error" as const,
-            };
-
-      // Hotfix d'urgence : perte moindre garantie, mais équipe sous tension.
-      const hotfixLoss = Math.round(BUG_BASE_PROGRESSION_LOSS / 2);
-      const teammate = pickRandomTeammate(state);
-      const hotfixEffects: EventEffect[] = [
-        { kind: "taskProgression", taskId: target.id, delta: -hotfixLoss },
-      ];
-      if (teammate) {
-        hotfixEffects.push({
-          kind: "morale",
-          employeId: teammate.id,
-          delta: -3,
-        });
-      }
-
-      present(dispatch, state, {
-        id: `bug-${state.engine.time}`,
-        title: "Bug critique",
-        description: `Un bug critique vient d'être repéré sur « ${target.name} ». Mobiliser l'équipe pour un hotfix d'urgence, ou laisser la QA encaisser ?`,
-        severity: "error",
-        options: [
-          {
-            id: "hotfix",
-            label: "Hotfix d'urgence",
-            outcomeHint: `-${hotfixLoss}% de progression, équipe sous tension`,
-            effects: hotfixEffects,
-            toast: {
-              message: `Hotfix déployé sur « ${target.name} » : progression -${hotfixLoss}%, équipe sollicitée.`,
-              type: "warning",
-            },
-          },
-          {
-            id: "laisser-passer",
-            label: "Laisser passer",
-            outcomeHint: "Selon la couverture QA en poste",
-            effects: letPassEffects,
-            toast: letPassToast,
-          },
-        ],
-      });
-      return true;
-    },
-  },
-];
-
-const EVENT_COOLDOWN_HOURS = 24;
-let lastEventAt: number | null = null;
-
-export const processRandomEvents = (
-  dispatch: AppDispatch,
-  state: RootState,
-) => {
-  // Une décision déjà ouverte gèle tout : pas de nouvel événement tant qu'elle
-  // n'est pas résolue (la boucle est de toute façon en pause à speed 0).
-  if (state.events.pending) return;
-
-  const time = state.engine.time;
-  if (lastEventAt != null && time - lastEventAt < EVENT_COOLDOWN_HOURS) return;
-
-  for (const ev of EVENTS) {
-    if (Math.random() < ev.chancePerTick) {
-      const fired = ev.trigger(dispatch, state);
-      if (fired) {
-        lastEventAt = time;
-        return;
-      }
-    }
-  }
-};
-
-export const resetEventCooldown = () => {
-  lastEventAt = null;
 };
 
 // ── Recrutement enrichi (MYL-13) — Volet C : demandes d'augmentation ─────────

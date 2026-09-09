@@ -11,6 +11,7 @@ import {
 } from "iconoir-react";
 
 import {
+  COMPONENT_TYPE_ORDER,
   ComponentType,
   Person,
   ProductionPerson,
@@ -33,19 +34,13 @@ export const pageTopMenuItems: TopMenuItem[] = [
   { name: "Pole Emploi", link: "/game/employe/recruit" },
 ];
 
-const CANDIDATE_LIFETIME = 168;
-
 const TYPE_COLOR: Record<ComponentType, string> = {
   [ComponentType.CODE]: "bg-primary",
   [ComponentType.VISUEL]: "bg-secondary",
   [ComponentType.UX]: "bg-accent",
 };
 
-const TYPE_ORDER: ComponentType[] = [
-  ComponentType.CODE,
-  ComponentType.VISUEL,
-  ComponentType.UX,
-];
+const TYPE_ORDER = COMPONENT_TYPE_ORDER;
 
 const isProductionPerson = (p: Person): p is ProductionPerson =>
   typeof (p as ProductionPerson).codeStat === "number";
@@ -84,9 +79,6 @@ export const EmployePage: React.FC = (): ReactElement => {
 
   const employeList = useAppSelector((state) => state.employe.employeList);
   const candidateList = useAppSelector((state) => state.employe.candidateList);
-  const lastCandidateGeneration = useAppSelector(
-    (state) => state.employe.lastCandidateGeneration,
-  );
   const time = useAppSelector((state) => state.engine.time);
   const qaCoverage = useAppSelector(selectQaCoverage);
   const activeCampaign = useAppSelector(selectActiveCampaign);
@@ -124,10 +116,6 @@ export const EmployePage: React.FC = (): ReactElement => {
     return { total, payroll, inProduction, free, byType, withoutBuilding };
   }, [employeList]);
 
-  const candidatesExpireIn = Math.max(
-    0,
-    lastCandidateGeneration + CANDIDATE_LIFETIME - time,
-  );
   const productionTotal = stats.inProduction + stats.free;
 
   return (
@@ -312,12 +300,6 @@ export const EmployePage: React.FC = (): ReactElement => {
                 {candidateList.length} candidat
                 {candidateList.length > 1 ? "s" : ""} disponible
                 {candidateList.length > 1 ? "s" : ""}
-                {candidateList.length > 0 && candidatesExpireIn > 0 && (
-                  <span className="opacity-60">
-                    {" "}
-                    · expire dans {Math.ceil(candidatesExpireIn / 24)}j
-                  </span>
-                )}
               </p>
             </div>
             <NavArrowRight height={24} />

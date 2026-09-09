@@ -1,6 +1,6 @@
-import { ReactElement, useEffect, useMemo, useState } from "react";
+import { ReactElement, useMemo, useState } from "react";
 
-import { UserPlus, WarningTriangle } from "iconoir-react";
+import { Search, UserPlus, WarningTriangle } from "iconoir-react";
 
 import {
   Candidate,
@@ -9,8 +9,8 @@ import {
   ProductionPerson,
   Specialty,
 } from "@/data/interface";
-import { setStopCandidateGeneration } from "@/data/redux/employeSlice";
 import { hireCandidate } from "@/data/redux/recruitmentThunks";
+import { CandidateSearchModal } from "@/components/employe/CandidateSearchModal";
 import {
   selectRecruitmentCap,
   selectRemainingSlots,
@@ -44,13 +44,24 @@ const CandidateRoleBadge = ({ candidate }: { candidate: Candidate }) => {
   return <RoleBadge personType={candidate.personType} />;
 };
 
+// Temps restant avant qu'un candidat ne quitte le vivier (heures de jeu).
+const remainingLabel = (hours: number): string => {
+  if (hours <= 0) return "Expiré";
+  if (hours < 24) return `${Math.ceil(hours)} h`;
+  return `${Math.ceil(hours / 24)} j`;
+};
+
 export const PoleEmploye: React.FC = (): ReactElement => {
   const dispatch = useAppDispatch();
   const candidateList = useAppSelector((state) => state.employe.candidateList);
-  // Plafond de recrutement §6.1 (cross-slice : cap = somme des studios débloqués).
+  const time = useAppSelector((state) => state.engine.time);
+  // Plafond de recrutement (cross-slice : cap = somme des places des bâtiments).
   const recruitmentCap = useAppSelector(selectRecruitmentCap);
   const remainingSlots = useAppSelector(selectRemainingSlots);
   const capReached = remainingSlots <= 0;
+
+  // Commande de recherche : formulaire déporté dans une modale.
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   // Id du candidat en cours d'entretien / négociation (null = modale fermée).
@@ -63,7 +74,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
     const ids = Object.keys(rowSelection)
       .map((index) => candidateList[parseInt(index)]?.id)
       .filter((id): id is number => id != null);
-    // Garde-fou plafond (§6.1) : on s'arrête net dès qu'une embauche est refusée
+    // Garde-fou plafond : on s'arrête net dès qu'une embauche est refusée
     // faute de place (le thunk relit le plafond à chaque appel + pousse le toast).
     for (const id of ids) {
       const result = dispatch(hireCandidate(id));
@@ -71,13 +82,6 @@ export const PoleEmploye: React.FC = (): ReactElement => {
     }
     setRowSelection({});
   };
-
-  useEffect(() => {
-    dispatch(setStopCandidateGeneration(true));
-    return () => {
-      dispatch(setStopCandidateGeneration(false));
-    };
-  }, [dispatch]);
 
   const columns = useMemo(() => {
     const columnHelper = createColumnHelper<Candidate>();
@@ -154,6 +158,28 @@ export const PoleEmploye: React.FC = (): ReactElement => {
           );
         },
       },
+      {
+        header: "Disponible",
+        accessorFn: (row: Candidate) =>
+          row.expiresAt == null ? Infinity : row.expiresAt - time,
+        enableColumnFilter: false,
+        cell: (info: any) => {
+          const expiresAt = (info.row.original as Candidate).expiresAt;
+          if (expiresAt == null) return <span className="opacity-60">—</span>;
+          const left = expiresAt - time;
+          return (
+            <span
+              className={
+                "badge badge-sm badge-outline " +
+                (left <= 24 ? "badge-error" : "badge-ghost")
+              }
+              title="Temps restant avant que le candidat quitte le vivier"
+            >
+              {remainingLabel(left)}
+            </span>
+          );
+        },
+      },
       columnHelper.display({
         header: "Action",
         cell: (props) => (
@@ -172,7 +198,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
         ),
       }),
     ];
-  }, [dispatch]);
+  }, [dispatch, time]);
 
   return (
     <div className="space-y-4">
@@ -184,12 +210,20 @@ export const PoleEmploye: React.FC = (): ReactElement => {
           <strong className="tabular-nums">{Math.max(0, remainingSlots)}</strong>{" "}
           <span className="opacity-60">/ {recruitmentCap}</span>
         </span>
+        {/* Le vivier ne se remplit plus tout seul : c'est le joueur qui commande
+            (et paie) une recherche ciblée. */}
+        <button
+          className="btn btn-sm btn-primary gap-1"
+          onClick={() => setSearchOpen(true)}
+        >
+          <Search width={16} height={16} /> Lancer une recherche
+        </button>
       </div>
       {capReached && (
         <div className="alert alert-warning py-2 text-sm">
           <WarningTriangle width={18} height={18} />
           <span>
-            Plafond d'effectif atteint — ouvre un nouveau studio pour recruter
+            Plafond d'effectif atteint — loue un nouveau bâtiment pour recruter
             davantage.
           </span>
         </div>
@@ -216,7 +250,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
                 aria-disabled={capReached}
                 title={
                   capReached
-                    ? "Plafond d'effectif atteint — ouvre un nouveau studio"
+                    ? "Plafond d'effectif atteint — loue un nouveau bâtiment"
                     : undefined
                 }
               >
@@ -232,6 +266,10 @@ export const PoleEmploye: React.FC = (): ReactElement => {
       <HireNegotiationModal
         candidate={negotiating}
         onClose={() => setNegotiatingId(null)}
+      />
+      <CandidateSearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
       />
     </div>
   );

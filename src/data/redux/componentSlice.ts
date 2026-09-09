@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import {
   Component,
+  ComponentDecayUpdate,
   ComponentQuality,
   ComponentType,
 } from "@/data/interface";
@@ -22,7 +23,13 @@ export interface ComponentState {
 
 const initialState: ComponentState = DEFAULT_COMPONENT_STATE;
 
-export const PRODUCTION_THRESHOLD = 80;
+// Points de travail nécessaires à un composant. Un spécialiste (stat ~17, moral
+// correct → ~14 points/h) met donc ~110 h de jeu, soit un peu moins de 5 jours,
+// à sortir un composant. C'est l'unité de temps « vraie vie » sur laquelle sont
+// calés les délais des contrats et l'obsolescence du stock : un contrat de
+// difficulté moyenne (~13 composants) représente environ deux mois de travail
+// pour un développeur seul.
+export const PRODUCTION_THRESHOLD = 1600;
 
 export const componentSlice = createSlice({
   name: "component",
@@ -48,6 +55,15 @@ export const componentSlice = createSlice({
         });
       }
     },
+    applyDecayTick(state, action: PayloadAction<ComponentDecayUpdate[]>) {
+      const byId = new Map(action.payload.map((u) => [u.id, u]));
+      for (const c of state.stock) {
+        const update = byId.get(c.id);
+        if (!update) continue;
+        c.quality = update.quality;
+        c.lastDecayAt = update.lastDecayAt;
+      }
+    },
     clearEmployeProgress(state, action: PayloadAction<number>) {
       delete state.productionProgress[action.payload];
     },
@@ -61,6 +77,7 @@ export const componentSlice = createSlice({
 export const {
   initializeComponentState,
   applyProductionTick,
+  applyDecayTick,
   clearEmployeProgress,
   removeComponents,
 } = componentSlice.actions;

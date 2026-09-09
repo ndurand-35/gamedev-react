@@ -8,7 +8,6 @@ import {
 import { buyBuilding } from "@/data/redux/companySlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
-import { Coins, Community, SendEuros } from "iconoir-react";
 import { formatPrice } from "@/data/utils";
 
 const pageTopMenuItems: TopMenuItem[] = [
@@ -39,52 +38,47 @@ export const SelogerPage: React.FC = (): ReactElement => {
   return (
     <div className="p-8 px-16 mt-14 mb-20 space-y-4">
       <h1>{availableBuildingList.length} Annonces</h1>
-      <div className="grid 2xl:grid-cols-4 xl:grid-cols-3 lg:grid-cols-2 md:grid-cols-2 sm:grid-cols-1 grid-cols-1 gap-4">
-        {availableBuildingList.map((b: Building) => (
-          <div
-            key={`available_building_${b.id}`}
-            className="card bg-base-100 shadow-xl"
-          >
-            <figure>
-              <img src={b?.image ?? ""} className="h-18" alt="" />
-            </figure>
-            <div className="card-body pb-4 space-y-1">
-              <p>
-                {b.address.city} - {b.address.country}
-              </p>
-              <h2 className="card-title">
-                {formatPrice(b.price)}
-                <Coins className="flex w-6 h-6" />
-              </h2>
-              <div className="flex flex-row justify-between">
-                <div
-                  className="flex flex-row items-center space-x-1 text-info tooltip"
-                  data-tip="Espace"
-                >
-                  <Community height={24} />
-                  <p>{b.place}</p>
-                </div>
-                <div
-                  className="flex flex-row items-center space-x-1 text-error tooltip"
+      <table className="table table-zebra bg-base-100 rounded-box shadow">
+        <thead>
+          <tr>
+            <th>Ville</th>
+            <th>Pays</th>
+            <th className="text-right">Places</th>
+            <th className="text-right">Charges / mois</th>
+            <th className="text-right">Prix</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {availableBuildingList.map((b: Building) => (
+            <tr key={`available_building_${b.id}`}>
+              <td className="font-medium">{b.address.city}</td>
+              <td>{b.address.country}</td>
+              <td className="tabular-nums text-right">{b.place}</td>
+              <td className="tabular-nums text-right text-error">
+                <span
+                  className="tooltip"
                   data-tip={`Loyer ${formatPrice(b.rent)} · Électricité ${formatPrice(b.electricity)} · Internet ${formatPrice(b.internet)}`}
                 >
-                  <SendEuros height={24} />
-                  <p>{formatPrice(getBuildingMonthlyCharges(b))} / mois</p>
-                </div>
-              </div>
-              <div className="card-actions justify-end">
+                  {formatPrice(getBuildingMonthlyCharges(b))}
+                </span>
+              </td>
+              <td className="tabular-nums text-right">
+                {formatPrice(b.price)}
+              </td>
+              <td>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary btn-sm"
                   onClick={() => setPendingBuyId(b.id)}
                   disabled={b.price > money}
                 >
                   Acheter
                 </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {pendingBuilding && (
         <dialog open className="modal modal-open">

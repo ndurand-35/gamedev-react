@@ -8,6 +8,7 @@ import {
   ProductionPerson,
   QA,
   Specialty,
+  jobLabel,
 } from "@/data/interface";
 import {
   assignComponentType,
@@ -168,7 +169,7 @@ export const EmployeModal: FC<EmployeModalProps> = ({
                   <RoleBadge personType={employe.personType} />
                 </div>
                 <p className="text-sm opacity-70">
-                  {prod?.productionType ?? employe.personType} · Salaire{" "}
+                  {jobLabel(employe)} · Salaire{" "}
                   {employe.salary} / mois
                 </p>
                 {prod && (

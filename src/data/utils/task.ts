@@ -4,19 +4,20 @@ import {
   ComponentType,
   Contract,
   ContractType,
-  Person,
-  ProductionPerson,
   StartedContract,
-  buildingSynergyMultiplier,
-  moraleProductivityMultiplier,
 } from "@/data/interface";
 import { faker } from "@faker-js/faker/locale/en";
-import { capitalize, randomIntFromInterval, weekToHour } from "@/data/utils";
-import { totalRequirementQuantity } from "@/data/utils/component";
+import { capitalize, randomIntFromInterval } from "@/data/utils";
+import {
+  computeAverageQuality,
+  selectBestComponents,
+  totalRequirementQuantity,
+} from "@/data/utils/component";
 import { AppDispatch, RootState } from "@/data/redux/store";
 import { pushNotification } from "@/data/redux/notificationSlice";
+import { removeComponents } from "@/data/redux/componentSlice";
 
-import { setTaskList } from "@/data/redux/taskSlice";
+import { removeTask, setTaskList } from "@/data/redux/taskSlice";
 import {
   addReputation,
   addReputationByType,
@@ -25,7 +26,33 @@ import {
 } from "@/data/redux/companySlice";
 import { MAX_CONTRACT_DIFFICULTY } from "./constant";
 
-export const ASSEMBLY_POINTS_PER_COMPONENT = 50;
+/** Part de la durée allouée en deçà de laquelle la livraison est « anticipée ». */
+export const EARLY_DELIVERY_RATIO = 0.7;
+/** Multiplicateur de prime appliqué au solde en cas de livraison anticipée. */
+export const EARLY_DELIVERY_BONUS = 1.2;
+/** Réputation perdue quand un contrat dépasse sa deadline sans être livré. */
+export const DEADLINE_REPUTATION_MALUS = -2;
+
+// --- Calibrage temporel des contrats ---------------------------------------
+// Charge de travail d'un composant pour un développeur seul et correctement
+// staffé : PRODUCTION_THRESHOLD / ~14 points par heure ≈ 110 h de jeu. Un
+// contrat de difficulté moyenne demande ~13 composants, soit ~2 mois en solo —
+// et nettement moins dès qu'on met plusieurs profils dessus.
+export const CONTRACT_HOURS_PER_COMPONENT = 110;
+/** Marge (en %) ajoutée par le client à l'estimation solo, tirée au hasard. */
+export const CONTRACT_DEADLINE_MIN_MARGIN = 120;
+export const CONTRACT_DEADLINE_MAX_MARGIN = 160;
+
+/**
+ * Délai contractuel (heures de jeu) déduit du volume de composants demandés,
+ * arrondi au jour plein. `marginPercent` = 100 → strictement l'estimation solo.
+ */
+export const contractDeadlineHours = (
+  totalQty: number,
+  marginPercent: number,
+): number =>
+  Math.round((totalQty * CONTRACT_HOURS_PER_COMPONENT * marginPercent) / 100 / 24) *
+  24;
 
 const minQualityForDifficulty = (
   difficulty: number,
@@ -83,11 +110,19 @@ export const generateNewContract = (reputation: number): Contract[] => {
   for (let i = 0; i < nbGenerated; i++) {
     let taskDifficulty = randomIntFromInterval(1, contractDifficulty);
     let taskType = randomContractType();
-    let time = randomIntFromInterval(1, 8);
 
     let requirements = requirementsForType(taskType, taskDifficulty);
     let totalQty = totalRequirementQuantity(requirements);
     let complexity = totalQty * taskDifficulty;
+    // Le délai suit la charge réelle du contrat plutôt qu'un tirage 1-8
+    // semaines sans rapport avec le volume de composants demandé.
+    let time = contractDeadlineHours(
+      totalQty,
+      randomIntFromInterval(
+        CONTRACT_DEADLINE_MIN_MARGIN,
+        CONTRACT_DEADLINE_MAX_MARGIN,
+      ),
+    );
 
     let priceDeposit = 150 + randomIntFromInterval(complexity * 6, complexity * 9);
     let priceAdditional =
@@ -102,7 +137,7 @@ export const generateNewContract = (reputation: number): Contract[] => {
         faker.hacker.adjective() +
         " " +
         faker.hacker.noun(),
-      time: weekToHour(time),
+      time,
       priceDeposit,
       priceAdditional,
       priceMalus,
@@ -116,130 +151,145 @@ export const generateNewContract = (reputation: number): Contract[] => {
   return generated;
 };
 
-const isProductionPerson = (p: Person): p is ProductionPerson =>
-  typeof (p as ProductionPerson).codeStat === "number";
-
-const integrationStat = (employe: ProductionPerson): number =>
-  (employe.codeStat + employe.visualStat + employe.uxStat) / 3;
-
-export const calculateTaskProgression = (
-  task: StartedContract,
-  employeList: Person[],
-): number => {
-  if (employeList.length === 0) return 0;
-  if (task.assemblyPoints <= 0) return 0;
-
-  const occupantsByBuilding: Record<number, number> = {};
-  for (const e of employeList) {
-    if (e.buildingId != null) {
-      occupantsByBuilding[e.buildingId] =
-        (occupantsByBuilding[e.buildingId] ?? 0) + 1;
-    }
-  }
-
-  let pointsProduced = 0;
-  for (const e of employeList) {
-    if (!isProductionPerson(e)) continue;
-    if (e.assignedComponentType) continue;
-    if ((e as ProductionPerson).trainingType) continue;
-    const synergy =
-      e.buildingId != null
-        ? buildingSynergyMultiplier(occupantsByBuilding[e.buildingId] ?? 1)
-        : 1;
-    pointsProduced +=
-      integrationStat(e) *
-      moraleProductivityMultiplier(e.morale) *
-      synergy;
-  }
-
-  const priorityMult = 1 + (task.priority - 1) * 0.25;
-  return ((pointsProduced * priorityMult) / task.assemblyPoints) * 100;
-};
-
-const qualityMultiplier = (avgQuality: number): number => {
+export const qualityMultiplier = (avgQuality: number): number => {
   return 0.5 + avgQuality * 0.2;
 };
 
-const reputationGainForQuality = (avgQuality: number): number => {
+export const reputationGainForQuality = (avgQuality: number): number => {
   return Math.round(avgQuality) - 1;
 };
 
-export const treatTasks = (dispatch: AppDispatch, state: RootState) => {
-  const remaining: StartedContract[] = [];
-  const time = state.engine.time;
+export interface ContractPayout {
+  /** Solde versé par le client, arrondi. */
+  reward: number;
+  /** Vrai si la livraison intervient avant `EARLY_DELIVERY_RATIO` du délai. */
+  early: boolean;
+  /** Réputation gagnée (négative sur du stock bâclé). */
+  reputationGain: number;
+}
 
-  for (const task of state.task.taskList) {
-    if (task.paused) {
-      if (time > task.startDate + task.time) {
-        dispatch(applyContractMalus(task.priceMalus));
-        dispatch(addReputation(-2));
-        continue;
-      }
-      remaining.push(task);
-      continue;
-    }
+/**
+ * Valorise une livraison : le solde dépend de la qualité moyenne des composants
+ * effectivement consommés — arbitrée au moment de livrer, plus à la signature —
+ * et d'une prime si le contrat part en avance.
+ */
+export const computeContractPayout = (
+  contract: StartedContract,
+  averageQuality: number,
+  time: number,
+): ContractPayout => {
+  const elapsed = time - contract.startDate;
+  const early = elapsed < contract.time * EARLY_DELIVERY_RATIO;
+  const reward = Math.round(
+    contract.priceAdditional *
+      qualityMultiplier(averageQuality) *
+      (early ? EARLY_DELIVERY_BONUS : 1),
+  );
+  return {
+    reward,
+    early,
+    reputationGain: reputationGainForQuality(averageQuality),
+  };
+};
 
-    const workingEmployes = state.employe.employeList.filter(
-      (e: Person) =>
-        e.buildingId != null && task.buildingIds?.includes(e.buildingId),
+/**
+ * Livraison déclenchée par le joueur : consomme les meilleurs composants du
+ * stock au moment du clic, verse le solde et retire le contrat. Sans stock
+ * suffisant l'action est refusée sans rien consommer, et le contrat reste
+ * ouvert jusqu'à sa deadline.
+ */
+export const deliverContract =
+  (contractId: number) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
+    const state = getState();
+    const contract = state.task.taskList.find(
+      (t: StartedContract) => t.id === contractId,
     );
-    const tickProgression = calculateTaskProgression(task, workingEmployes);
-    const updated: StartedContract = {
-      ...task,
-      progression: task.progression + tickProgression,
-    };
+    if (!contract) return;
 
-    if (updated.progression >= 100) {
-      const elapsed = time - updated.startDate;
-      const earlyBonus = elapsed < updated.time * 0.7 ? 1.2 : 1;
-      const reward = Math.round(
-        updated.priceAdditional *
-          qualityMultiplier(updated.averageQuality) *
-          earlyBonus,
-      );
-      dispatch(setMoney(state.company.money + reward));
-      const repGain = reputationGainForQuality(updated.averageQuality);
-      dispatch(addReputation(repGain));
-      if (repGain > 0 && updated.consumedComponents.length > 0) {
-        const counts: Record<ComponentType, number> = {
-          [ComponentType.CODE]: 0,
-          [ComponentType.VISUEL]: 0,
-          [ComponentType.UX]: 0,
-        };
-        for (const c of updated.consumedComponents) counts[c.type]++;
-        const total = updated.consumedComponents.length;
-        for (const t of Object.values(ComponentType)) {
-          if (counts[t] === 0) continue;
-          const share = Math.max(1, Math.round((repGain * counts[t]) / total));
-          dispatch(addReputationByType({ type: t, delta: share }));
-        }
-      }
+    const selection = selectBestComponents(
+      state.component.stock,
+      contract.requirements,
+    );
+    if (selection.missing.length > 0) {
       dispatch(
         pushNotification({
-          message:
-            earlyBonus > 1
-              ? `Contrat « ${updated.name} » livré en avance (+20% bonus) !`
-              : `Contrat « ${updated.name} » livré.`,
-          type: "success",
+          message: `Stock insuffisant pour livrer « ${contract.name} ».`,
+          type: "error",
         }),
       );
-      continue;
+      return;
     }
-    if (time > updated.startDate + updated.time) {
-      dispatch(applyContractMalus(updated.priceMalus));
-      dispatch(addReputation(-2));
+
+    const consumed = selection.consumed;
+    const averageQuality = computeAverageQuality(consumed);
+    const { reward, early, reputationGain } = computeContractPayout(
+      contract,
+      averageQuality,
+      state.engine.time,
+    );
+
+    dispatch(removeComponents(consumed.map((c) => c.id)));
+    dispatch(setMoney(state.company.money + reward));
+    dispatch(addReputation(reputationGain));
+
+    if (reputationGain > 0 && consumed.length > 0) {
+      const counts: Record<ComponentType, number> = {
+        [ComponentType.CODE]: 0,
+        [ComponentType.VISUEL]: 0,
+        [ComponentType.UX]: 0,
+      };
+      for (const c of consumed) counts[c.type]++;
+      const total = consumed.length;
+      for (const t of Object.values(ComponentType)) {
+        if (counts[t] === 0) continue;
+        const share = Math.max(
+          1,
+          Math.round((reputationGain * counts[t]) / total),
+        );
+        dispatch(addReputationByType({ type: t, delta: share }));
+      }
+    }
+
+    dispatch(removeTask(contractId));
+    dispatch(
+      pushNotification({
+        message: early
+          ? `Contrat « ${contract.name} » livré en avance (+20% bonus) !`
+          : `Contrat « ${contract.name} » livré.`,
+        type: "success",
+      }),
+    );
+  };
+
+/**
+ * Tick de contrats : la livraison étant à la main du joueur, la boucle de jeu
+ * n'arbitre plus que les deadlines dépassées.
+ */
+export const treatTasks = (dispatch: AppDispatch, state: RootState) => {
+  const time = state.engine.time;
+  const remaining: StartedContract[] = [];
+  let expired = false;
+
+  for (const task of state.task.taskList) {
+    if (time > task.startDate + task.time) {
+      expired = true;
+      dispatch(applyContractMalus(task.priceMalus));
+      dispatch(addReputation(DEADLINE_REPUTATION_MALUS));
       dispatch(
         pushNotification({
-          message: `Contrat « ${updated.name} » échoué : deadline dépassée.`,
+          message: `Contrat « ${task.name} » échoué : deadline dépassée.`,
           type: "error",
         }),
       );
       continue;
     }
-    remaining.push(updated);
+    remaining.push(task);
   }
 
-  dispatch(setTaskList({ taskList: remaining }));
+  // N'écrit dans le store que si la liste change réellement : sans résolution
+  // automatique, la grande majorité des ticks ne touche plus aux contrats.
+  if (expired) dispatch(setTaskList({ taskList: remaining }));
 };
 
 function randomContractType(): ContractType {

@@ -1,8 +1,12 @@
 import { ReactElement, useEffect, useState } from "react";
 import { Building as BuildingIcon, Xmark } from "iconoir-react";
 
-import { BuildingEmployeView, BuildingPicker } from "@/components/building";
-import { SpeedDial } from "@/components/layout";
+import {
+  BuildingEmployeView,
+  BuildingPicker,
+  EmployeViewSwitch,
+  useEmployeViewMode,
+} from "@/components/building";
 import { TopMenuItem } from "@/data/interface";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
@@ -22,6 +26,7 @@ export const HomePage: React.FC = (): ReactElement => {
     buildings[0]?.id,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [viewMode, setViewMode] = useEmployeViewMode();
   const [selectedEmployeId, setSelectedEmployeId] = useState<number | null>(
     null,
   );
@@ -60,16 +65,21 @@ export const HomePage: React.FC = (): ReactElement => {
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="btn btn-primary"
+          className="btn btn-outline btn-sm btn-square"
           aria-label="Ouvrir la liste des bâtiments"
+          title="Bâtiments"
         >
           <BuildingIcon height={20} width={20} />
-          Bâtiments
         </button>
         {building && (
-          <h1 className="text-xl font-bold truncate max-w-[60%]">
+          <h1 className="text-xl font-bold truncate max-w-[50%]">
             {building.name}
           </h1>
+        )}
+        {building && employes.length > 0 && (
+          <div className="ml-auto">
+            <EmployeViewSwitch mode={viewMode} onMode={setViewMode} />
+          </div>
         )}
       </div>
 
@@ -103,7 +113,7 @@ export const HomePage: React.FC = (): ReactElement => {
       )}
 
       {/* Effectif du bâtiment sélectionné : occupe l'espace restant de l'Accueil */}
-      <div className="flex flex-1 min-h-0 flex-col rounded-lg border border-base-content/20 bg-base-100">
+      <div className="flex flex-1 min-h-0 flex-col bg-base-100">
         {!building ? (
           <p className="m-auto p-8 text-center opacity-70">
             Aucun bâtiment. Achetez-en un depuis SeLoger.
@@ -116,6 +126,7 @@ export const HomePage: React.FC = (): ReactElement => {
           <BuildingEmployeView
             building={building}
             employes={employes}
+            mode={viewMode}
             onSelect={openEmploye}
           />
         )}
@@ -125,7 +136,6 @@ export const HomePage: React.FC = (): ReactElement => {
         employeId={selectedEmployeId}
         onClose={() => setSelectedEmployeId(null)}
       />
-      <SpeedDial />
     </div>
   );
 };

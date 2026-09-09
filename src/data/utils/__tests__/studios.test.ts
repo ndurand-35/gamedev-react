@@ -76,11 +76,4 @@ describe("table figée", () => {
     expect(garage.reputationThreshold).toBe(0);
     expect(garage.revealText).toBeUndefined();
   });
-
-  it("a des quotas d'effectif croissants avec le prestige (§6.1)", () => {
-    const slots = STUDIO_DEFS.map((s) => s.employeeSlots);
-    for (let i = 1; i < slots.length; i++) {
-      expect(slots[i]).toBeGreaterThan(slots[i - 1]);
-    }
-  });
 });

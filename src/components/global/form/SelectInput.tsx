@@ -10,17 +10,20 @@ export const SelectInput: React.FC<SelectInputProps> = ({
   children,
 }) => {
   return (
-    <label className="form-control w-full">
+    // `form-control` a disparu en daisyUI 5 : sans lui, un <label> reste
+    // inline et le libellé se colle à gauche du select. On empile en flex-col
+    // comme TextInput pour garder l'alignement des champs du formulaire.
+    <div className="w-full flex flex-col">
       <div className="label">
         <span className="label-text">{label}</span>
       </div>
       <select
-        className="select select-bordered"
+        className="select select-bordered w-full"
         value={field.state.value}
         onChange={(e) => field.handleChange(e.target.value)}
       >
         {children}
       </select>
-    </label>
+    </div>
   );
 };

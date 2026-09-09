@@ -83,7 +83,7 @@ export const useAlerts = (): Alert[] => {
         id: "deadline_soon",
         level: "warning",
         message: `${dueSoon.length} contrat${dueSoon.length > 1 ? "s" : ""} avec deadline < 24h.`,
-        link: { to: "/game/task", label: "Voir" },
+        link: { to: "/game/product/contract", label: "Voir" },
       });
     }
 
@@ -95,7 +95,7 @@ export const useAlerts = (): Alert[] => {
         id: "overdue",
         level: "error",
         message: `${overdue.length} contrat${overdue.length > 1 ? "s" : ""} en retard.`,
-        link: { to: "/game/task", label: "Voir" },
+        link: { to: "/game/product/contract", label: "Voir" },
       });
     }
 

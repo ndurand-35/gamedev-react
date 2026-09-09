@@ -18,7 +18,7 @@ import type { RootState } from "@/data/redux/store";
 const stateWith = (
   overrides: {
     money?: number;
-    taskList?: Array<{ id: number; progression: number; name?: string }>;
+    taskList?: Array<{ id: number; time: number; name?: string }>;
   } = {},
 ): RootState =>
   ({
@@ -69,23 +69,23 @@ describe("resolveEffects", () => {
     );
   });
 
-  it("effet taskProgression : applique le delta à la bonne tâche, borné à 0", () => {
+  it("effet taskDeadline : décale le délai de la bonne tâche, borné à 0", () => {
     const dispatch = vi.fn();
     resolveEffects(
-      [{ kind: "taskProgression", taskId: 2, delta: -10 }],
+      [{ kind: "taskDeadline", taskId: 2, delta: -10 }],
       dispatch as never,
       stateWith({
         taskList: [
-          { id: 1, progression: 50, name: "A" },
-          { id: 2, progression: 5, name: "B" },
+          { id: 1, time: 50, name: "A" },
+          { id: 2, time: 5, name: "B" },
         ],
       }),
     );
     expect(dispatch).toHaveBeenCalledWith(
       setTaskList({
         taskList: [
-          { id: 1, progression: 50, name: "A" },
-          { id: 2, progression: 0, name: "B" }, // 5 - 10 borné à 0
+          { id: 1, time: 50, name: "A" },
+          { id: 2, time: 0, name: "B" }, // 5 - 10 borné à 0
         ] as never,
       }),
     );

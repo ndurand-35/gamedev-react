@@ -7,3 +7,5 @@ export * from "@/components/employe/CampaignPanel";
 export * from "@/components/employe/FireConfirmModal";
 export * from "@/components/employe/TrainingConfirmModal";
 export * from "@/components/employe/HireNegotiationModal";
+export * from "@/components/employe/ActivityBadge";
+export * from "@/components/employe/CandidateSearchModal";
