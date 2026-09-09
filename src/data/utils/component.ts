@@ -22,7 +22,7 @@ import {
 } from "@/data/redux/componentSlice";
 import { computeComponentDecay } from "@/data/interface";
 
-const isProductionPerson = (p: Person): p is ProductionPerson =>
+export const isProductionPerson = (p: Person): p is ProductionPerson =>
   typeof (p as ProductionPerson).codeStat === "number";
 
 export const getRelevantStat = (

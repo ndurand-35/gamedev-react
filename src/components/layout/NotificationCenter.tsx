@@ -17,11 +17,20 @@ import {
   clearNotifications,
   dismissNotification,
 } from "@/data/redux/notificationSlice";
+import { formatPrice } from "@/data/utils";
 
 const ALERT_LEVEL_CLASS: Record<Alert["level"], string> = {
   error: "text-error",
   warning: "text-warning",
   info: "text-info",
+};
+
+// Le bandeau de tête porte la couleur du niveau sur son cadre et sa facture ;
+// le message, lui, reste lisible en couleur de texte normale.
+const ALERT_BORDER_CLASS: Record<Alert["level"], string> = {
+  error: "border-error/40 bg-error/5",
+  warning: "border-warning/40 bg-warning/5",
+  info: "border-info/40 bg-info/5",
 };
 
 const ALERT_ICON: Record<Alert["level"], React.ReactElement> = {
@@ -54,6 +63,20 @@ const formatRelativeTime = (createdAt: number): string => {
   return `il y a ${hr} h`;
 };
 
+/** Facture d'une alerte. Une alerte à 0 € n'affiche rien : rien ne brûle. */
+const AlertCost = ({
+  alert,
+  className = "",
+}: {
+  alert: Alert;
+  className?: string;
+}) =>
+  alert.monthlyCost > 0 ? (
+    <span className={"tabular-nums whitespace-nowrap " + className}>
+      −{formatPrice(alert.monthlyCost)} €/mois
+    </span>
+  ) : null;
+
 export const NotificationCenter = () => {
   const alerts = useAlerts();
   const notifications = useAppSelector((s) => s.notification.list);
@@ -63,6 +86,9 @@ export const NotificationCenter = () => {
 
   const total = alerts.length;
   const hasError = alerts.some((a) => a.level === "error");
+  // `useAlerts` trie déjà par facture décroissante : la tête de liste est la
+  // seule chose à regarder maintenant, le reste attend son tour.
+  const [costliest, ...others] = alerts;
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +141,15 @@ export const NotificationCenter = () => {
             {total}
           </span>
         )}
+        {/* Ce que coûte l'alerte la plus chère : lisible sans ouvrir le panneau. */}
+        {costliest && (
+          <AlertCost
+            alert={costliest}
+            className={
+              "text-xs font-semibold " + ALERT_LEVEL_CLASS[costliest.level]
+            }
+          />
+        )}
       </button>
 
       {open && (
@@ -136,45 +171,102 @@ export const NotificationCenter = () => {
           </div>
 
           <div className="overflow-y-auto flex-1">
-            <section className="px-3 py-2">
-              <h3 className="text-xs font-semibold opacity-70 mb-1">
-                Alertes ({alerts.length})
-              </h3>
-              {alerts.length === 0 ? (
+            {!costliest ? (
+              <section className="px-3 py-2">
+                <h3 className="text-xs font-semibold opacity-70 mb-1">
+                  Alertes (0)
+                </h3>
                 <p className="text-xs opacity-60 italic py-1">
                   Aucune alerte active.
                 </p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-base-content/10">
-                  {alerts.map((a) => (
-                    <li
-                      key={a.id}
-                      className="py-2 flex flex-row items-start justify-between gap-2"
-                    >
-                      <div className="flex flex-row items-start gap-2 flex-1 min-w-0">
-                        <span className={ALERT_LEVEL_CLASS[a.level]}>
-                          {ALERT_ICON[a.level]}
-                        </span>
-                        <span
-                          className={"text-xs " + ALERT_LEVEL_CLASS[a.level]}
-                        >
-                          {a.message}
+              </section>
+            ) : (
+              <>
+                <section className="px-3 py-2">
+                  <h3 className="text-xs font-semibold opacity-70 mb-1">
+                    Ce qui coûte le plus cher
+                  </h3>
+                  <div
+                    className={
+                      "flex flex-col gap-2 rounded border p-2 " +
+                      ALERT_BORDER_CLASS[costliest.level]
+                    }
+                  >
+                    <div className="flex flex-row items-start gap-2">
+                      <span className={ALERT_LEVEL_CLASS[costliest.level]}>
+                        {ALERT_ICON[costliest.level]}
+                      </span>
+                      <span className="text-sm flex-1 min-w-0">
+                        {costliest.message}
+                      </span>
+                    </div>
+                    <div className="flex flex-row items-end justify-between gap-2">
+                      <div className="flex flex-col min-w-0">
+                        <AlertCost
+                          alert={costliest}
+                          className={
+                            "text-lg font-semibold leading-tight " +
+                            ALERT_LEVEL_CLASS[costliest.level]
+                          }
+                        />
+                        <span className="text-[10px] opacity-70">
+                          {costliest.costLabel}
                         </span>
                       </div>
-                      {a.link && (
+                      {costliest.link && (
                         <Link
-                          to={a.link.to}
+                          to={costliest.link.to}
                           onClick={() => setOpen(false)}
-                          className="btn btn-xs btn-ghost"
+                          className="btn btn-xs btn-outline"
                         >
-                          {a.link.label}
+                          {costliest.link.label}
                         </Link>
                       )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                    </div>
+                  </div>
+                </section>
+
+                {others.length > 0 && (
+                  <section className="px-3 pb-2">
+                    <h3 className="text-xs font-semibold opacity-70 mb-1">
+                      Ensuite ({others.length})
+                    </h3>
+                    <ul className="flex flex-col divide-y divide-base-content/10">
+                      {others.map((a) => (
+                        <li
+                          key={a.id}
+                          className="py-2 flex flex-row items-start justify-between gap-2"
+                        >
+                          <div className="flex flex-row items-start gap-2 flex-1 min-w-0">
+                            <span className={ALERT_LEVEL_CLASS[a.level]}>
+                              {ALERT_ICON[a.level]}
+                            </span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs opacity-80">
+                                {a.message}
+                              </span>
+                              <AlertCost
+                                alert={a}
+                                className="text-[10px] opacity-60"
+                              />
+                            </div>
+                          </div>
+                          {a.link && (
+                            <Link
+                              to={a.link.to}
+                              onClick={() => setOpen(false)}
+                              className="btn btn-xs btn-ghost"
+                            >
+                              {a.link.label}
+                            </Link>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </>
+            )}
 
             <section className="px-3 py-2 border-t border-base-content/10">
               <div className="flex flex-row items-center justify-between mb-1">

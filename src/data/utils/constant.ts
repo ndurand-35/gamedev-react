@@ -64,6 +64,7 @@ export const DEFAULT_TASK_STATE: TaskState = {
   availableContractList: [],
   lastContractGeneration: -168,
   nextContractId: 1,
+  clients: {},
 };
 export const DEFAULT_EMPLOYE_STATE: EmployeState = {
   employeList: [],

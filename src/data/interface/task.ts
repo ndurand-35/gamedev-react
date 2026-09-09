@@ -28,8 +28,20 @@ export enum ContractType {
 export interface Contract extends Task {
   time: number;
 
+  /**
+   * Client émetteur, stable d'un contrat à l'autre (cf. `Client`). Absent sur
+   * les contrats des parties antérieures aux clients à mémoire : ceux-là
+   * restent anonymes jusqu'à leur résolution.
+   */
+  clientId: string;
   clientName: string;
   clientImage: string;
+  /**
+   * Prime de fidélité appliquée à l'acompte et au solde (0.15 = +15 %), nulle
+   * pour un premier contact. Conservée pour l'affichage : les prix stockés la
+   * contiennent déjà.
+   */
+  loyaltyBonus: number;
 
   priceDeposit: number;
   priceAdditional: number;

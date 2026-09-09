@@ -5,6 +5,7 @@ import {
   Contract,
   StartedContract,
 } from "@/data/interface";
+import { ClientBadge } from "@/components/contract/ClientBadge";
 import { RequirementList } from "@/components/contract/RequirementList";
 import { setMoney } from "@/data/redux/companySlice";
 import { acceptContract } from "@/data/redux/taskSlice";
@@ -62,6 +63,13 @@ export const ContractCard: FC<ContractCardProps> = memo(
     return (
       <tr>
         <td className="font-medium">{contract.name}</td>
+        <td>
+          <ClientBadge
+            clientId={contract.clientId}
+            name={contract.clientName}
+            loyaltyBonus={contract.loyaltyBonus}
+          />
+        </td>
         <td>
           <div className="badge badge-neutral badge-sm">
             {contract.taskDifficulty}

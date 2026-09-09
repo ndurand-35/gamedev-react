@@ -1,19 +1,13 @@
 import { FC, ReactElement, useMemo } from "react";
 
-import {
-  ComponentType,
-  QUALITY_BADGE_CLASS,
-  QUALITY_LABELS,
-  StartedContract,
-  qualityFromAverage,
-} from "@/data/interface";
+import { ComponentType, StartedContract } from "@/data/interface";
+import { ClientBadge } from "@/components/contract/ClientBadge";
+import { DeliveryAdvisor } from "@/components/contract/DeliveryAdvisor";
 import { RequirementList } from "@/components/contract/RequirementList";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import {
-  computeAverageQuality,
-  computeContractPayout,
+  adviseDelivery,
   deliverContract,
-  formatPrice,
   selectBestComponents,
 } from "@/data/utils";
 
@@ -24,7 +18,9 @@ interface ContractDeliveryProps {
 /**
  * Carte d'un contrat signé, en attente de livraison. Le joueur y arbitre le
  * moment de livrer : le stock du moment détermine la qualité moyenne — donc le
- * solde — et la prime d'anticipation s'éteint passé 70 % du délai.
+ * solde — et la prime d'anticipation s'éteint passé 70 % du délai. Cet
+ * arbitrage n'est pas laissé à l'intuition : le `DeliveryAdvisor` en chiffre
+ * les deux branches.
  */
 export const ContractDelivery: FC<ContractDeliveryProps> = ({
   contract,
@@ -32,7 +28,13 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
   const dispatch = useAppDispatch();
   const time = useAppSelector((state) => state.engine.time);
   const stock = useAppSelector((state) => state.component.stock);
+  const employes = useAppSelector((state) => state.employe.employeList);
+  const productionProgress = useAppSelector(
+    (state) => state.component.productionProgress,
+  );
 
+  // Sélection sur le stock RÉEL : c'est elle qui doit décider si le bouton est
+  // actif, puisque c'est exactement ce que `deliverContract` consommera.
   const selection = useMemo(
     () => selectBestComponents(stock, contract.requirements),
     [stock, contract.requirements],
@@ -54,13 +56,17 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
     return held;
   }, [contract.requirements, selection.missing]);
 
-  const payout = useMemo(() => {
-    const averageQuality = computeAverageQuality(selection.consumed);
-    return {
-      averageQuality,
-      ...computeContractPayout(contract, averageQuality, time),
-    };
-  }, [selection.consumed, contract, time]);
+  const advice = useMemo(
+    () =>
+      adviseDelivery({
+        contract,
+        stock,
+        employes,
+        productionProgress,
+        time,
+      }),
+    [contract, stock, employes, productionProgress, time],
+  );
 
   const hoursLeft = contract.startDate + contract.time - time;
   const daysLeft = Math.max(0, Math.round(hoursLeft / 24));
@@ -69,62 +75,45 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
       ? "text-error"
       : hoursLeft < 24
         ? "text-warning"
-        : payout.early
+        : advice.now.early
           ? "text-success"
           : "";
 
   return (
-    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-row items-center gap-2">
-          <p className="font-medium">{contract.name}</p>
-          <span className="badge badge-ghost badge-sm">
-            {contract.clientName}
-          </span>
+    <div className="flex flex-col gap-3 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-row items-center gap-2">
+            <p className="font-medium">{contract.name}</p>
+            <ClientBadge
+              clientId={contract.clientId}
+              name={contract.clientName}
+              loyaltyBonus={contract.loyaltyBonus}
+            />
+          </div>
+          <p className={"text-sm " + deadlineTone}>
+            {hoursLeft <= 0
+              ? "Deadline dépassée"
+              : `${daysLeft} jour${daysLeft > 1 ? "s" : ""} restant${daysLeft > 1 ? "s" : ""}`}
+            {advice.now.early && hoursLeft > 0 && (
+              <span className="ml-2 badge badge-xs badge-success">
+                bonus livraison anticipée
+              </span>
+            )}
+          </p>
+          <div className="mt-1">
+            <RequirementList
+              requirements={contract.requirements}
+              heldByType={heldByType}
+            />
+          </div>
         </div>
-        <p className={"text-sm " + deadlineTone}>
-          {hoursLeft <= 0
-            ? "Deadline dépassée"
-            : `${daysLeft} jour${daysLeft > 1 ? "s" : ""} restant${daysLeft > 1 ? "s" : ""}`}
-          {payout.early && hoursLeft > 0 && (
-            <span className="ml-2 badge badge-xs badge-success">
-              bonus livraison anticipée
-            </span>
-          )}
-        </p>
-        <div className="mt-1">
-          <RequirementList
-            requirements={contract.requirements}
-            heldByType={heldByType}
-          />
-        </div>
-      </div>
 
-      <div className="flex flex-row items-center gap-4">
-        <div className="flex flex-col items-end gap-1">
-          {deliverable ? (
-            <>
-              <span
-                className={`badge badge-sm ${QUALITY_BADGE_CLASS[qualityFromAverage(payout.averageQuality)]}`}
-                title="Qualité moyenne du stock qui serait consommé"
-              >
-                {QUALITY_LABELS[qualityFromAverage(payout.averageQuality)]}
-              </span>
-              <span className="text-sm font-semibold text-success tabular-nums">
-                {formatPrice(payout.reward)}
-              </span>
-            </>
-          ) : (
-            <span className="text-xs opacity-60 text-right max-w-40">
-              Stock incomplet — produisez les composants manquants.
-            </span>
-          )}
-        </div>
         <button
           type="button"
           onClick={() => dispatch(deliverContract(contract.id))}
           disabled={!deliverable}
-          className="btn btn-primary btn-sm"
+          className="btn btn-primary btn-sm self-start sm:self-auto"
           title={
             deliverable
               ? "Consomme le stock et encaisse le solde"
@@ -134,6 +123,8 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
           Livrer
         </button>
       </div>
+
+      <DeliveryAdvisor advice={advice} priceMalus={contract.priceMalus} />
     </div>
   );
 };

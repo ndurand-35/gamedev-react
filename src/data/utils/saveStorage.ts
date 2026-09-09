@@ -26,7 +26,8 @@ export const GAME_VERSION = "0.0.0";
 // Version de schéma des sauvegardes, DÉCOUPLÉE de redux-persist (v10). Démarre à
 // 1 ; tout changement de forme de l'état persisté dans un slot incrémente cette
 // valeur ET ajoute une entrée dans `migrations`.
-export const SAVE_SCHEMA_VERSION = 1;
+// 2 : carnet de clients persistants (`task.clients`).
+export const SAVE_SCHEMA_VERSION = 2;
 
 // Slots manuels exposés au joueur (wireframe §4 : 3 slots).
 export const MANUAL_SLOT_IDS = ["slot_1", "slot_2", "slot_3"] as const;
@@ -127,13 +128,20 @@ export const deserializeState = (json: string): Record<string, unknown> =>
  * Registre des migrations ascendantes. La clé `N` transforme un état de version
  * de schéma `N` vers `N+1`. Appliqué séquentiellement au load quand la version
  * stockée est inférieure à `SAVE_SCHEMA_VERSION`.
- *
- * Aucune migration nécessaire tant que `SAVE_SCHEMA_VERSION === 1`.
  */
 export const migrations: Record<
   number,
   (state: Record<string, unknown>) => Record<string, unknown>
-> = {};
+> = {
+  // 1 → 2 : clients à mémoire. La partie repart avec un carnet vide ; les
+  // contrats déjà signés n'ont pas de `clientId` et se résolvent en anonymes
+  // (ni relation gagnée, ni rupture) — le réseau se construit à partir des
+  // signatures suivantes.
+  1: (state) => {
+    const task = (state.task ?? {}) as Record<string, unknown>;
+    return { ...state, task: { ...task, clients: task.clients ?? {} } };
+  },
+};
 
 /**
  * Applique les migrations de `fromVersion` (exclu côté borne basse) jusqu'à

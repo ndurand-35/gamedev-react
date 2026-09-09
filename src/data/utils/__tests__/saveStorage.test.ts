@@ -115,9 +115,21 @@ describe("validateLoaded", () => {
 });
 
 describe("runMigrations (migration ascendante)", () => {
+  // Le registre réel porte des migrations de production : on le restaure après
+  // chaque test pour ne pas priver les suivants de leurs entrées.
+  const realMigrations = { ...migrations };
   afterEach(() => {
-    delete migrations[1];
-    delete migrations[2];
+    for (const key of Object.keys(migrations)) delete migrations[Number(key)];
+    Object.assign(migrations, realMigrations);
+  });
+
+  it("migre 1 → 2 en dotant `task` d'un carnet de clients vide", () => {
+    const out = migrations[1]({ task: { taskList: [], nextContractId: 3 } });
+    expect(out.task).toEqual({
+      taskList: [],
+      nextContractId: 3,
+      clients: {},
+    });
   });
 
   it("applique séquentiellement les migrations de from → to", () => {

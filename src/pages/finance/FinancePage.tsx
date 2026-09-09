@@ -14,7 +14,10 @@ import { selectLoanSummary } from "@/data/redux/selectors";
 import { formatPrice } from "@/data/utils";
 import {
   MonthlyReport,
+  PROJECTION_HORIZON_MONTHS,
+  ProjectedMonth,
   averageNet,
+  computeCashProjection,
   computeMonthlyProjection,
   computeRunwayMonths,
 } from "@/data/utils/finance";
@@ -98,6 +101,49 @@ const PnlRow = ({
   </div>
 );
 
+// Une colonne de la projection : le mois, son résultat, la trésorerie qu'il
+// laisse derrière lui. Le mois de rupture est mis en évidence — c'est la seule
+// information que le joueur doit pouvoir lire sans compter.
+const ProjectionMonthCard = ({
+  month,
+  isBreach,
+}: {
+  month: ProjectedMonth;
+  isBreach: boolean;
+}) => (
+  <div
+    className={
+      "rounded-lg border p-3 space-y-1 " +
+      (isBreach ? "border-error bg-error/10" : "border-base-300")
+    }
+  >
+    <div className="flex flex-row items-baseline justify-between">
+      <span className="font-medium">{month.label}</span>
+      <span className="text-xs opacity-60">
+        {month.offset === 1 ? "mois en cours" : `+${month.offset - 1} mois`}
+      </span>
+    </div>
+    <p
+      className={
+        "text-sm tabular-nums " +
+        (month.net >= 0 ? "text-success" : "text-error")
+      }
+    >
+      {month.net >= 0 ? "+" : "−"}
+      {formatPrice(Math.abs(month.net))} € de résultat
+    </p>
+    <p
+      className={
+        "text-lg font-semibold tabular-nums " +
+        (month.moneyAfter < 0 ? "text-error" : "text-base-content")
+      }
+    >
+      {formatPrice(month.moneyAfter)} €
+    </p>
+    <p className="text-xs opacity-60">trésorerie après clôture</p>
+  </div>
+);
+
 // Histogramme des résultats nets mensuels (barres au-dessus / en dessous de 0).
 const NetHistoryChart = ({ reports }: { reports: MonthlyReport[] }) => {
   const scale = Math.max(...reports.map((r) => Math.abs(r.net)), 1);
@@ -168,12 +214,27 @@ export const FinancePage: FC = (): ReactElement => {
     [products, buildings, employes, loans, time, campaign],
   );
 
+  const cash = useMemo(
+    () =>
+      computeCashProjection({
+        products,
+        buildings,
+        employes,
+        loans,
+        time,
+        campaign,
+        money,
+      }),
+    [products, buildings, employes, loans, time, campaign, money],
+  );
+
   const history = useMemo(
     () => monthlyReports.slice(-HISTORY_MONTHS),
     [monthlyReports],
   );
 
   const runway = computeRunwayMonths(money, projection.net);
+  const breach = cash.breach;
   const avg3 = averageNet(monthlyReports, 3);
 
   // Assiette des barres du compte de résultat : le plus gros flux du mois.
@@ -200,11 +261,19 @@ export const FinancePage: FC = (): ReactElement => {
           value={formatPrice(money) + " €"}
           icon={<Coins height={32} width={32} />}
           hint={
-            runway === null
-              ? "Résultat mensuel positif"
-              : `≈ ${runway} mois d'autonomie`
+            breach
+              ? `Rupture prévue en ${breach.label}`
+              : runway === null
+                ? "Résultat mensuel positif"
+                : `≈ ${runway} mois d'autonomie`
           }
-          tone={money < 0 ? "error" : runway !== null && runway <= 2 ? "warning" : "neutral"}
+          tone={
+            money < 0 || (breach && breach.offset === 1)
+              ? "error"
+              : breach
+                ? "warning"
+                : "neutral"
+          }
         />
         <StatCard
           label="Revenus mensuels"
@@ -284,10 +353,17 @@ export const FinancePage: FC = (): ReactElement => {
               </span>
             </div>
 
-            {runway !== null && (
-              <p className="text-xs text-warning">
-                ⚠️ À ce rythme, la trésorerie tient ≈ {runway} mois.
+            {breach ? (
+              <p className="text-xs text-error">
+                ⚠️ À ce rythme, la clôture de {breach.label} ne passe plus : il y
+                manquerait {formatPrice(-breach.moneyAfter)} €.
               </p>
+            ) : (
+              runway !== null && (
+                <p className="text-xs text-warning">
+                  ⚠️ À ce rythme, la trésorerie tient ≈ {runway} mois.
+                </p>
+              )
             )}
           </div>
         </div>
@@ -366,6 +442,55 @@ export const FinancePage: FC = (): ReactElement => {
               <NavArrowRight height={24} />
             </Link>
           </div>
+        </div>
+      </div>
+
+      <div
+        className={
+          "card bg-base-100 shadow-md border " +
+          (breach ? "border-error" : "border-base-300")
+        }
+      >
+        <div className="p-4 space-y-3">
+          <div className="flex flex-row items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              Projection de trésorerie — {PROJECTION_HORIZON_MONTHS} mois
+            </h2>
+            <span className="text-xs opacity-60">
+              effectifs et charges constants
+            </span>
+          </div>
+
+          <div className="grid md:grid-cols-3 grid-cols-1 gap-3">
+            {cash.months.map((m) => (
+              <ProjectionMonthCard
+                key={`proj_${m.offset}`}
+                month={m}
+                isBreach={breach?.offset === m.offset}
+              />
+            ))}
+          </div>
+
+          {breach ? (
+            <p className="text-sm text-error">
+              Rupture de trésorerie à la clôture de <b>{breach.label}</b>
+              {breach.offset > 1 && ` (dans ${breach.offset - 1} mois)`} :
+              il manquerait {formatPrice(-breach.moneyAfter)} €. Sans prêt de
+              sauvetage, le mois ne se clôture pas.
+            </p>
+          ) : (
+            <p className="text-sm text-success">
+              Aucune rupture sur l'horizon : {formatPrice(cash.endingMoney)} €
+              attendus après {PROJECTION_HORIZON_MONTHS} clôtures.
+            </p>
+          )}
+
+          <p className="text-xs opacity-60">
+            Les revenus produits sont érodés mois après mois par l'obsolescence
+            et les mensualités suivent l'échéancier réel des prêts — un prêt
+            soldé cesse de peser. Contrats et achats ponctuels ne sont pas
+            projetés.
+          </p>
         </div>
       </div>
 

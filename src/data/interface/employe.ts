@@ -45,6 +45,10 @@ export const MAX_MORALE = 100;
 export const RESIGNATION_MORALE_THRESHOLD = 20;
 export const LOW_MORALE_THRESHOLD = 50;
 export const PAID_MORALE_BONUS = 1;
+// Probabilité qu'un employé sous le seuil de démission parte, tirée à chaque
+// heure de jeu par `processMoraleTick`. Posée ici plutôt que dans la boucle de
+// jeu : le chiffrage des alertes en a besoin pour estimer un risque mensuel.
+export const RESIGNATION_CHANCE_PER_TICK = 0.005;
 
 // Multiplier appliqué à la productivité selon le moral.
 // 100 → 1.0, 50 → 0.7, 0 → 0.4

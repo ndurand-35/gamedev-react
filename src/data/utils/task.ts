@@ -1,10 +1,12 @@
 import {
+  Client,
   ComponentQuality,
   ComponentRequirement,
   ComponentType,
   Contract,
   ContractType,
   StartedContract,
+  clientTier,
 } from "@/data/interface";
 import { faker } from "@faker-js/faker/locale/en";
 import { capitalize, randomIntFromInterval } from "@/data/utils";
@@ -17,7 +19,21 @@ import { AppDispatch, RootState } from "@/data/redux/store";
 import { pushNotification } from "@/data/redux/notificationSlice";
 import { removeComponents } from "@/data/redux/componentSlice";
 
-import { removeTask, setTaskList } from "@/data/redux/taskSlice";
+import {
+  loseClient,
+  recordClientDelivery,
+  removeTask,
+  setTaskList,
+} from "@/data/redux/taskSlice";
+import {
+  CLIENT_RETURN_CHANCE,
+  clampRelation,
+  clientRelationDelta,
+  loyaltyBonus,
+  newClientIdentity,
+  pickReturningClient,
+  returningCandidates,
+} from "@/data/utils/client";
 import {
   addReputation,
   addReputationByType,
@@ -93,7 +109,16 @@ const requirementsForType = (
   }
 };
 
-export const generateNewContract = (reputation: number): Contract[] => {
+/**
+ * Lot de contrats disponibles. Chaque contrat porte un client : un habitué tiré
+ * du registre (au plus une fois par lot, pondéré par la relation) ou un inconnu
+ * fraîchement nommé. Un client fidèle revient avec une prime sur l'acompte et
+ * le solde — c'est le rendement de la relation, pas du talent.
+ */
+export const generateNewContract = (
+  reputation: number,
+  clients: Record<string, Client> = {},
+): Contract[] => {
   let nbGenerated = 8;
   let contractDifficulty = 2;
   if (reputation === 100) {
@@ -105,6 +130,10 @@ export const generateNewContract = (reputation: number): Contract[] => {
   else if (reputation > 25) nbGenerated = 7;
   if (reputation > 1)
     contractDifficulty = MAX_CONTRACT_DIFFICULTY * (reputation / 100);
+
+  // Un même client ne monopolise pas la liste : une place par lot au plus.
+  const candidates = returningCandidates(clients);
+  const alreadyPlaced = new Set<string>();
 
   let generated: Contract[] = [];
   for (let i = 0; i < nbGenerated; i++) {
@@ -129,6 +158,21 @@ export const generateNewContract = (reputation: number): Contract[] => {
       600 + randomIntFromInterval(complexity * 22, complexity * 28);
     let priceMalus = randomIntFromInterval(priceDeposit * 2, priceDeposit * 3);
 
+    const returning =
+      Math.random() < CLIENT_RETURN_CHANCE
+        ? pickReturningClient(
+            candidates.filter((c) => !alreadyPlaced.has(c.id)),
+          )
+        : undefined;
+    if (returning) alreadyPlaced.add(returning.id);
+
+    const client = returning ?? newClientIdentity();
+    const bonus = returning ? loyaltyBonus(returning.relation) : 0;
+    // Le malus reste au tarif du contrat nu : la fidélité paie mieux, elle
+    // n'assure pas contre l'échec.
+    priceDeposit = Math.round(priceDeposit * (1 + bonus));
+    priceAdditional = Math.round(priceAdditional * (1 + bonus));
+
     generated.push({
       id: 0,
       name:
@@ -141,8 +185,10 @@ export const generateNewContract = (reputation: number): Contract[] => {
       priceDeposit,
       priceAdditional,
       priceMalus,
-      clientName: faker.company.name(),
-      clientImage: faker.image.urlLoremFlickr({ category: "logo" }),
+      clientId: client.id,
+      clientName: client.name,
+      clientImage: client.image,
+      loyaltyBonus: bonus,
       type: taskType,
       taskDifficulty,
       requirements,
@@ -251,6 +297,42 @@ export const deliverContract =
       }
     }
 
+    // Le client se souvient : livrer vite le fait revenir avec un meilleur
+    // contrat, livrer du bâclé refroidit la relation.
+    if (contract.clientId) {
+      const client = state.task.clients?.[contract.clientId];
+      const delta = clientRelationDelta(early, reputationGain < 0);
+      dispatch(
+        recordClientDelivery({
+          clientId: contract.clientId,
+          delta,
+          early,
+          time: state.engine.time,
+        }),
+      );
+
+      // On n'annonce que les franchissements de palier : le reste se lit dans
+      // le carnet d'adresses, sans bruit de notification à chaque livraison.
+      if (client) {
+        const before = clientTier(client);
+        const after = clientTier({
+          ...client,
+          relation: clampRelation(client.relation + delta),
+        });
+        if (after !== before) {
+          dispatch(
+            pushNotification({
+              message:
+                delta < 0
+                  ? `${contract.clientName} refroidit : relation « ${after} ».`
+                  : `${contract.clientName} vous classe désormais « ${after} ».`,
+              type: delta < 0 ? "warning" : "info",
+            }),
+          );
+        }
+      }
+    }
+
     dispatch(removeTask(contractId));
     dispatch(
       pushNotification({
@@ -282,6 +364,18 @@ export const treatTasks = (dispatch: AppDispatch, state: RootState) => {
           type: "error",
         }),
       );
+      // Une deadline manquée est sans appel : le client sort du carnet et ne
+      // proposera plus rien. C'est le prix d'une signature de trop.
+      const client = state.task.clients?.[task.clientId];
+      if (client && !client.lost) {
+        dispatch(loseClient({ clientId: task.clientId, time }));
+        dispatch(
+          pushNotification({
+            message: `${task.clientName} rompt : plus aucun contrat de leur part.`,
+            type: "error",
+          }),
+        );
+      }
       continue;
     }
     remaining.push(task);

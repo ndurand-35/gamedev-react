@@ -1,6 +1,7 @@
 import {
   PAID_MORALE_BONUS,
   ProductStatus,
+  RESIGNATION_CHANCE_PER_TICK,
   RESIGNATION_MORALE_THRESHOLD,
   computeDecayedRevenue,
   getBuildingMonthlyCharges,
@@ -125,8 +126,6 @@ export const processLoanRepayments = (
 
   return { money, seizure };
 };
-
-const RESIGNATION_CHANCE_PER_TICK = 0.005;
 
 // ── Clôture mensuelle ────────────────────────────────────────────────────────
 // Aucun salaire n'est jamais laissé impayé : soit le mois est intégralement

@@ -3,7 +3,11 @@ import { ReactElement } from "react";
 import { useAppSelector } from "@/data/redux/hooks";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { Contract, StartedContract } from "@/data/interface";
-import { ContractCard, ContractDelivery } from "@/components/contract";
+import {
+  ClientNetwork,
+  ContractCard,
+  ContractDelivery,
+} from "@/components/contract";
 import { productTopMenuItems } from "@/pages/product/menu";
 
 export const TaskPage: React.FC = (): ReactElement => {
@@ -37,11 +41,19 @@ export const TaskPage: React.FC = (): ReactElement => {
       </section>
 
       <section className="space-y-2">
+        <h2 className="text-xl font-bold">Carnet d'adresses</h2>
+        <div className="bg-base-100 rounded-box shadow">
+          <ClientNetwork />
+        </div>
+      </section>
+
+      <section className="space-y-2">
         <h2 className="text-xl font-bold">Contrats disponibles</h2>
         <table className="table table-zebra bg-base-100 rounded-box shadow">
           <thead>
             <tr>
               <th>Contrat</th>
+              <th>Client</th>
               <th>Difficulté</th>
               <th>Délai</th>
               <th className="text-right">Acompte</th>

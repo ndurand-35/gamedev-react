@@ -3,12 +3,15 @@ export * from "@/data/utils/task";
 export * from "@/data/utils/building";
 export * from "@/data/utils/employe";
 export * from "@/data/utils/component";
+export * from "@/data/utils/client";
+export * from "@/data/utils/deliveryAdvisor";
 export * from "@/data/utils/billing";
 export * from "@/data/utils/training";
 export * from "@/data/utils/events";
 export * from "@/data/utils/milestone";
 export * from "@/data/utils/recruitment";
 export * from "@/data/utils/studios";
+export * from "@/data/utils/alertCost";
 
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);

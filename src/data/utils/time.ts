@@ -5,6 +5,14 @@ export const getTimeAsDate = (time: number): Dayjs => {
   return startDate.add(time, "h");
 };
 
+/**
+ * `engine.time` (heures) décalé de N mois calendaires. Sert aux projections
+ * pluri-mensuelles : on avance le temps de jeu plutôt que de dupliquer les
+ * formules qui en dépendent (obsolescence produit, expiration de campagne).
+ */
+export const addMonthsToTime = (time: number, months: number): number =>
+  getTimeAsDate(time).add(months, "month").diff(dayjs("1970-01-01"), "hour");
+
 export const weekToHour = (week: number): number => {
   return week * 7 * 24;
 };

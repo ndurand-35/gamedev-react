@@ -1,15 +1,22 @@
 import { describe, it, expect } from "vitest";
 
 import { Building, Person, Product, ProductStatus } from "@/data/interface";
-import { VARIABLE_CHARGE_PER_EMPLOYEE, type Loan } from "@/data/utils/economy";
+import {
+  REVENUE_DECAY_GRACE_MONTHS,
+  VARIABLE_CHARGE_PER_EMPLOYEE,
+  revenueDecayMultiplier,
+  type Loan,
+} from "@/data/utils/economy";
 import {
   averageNet,
   computeBuildingCharges,
+  computeCashProjection,
   computeMonthlyProjection,
   computeProductRevenue,
   computeRunwayMonths,
   type MonthlyReport,
 } from "@/data/utils/finance";
+import { addMonthsToTime } from "@/data/utils/time";
 
 const building = (id: number, rent: number): Building => ({
   id,
@@ -41,6 +48,32 @@ const product = (
 
 const loan = (monthlyPayment: number): Loan =>
   ({ id: 1, monthlyPayment }) as unknown as Loan;
+
+// Prêt réellement amortissable : la projection pluri-mensuelle rejoue
+// l'échéancier, elle a donc besoin du capital restant et du terme.
+const amortizingLoan = (
+  monthlyPayment: number,
+  remainingMonths: number,
+  outstandingBalance: number,
+): Loan =>
+  ({
+    id: 1,
+    monthlyPayment,
+    remainingMonths,
+    outstandingBalance,
+    monthlyRate: 0,
+    missedPayments: 0,
+  }) as unknown as Loan;
+
+const launchedProduct = (
+  id: number,
+  monthlyRevenue: number,
+  launchTime: number,
+): Product =>
+  ({
+    ...product(id, monthlyRevenue, ProductStatus.LAUNCHED),
+    launchTime,
+  }) as Product;
 
 const report = (net: number, time: number): MonthlyReport => ({
   time,
@@ -126,6 +159,106 @@ describe("computeMonthlyProjection", () => {
     });
     expect(projection.expenses).toBe(0);
     expect(projection.net).toBe(0);
+  });
+});
+
+describe("computeCashProjection", () => {
+  it("projette l'horizon par défaut et fait courir la trésorerie", () => {
+    const cash = computeCashProjection({
+      products: [],
+      buildings: [],
+      employes: [employe(1, 2000, 1)],
+      loans: [],
+      time: 0,
+      money: 10_000,
+    });
+
+    expect(cash.months.map((m) => m.offset)).toEqual([1, 2, 3]);
+    expect(cash.months.map((m) => m.moneyAfter)).toEqual([8000, 6000, 4000]);
+    expect(cash.endingMoney).toBe(4000);
+    expect(cash.breach).toBeNull();
+  });
+
+  it("aligne le premier mois sur la projection du mois en cours", () => {
+    const input = {
+      products: [launchedProduct(1, 10_000, 0)],
+      buildings: [building(1, 1000)],
+      employes: [employe(1, 2000, 1)],
+      loans: [],
+      time: 0,
+    };
+    const monthly = computeMonthlyProjection(input);
+    const [first] = computeCashProjection({ ...input, money: 0 }).months;
+
+    expect(first.revenue).toBe(monthly.revenue);
+    expect(first.expenses).toBe(monthly.expenses);
+    expect(first.net).toBe(monthly.net);
+  });
+
+  it("érode les revenus produits d'un mois sur l'autre", () => {
+    // Lancé juste avant la fin du palier de grâce : le 2e mois projeté est le
+    // premier à subir l'obsolescence.
+    const launchTime = 0;
+    const time = addMonthsToTime(launchTime, REVENUE_DECAY_GRACE_MONTHS);
+    const cash = computeCashProjection({
+      products: [launchedProduct(1, 10_000, launchTime)],
+      buildings: [],
+      employes: [],
+      loans: [],
+      time,
+      money: 0,
+    });
+
+    expect(cash.months[0].revenue).toBe(10_000);
+    expect(cash.months[1].revenue).toBe(
+      Math.round(10_000 * revenueDecayMultiplier(REVENUE_DECAY_GRACE_MONTHS + 1)),
+    );
+    expect(cash.months[2].revenue).toBeLessThan(cash.months[1].revenue);
+  });
+
+  it("amortit l'échéancier : un prêt soldé ne pèse plus sur les mois suivants", () => {
+    const cash = computeCashProjection({
+      products: [],
+      buildings: [],
+      employes: [],
+      loans: [amortizingLoan(500, 2, 1000)],
+      time: 0,
+      money: 5000,
+    });
+
+    expect(cash.months.map((m) => m.loanPayments)).toEqual([500, 500, 0]);
+    expect(cash.endingMoney).toBe(4000);
+  });
+
+  it("date la rupture au premier mois dont la clôture ne passe plus", () => {
+    const cash = computeCashProjection({
+      products: [],
+      buildings: [],
+      employes: [employe(1, 2000, 1)],
+      loans: [],
+      time: 0,
+      money: 3000,
+    });
+
+    expect(cash.breach).not.toBeNull();
+    expect(cash.breach?.offset).toBe(2);
+    expect(cash.breach?.moneyAfter).toBe(-1000);
+    // La rupture est le PREMIER mois négatif, pas le dernier de l'horizon.
+    expect(cash.months[0].moneyAfter).toBe(1000);
+  });
+
+  it("respecte un horizon explicite", () => {
+    const cash = computeCashProjection({
+      products: [],
+      buildings: [],
+      employes: [],
+      loans: [],
+      time: 0,
+      money: 100,
+      months: 6,
+    });
+    expect(cash.months).toHaveLength(6);
+    expect(cash.endingMoney).toBe(100);
   });
 });
 

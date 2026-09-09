@@ -1,4 +1,3 @@
-import { RangeInput } from "@/components/global/form/RangeInput";
 import { SelectInput } from "@/components/global/form/SelectInput";
 import { TextInput } from "@/components/global/form/TextInput";
 import {
@@ -32,20 +31,20 @@ import { useNavigate } from "react-router-dom";
 
 // ── Budget de création du fondateur ─────────────────────────────────────────
 // Le fondateur produit comme n'importe quel employé : une stat par type de
-// composant (Code / Visuel / UX), lue telle quelle par getRelevantStat.
+// composant (Code / Visuel / UX), lue telle quelle par getRelevantStat. Le
+// budget n'est plus dépensé par le joueur : chaque profil le répartit pour lui.
 export const FOUNDER_STAT_POINTS = 18;
-export const MIN_FOUNDER_STAT = 1;
 
-// Un curseur par tâche produisible : le joueur voit directement ce que chaque
-// point alimente en jeu.
+// Une ligne par tâche produisible : le joueur voit directement ce que le
+// profil choisi alimente en jeu.
 const STAT_GROUPS: Array<{
   type: ComponentType;
   key: ProductionStatKey;
   label: string;
 }> = [
-  { type: ComponentType.CODE, key: 'codeStat', label: 'Code' },
-  { type: ComponentType.VISUEL, key: 'visualStat', label: 'Visuel' },
-  { type: ComponentType.UX, key: 'uxStat', label: 'UX' },
+  { type: ComponentType.CODE, key: "codeStat", label: "Code" },
+  { type: ComponentType.VISUEL, key: "visualStat", label: "Visuel" },
+  { type: ComponentType.UX, key: "uxStat", label: "UX" },
 ];
 
 const ALL_STAT_KEYS: ProductionStatKey[] = STAT_GROUPS.map((g) => g.key);
@@ -53,10 +52,12 @@ const ALL_STAT_KEYS: ProductionStatKey[] = STAT_GROUPS.map((g) => g.key);
 // ── Profil : choix unique (rôle + spécialité fusionnés) ─────────────────────
 // La spécialité porte à elle seule le métier : badge, enveloppe salariale,
 // libellé de poste et avatar studio en sont tous dérivés. Le joueur choisit un
-// profil, qui pose la répartition de départ.
+// profil, et ce profil fixe seul la répartition de départ — chaque preset
+// dépense exactement FOUNDER_STAT_POINTS.
 interface ProfileDef {
   specialty: Specialty;
   label: string;
+  description: string;
   preset: Record<ProductionStatKey, number>;
 }
 
@@ -64,49 +65,37 @@ const PROFILES: ProfileDef[] = [
   {
     specialty: "FULLSTACK",
     label: "Polyvalent — à l'aise partout",
+    description:
+      "Ni faiblesse ni pointe : vous produisez les trois types de composants au même niveau.",
     preset: { codeStat: 6, visualStat: 6, uxStat: 6 },
   },
   {
     specialty: ComponentType.CODE,
     label: "Développeur — spécialiste Code",
+    description:
+      "Vous excellez sur le Code ; le Visuel et l'UX attendront vos premiers recrutements.",
     preset: { codeStat: 10, visualStat: 4, uxStat: 4 },
   },
   {
     specialty: ComponentType.VISUEL,
     label: "Graphiste — spécialiste Visuel",
+    description:
+      "Vous excellez sur le Visuel ; le Code et l'UX attendront vos premiers recrutements.",
     preset: { codeStat: 4, visualStat: 10, uxStat: 4 },
   },
   {
     specialty: ComponentType.UX,
     label: "Designer UX — spécialiste UX",
+    description:
+      "Vous excellez sur l'UX ; le Code et le Visuel attendront vos premiers recrutements.",
     preset: { codeStat: 4, visualStat: 4, uxStat: 10 },
   },
 ];
 
 const FULLSTACK_PROFILE = PROFILES[0];
 
-// Écart minimal entre la meilleure stat et la suivante pour parler de
-// spécialité : en deçà, le fondateur est un polyvalent.
-const SPECIALIST_GAP = 4;
-
-// Le profil final est relu dans les curseurs, pas dans le menu déroulant : le
-// badge affiché en jeu ne peut donc pas mentir sur les stats réelles.
-const deriveProfile = (values: ProductionPerson): ProfileDef => {
-  const ranked = STAT_GROUPS.map((g) => ({
-    type: g.type,
-    value: Number(values[g.key] ?? 0),
-  })).sort((a, b) => b.value - a.value);
-
-  if (ranked[0].value - ranked[1].value < SPECIALIST_GAP) {
-    return FULLSTACK_PROFILE;
-  }
-  return (
-    PROFILES.find((p) => p.specialty === ranked[0].type) ?? FULLSTACK_PROFILE
-  );
-};
-
-const sumStats = (values: ProductionPerson): number =>
-  ALL_STAT_KEYS.reduce((acc, key) => acc + Number(values[key] ?? 0), 0);
+const findProfile = (specialty: Specialty): ProfileDef =>
+  PROFILES.find((p) => p.specialty === specialty) ?? FULLSTACK_PROFILE;
 
 // Aperçu de la qualité moyenne produite : rollComponentQuality part de
 // stat / 5, on affiche donc l'espérance sans le hasard.
@@ -123,12 +112,13 @@ const NewGamePage: React.FC = () => {
   const form = useForm<ProductionPerson & { gameName: string }>({
     onSubmit: ({ value }) => {
       const { gameName, ...rest } = value;
-      // Le profil est recalculé sur la répartition finale : si le joueur a
-      // retouché ses curseurs après avoir choisi un profil, badge et libellé
-      // suivent les stats réellement dépensées.
-      const profile = deriveProfile(rest);
+      // Les stats suivent le profil et rien d'autre : on réapplique le preset à
+      // la validation pour que le badge affiché en jeu ne puisse pas mentir sur
+      // les stats réelles du fondateur.
+      const profile = findProfile(rest.specialty);
       const director: ProductionPerson = {
         ...rest,
+        ...profile.preset,
         specialty: profile.specialty,
       };
 
@@ -166,11 +156,10 @@ const NewGamePage: React.FC = () => {
     } as ProductionPerson & { gameName: string },
   });
 
-  // Le menu « Profil » ne fait qu'amorcer la répartition : les curseurs
-  // restent libres, et c'est eux qui font foi à la validation.
+  // Le menu « Profil » pose la répartition : les stats ne sont plus éditables,
+  // elles ne font que refléter le preset du profil sélectionné.
   const applyProfile = (specialty: Specialty) => {
-    const profile =
-      PROFILES.find((p) => p.specialty === specialty) ?? FULLSTACK_PROFILE;
+    const profile = findProfile(specialty);
     ALL_STAT_KEYS.forEach((key) =>
       form.setFieldValue(key, profile.preset[key]),
     );
@@ -229,7 +218,7 @@ const NewGamePage: React.FC = () => {
                 children={(field) => <TextInput field={field} label="Nom" />}
               />
 
-              {/* Profil : amorce la répartition, rôle et badge en découlent */}
+              {/* Profil : fixe la répartition, rôle et badge en découlent */}
               <form.Field
                 name="specialty"
                 children={(field) => (
@@ -253,32 +242,24 @@ const NewGamePage: React.FC = () => {
               />
             </div>
 
-            {/* Panneau de compétences */}
+            {/* Compétences du profil : lecture seule */}
             <form.Subscribe
               selector={(state) => state.values}
               children={(values) => {
-                const spent = sumStats(values);
-                const remaining = FOUNDER_STAT_POINTS - spent;
+                const profile = findProfile(values.specialty);
 
                 return (
                   <div className="form-control space-y-4">
                     <div>
                       <h2 className="text-xl font-semibold">
-                        Répartir vos compétences
+                        Compétences de départ
                       </h2>
-                      <p
-                        className={
-                          "text-sm " +
-                          (remaining < 0 ? "text-error" : "text-gray-600")
-                        }
-                      >
-                        Points restants : {remaining} / {FOUNDER_STAT_POINTS}
+                      <p className="text-sm text-gray-600">
+                        Elles découlent du profil choisi :{" "}
+                        <span className="font-semibold">{profile.label}</span>.
                       </p>
                       <p className="text-sm text-gray-600">
-                        Profil retenu :{" "}
-                        <span className="font-semibold">
-                          {deriveProfile(values).label}
-                        </span>
+                        {profile.description}
                       </p>
                     </div>
 
@@ -296,17 +277,19 @@ const NewGamePage: React.FC = () => {
                             {previewQuality(values, group.type)}
                           </span>
                         </div>
-                        <form.Field
-                          name={group.key}
-                          children={(field) => (
-                            <RangeInput
-                              field={field}
-                              label={group.label}
-                              min={MIN_FOUNDER_STAT}
-                              max={MAX_STAT_POSSIBLE}
-                            />
-                          )}
-                        />
+                        <div>
+                          <div className="flex flex-row justify-between">
+                            <span className="label-text">{group.label}</span>
+                            <span className="font-mono text-sm">
+                              {values[group.key]} / {MAX_STAT_POSSIBLE}
+                            </span>
+                          </div>
+                          <progress
+                            className="progress progress-primary w-full"
+                            value={Number(values[group.key] ?? 0)}
+                            max={MAX_STAT_POSSIBLE}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -319,24 +302,15 @@ const NewGamePage: React.FC = () => {
             selector={(state) => ({
               canSubmit: state.canSubmit,
               isSubmitting: state.isSubmitting,
-              remaining: FOUNDER_STAT_POINTS - sumStats(state.values),
             })}
-            children={({ canSubmit, isSubmitting, remaining }) => (
-              <>
-                <button
-                  type="submit"
-                  disabled={!canSubmit || remaining < 0}
-                  className="mt-2 btn btn-primary"
-                >
-                  {isSubmitting ? "..." : "Commencer la Partie"}
-                </button>
-                {remaining < 0 && (
-                  <p className="text-error text-sm text-center">
-                    Vous avez dépensé {-remaining} point
-                    {remaining < -1 ? "s" : ""} de trop.
-                  </p>
-                )}
-              </>
+            children={({ canSubmit, isSubmitting }) => (
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="mt-2 btn btn-primary"
+              >
+                {isSubmitting ? "..." : "Commencer la Partie"}
+              </button>
             )}
           />
         </form>
