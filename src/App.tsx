@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { useEffect } from "react";
 import {
   createBrowserRouter,
   Navigate,
@@ -39,10 +39,6 @@ import { OwnedPage } from "@/pages/building/OwnedPage";
 import MainMenu from "@/pages/start/MainMenu";
 import NewGamePage from "@/pages/start/NewGamePage";
 
-// MapMonde (MYL-19) : page chargée en lazy → le bundle Three (R3F/drei) reste
-// dans son propre chunk, hors du jeu principal.
-const WorldMapPage = lazy(() => import("@/pages/WorldMapPage"));
-
 const router = createBrowserRouter([
   { path: "/", element: <MainMenu /> },
   { path: "/new-game", element: <NewGamePage /> },
@@ -64,20 +60,6 @@ const router = createBrowserRouter([
       { path: "/game/building", element: <BuildingPage /> },
       { path: "/game/building/owned", element: <OwnedPage /> },
       { path: "/game/building/buy", element: <SelogerPage /> },
-      {
-        path: "/game/worldmap",
-        element: (
-          <Suspense
-            fallback={
-              <div className="flex h-[60vh] items-center justify-center">
-                <span className="loading loading-ring loading-lg" />
-              </div>
-            }
-          >
-            <WorldMapPage />
-          </Suspense>
-        ),
-      },
     ],
   },
 ]);

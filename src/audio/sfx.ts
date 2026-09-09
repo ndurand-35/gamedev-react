@@ -5,11 +5,10 @@
 // d'un geste utilisateur, chaque fonction est un no-op silencieux — jamais
 // d'exception qui remonterait dans le gameplay.
 //
-// Deux sons seulement (périmètre MYL-22) :
+// Un seul son (le feedback de sélection de pin est parti avec la mappemonde) :
 //   • `playStudioOpenSting()`  → sting court de succès au déblocage d'un studio
 //                                 (accroché à `studio.pendingReveal`, contrat
 //                                 Stage 1 — voir `useStudioOpenChime`).
-//   • `playStudioPinSelect()`  → feedback léger optionnel à la sélection d'un pin.
 //
 // Tout passe par un GainNode maître unique → `setAudioMuted(true)` coupe tout
 // instantanément (point d'accroche pour un futur bouton mute global).
@@ -139,25 +138,5 @@ export function playStudioOpenSting(): void {
     pad.stop(now + 0.65);
   } catch {
     // Non bloquant v1 : on n'interrompt jamais le jeu pour un échec audio.
-  }
-}
-
-/**
- * Feedback léger de sélection de pin (optionnel, UX §4.2 « pas de son
- * obligatoire ») : un blip sinus court et doux, volontairement discret.
- */
-export function playStudioPinSelect(): void {
-  const bus = ensureAudio();
-  if (!bus) return;
-  try {
-    playNotes(bus, [880], {
-      type: "sine",
-      noteDuration: 0.07,
-      gap: 0,
-      gain: 0.12,
-      filterFreq: 6000,
-    });
-  } catch {
-    // no-op (cf. playStudioOpenSting).
   }
 }
