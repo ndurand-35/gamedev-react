@@ -1,5 +1,6 @@
-import { ReactElement, useState } from "react";
+import { ReactElement, useMemo, useState } from "react";
 
+import { SortableHeader } from "@/components/SortableHeader";
 import {
   Building,
   TopMenuItem,
@@ -9,6 +10,12 @@ import { buyBuilding } from "@/data/redux/companySlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { formatPrice } from "@/data/utils";
+import {
+  BuildingSort,
+  BuildingSortKey,
+  nextBuildingSort,
+  sortBuildings,
+} from "@/data/utils/building";
 
 const pageTopMenuItems: TopMenuItem[] = [
   { name: "Accueil", link: "/game/building" },
@@ -24,6 +31,15 @@ export const SelogerPage: React.FC = (): ReactElement => {
   );
   const [pendingBuyId, setPendingBuyId] = useState<number | null>(null);
   useTopMenu(pageTopMenuItems);
+
+  const [sort, setSort] = useState<BuildingSort | null>(null);
+  const toggleSort = (key: BuildingSortKey) =>
+    setSort((prev) => nextBuildingSort(prev, key));
+  const sortedBuildings = useMemo(
+    () => sortBuildings(availableBuildingList, sort),
+    [availableBuildingList, sort],
+  );
+  const headerProps = { sort, onSort: toggleSort };
 
   const pendingBuilding =
     pendingBuyId == null
@@ -41,16 +57,31 @@ export const SelogerPage: React.FC = (): ReactElement => {
       <table className="table table-zebra bg-base-100 rounded-box shadow">
         <thead>
           <tr>
-            <th>Ville</th>
-            <th>Pays</th>
-            <th className="text-right">Places</th>
-            <th className="text-right">Charges / mois</th>
-            <th className="text-right">Prix</th>
+            <SortableHeader label="Ville" sortKey="city" {...headerProps} />
+            <SortableHeader label="Pays" sortKey="country" {...headerProps} />
+            <SortableHeader
+              label="Places"
+              sortKey="place"
+              align="right"
+              {...headerProps}
+            />
+            <SortableHeader
+              label="Charges / mois"
+              sortKey="charges"
+              align="right"
+              {...headerProps}
+            />
+            <SortableHeader
+              label="Prix"
+              sortKey="price"
+              align="right"
+              {...headerProps}
+            />
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          {availableBuildingList.map((b: Building) => (
+          {sortedBuildings.map((b: Building) => (
             <tr key={`available_building_${b.id}`}>
               <td className="font-medium">{b.address.city}</td>
               <td>{b.address.country}</td>

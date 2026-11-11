@@ -16,6 +16,7 @@ import {
   selectRemainingSlots,
 } from "@/data/redux/selectors";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
+import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 import { createColumnHelper } from "@tanstack/react-table";
 import { MyTable } from "@/components/Table";
 import { ComponentTypeBadge } from "@/components/component";
@@ -59,6 +60,9 @@ export const PoleEmploye: React.FC = (): ReactElement => {
   const recruitmentCap = useAppSelector(selectRecruitmentCap);
   const remainingSlots = useAppSelector(selectRemainingSlots);
   const capReached = remainingSlots <= 0;
+  // Sans entretien, le salaire attendu d'un candidat est inconnu — sauf si le
+  // fondateur sait lire un CV (compétence « Lecture de CV »).
+  const hasCvReading = useFounderSkill("cv_reading");
 
   // Commande de recherche : formulaire déporté dans une modale.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -127,7 +131,12 @@ export const PoleEmploye: React.FC = (): ReactElement => {
       },
       {
         header: "Salaire attendu",
-        accessorFn: (row: Candidate) => row.expectedSalary ?? row.salary,
+        // Un salaire inconnu se trie comme 0 : l'ordre de la colonne ne doit
+        // pas trahir ce que l'affichage cache.
+        accessorFn: (row: Candidate) =>
+          row.revealedStats || hasCvReading
+            ? (row.expectedSalary ?? row.salary)
+            : 0,
         cell: (info: any) => {
           const c = info.row.original as Candidate;
           const value = c.expectedSalary ?? c.salary;
@@ -135,8 +144,10 @@ export const PoleEmploye: React.FC = (): ReactElement => {
             <span className="tabular-nums">
               {c.revealedStats ? (
                 formatPrice(value) + " / Mois"
-              ) : (
+              ) : hasCvReading ? (
                 <span className="opacity-70">≈ {formatPrice(value)} / Mois</span>
+              ) : (
+                <span className="opacity-50">Inconnu</span>
               )}
             </span>
           );
@@ -198,7 +209,7 @@ export const PoleEmploye: React.FC = (): ReactElement => {
         ),
       }),
     ];
-  }, [dispatch, time]);
+  }, [dispatch, time, hasCvReading]);
 
   return (
     <div className="space-y-4">

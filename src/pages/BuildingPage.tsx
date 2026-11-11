@@ -1,8 +1,9 @@
-import { ReactElement, useMemo } from "react";
+import { ReactElement, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Building as BuildingIcon,
   Community,
+  LogOut,
   NavArrowRight,
   SendEuros,
 } from "iconoir-react";
@@ -16,6 +17,7 @@ import {
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
 import { formatPrice } from "@/data/utils";
+import { BuildingReleaseModal } from "@/components/building";
 
 const pageTopMenuItems: TopMenuItem[] = [
   { name: "Accueil", link: "/game/building" },
@@ -29,9 +31,18 @@ interface StatCardProps {
   icon: ReactElement;
   hint?: string;
   tone?: "neutral" | "success" | "warning" | "error";
+  /** Rend la carte cliquable : elle mène à cette page. */
+  to?: string;
 }
 
-const StatCard = ({ label, value, icon, hint, tone = "neutral" }: StatCardProps) => {
+const StatCard = ({
+  label,
+  value,
+  icon,
+  hint,
+  tone = "neutral",
+  to,
+}: StatCardProps) => {
   const toneClass =
     tone === "success"
       ? "text-success"
@@ -40,17 +51,27 @@ const StatCard = ({ label, value, icon, hint, tone = "neutral" }: StatCardProps)
         : tone === "error"
           ? "text-error"
           : "text-base-content";
-  return (
-    <div className="card bg-base-100 shadow-md border border-base-300">
-      <div className="p-4 flex flex-row items-center space-x-4">
-        <div className={"opacity-70 " + toneClass}>{icon}</div>
-        <div>
-          <p className="text-sm opacity-70">{label}</p>
-          <p className={"text-2xl font-semibold " + toneClass}>{value}</p>
-          {hint && <p className="text-xs opacity-60">{hint}</p>}
-        </div>
+  const content = (
+    <div className="p-4 flex flex-row items-center space-x-4">
+      <div className={"opacity-70 " + toneClass}>{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm opacity-70">{label}</p>
+        <p className={"text-2xl font-semibold " + toneClass}>{value}</p>
+        {hint && <p className="text-xs opacity-60">{hint}</p>}
       </div>
+      {to && <NavArrowRight height={24} className="opacity-60" />}
     </div>
+  );
+  const cardClass = "card bg-base-100 shadow-md border border-base-300";
+  return to ? (
+    <Link
+      to={to}
+      className={cardClass + " hover:border-primary transition-colors"}
+    >
+      {content}
+    </Link>
+  ) : (
+    <div className={cardClass}>{content}</div>
   );
 };
 
@@ -58,6 +79,7 @@ export const BuildingPage: React.FC = (): ReactElement => {
   useTopMenu(pageTopMenuItems);
 
   const buildingList = useAppSelector((s) => s.company.buildingList);
+  const [releaseTarget, setReleaseTarget] = useState<Building | null>(null);
   const availableBuildingList = useAppSelector(
     (s) => s.company.availableBuildingList,
   );
@@ -110,8 +132,7 @@ export const BuildingPage: React.FC = (): ReactElement => {
   const sortedBuildings = useMemo(
     () =>
       [...buildingList].sort(
-        (a, b) =>
-          getBuildingMonthlyCharges(b) - getBuildingMonthlyCharges(a),
+        (a, b) => getBuildingMonthlyCharges(b) - getBuildingMonthlyCharges(a),
       ),
     [buildingList],
   );
@@ -128,15 +149,16 @@ export const BuildingPage: React.FC = (): ReactElement => {
 
       <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-4">
         <StatCard
-          label="Bâtiments"
+          label="Mes bâtiments"
           value={stats.totalBuildings.toString()}
           hint={
             stats.emptyBuildings > 0
               ? `${stats.emptyBuildings} vide${stats.emptyBuildings > 1 ? "s" : ""}`
-              : undefined
+              : "Voir la liste"
           }
           icon={<BuildingIcon height={32} width={32} />}
           tone={stats.emptyBuildings > 0 ? "warning" : "neutral"}
+          to="/game/building/owned"
         />
         <StatCard
           label="Capacité"
@@ -199,9 +221,7 @@ export const BuildingPage: React.FC = (): ReactElement => {
                     key={`charges_legend_${c.label}`}
                     className="flex flex-row items-center space-x-2"
                   >
-                    <span
-                      className={"inline-block w-3 h-3 rounded " + c.bg}
-                    />
+                    <span className={"inline-block w-3 h-3 rounded " + c.bg} />
                     <span>
                       {c.label} : {formatPrice(c.value)}
                     </span>
@@ -251,6 +271,18 @@ export const BuildingPage: React.FC = (): ReactElement => {
                       <span className="tabular-nums text-error">
                         {formatPrice(charges)} /mois
                       </span>
+                      {/* Un bâtiment vide coûte sans produire : la sortie
+                          est proposée là où l'avertissement s'affiche. */}
+                      {isEmpty && (
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-warning btn-outline gap-1"
+                          onClick={() => setReleaseTarget(b)}
+                        >
+                          <LogOut width={14} height={14} />
+                          Libérer
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -260,47 +292,27 @@ export const BuildingPage: React.FC = (): ReactElement => {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-        <Link
-          to="/game/building/owned"
-          className="card bg-base-100 shadow-md border border-base-300 hover:border-primary transition-colors"
-        >
-          <div className="p-4 flex flex-row items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Mes bâtiments</h3>
-              <p className="text-sm opacity-70">
-                {stats.totalBuildings} bâtiment
-                {stats.totalBuildings > 1 ? "s" : ""}
-                {stats.emptyBuildings > 0 && (
-                  <span className="text-warning">
-                    {" "}
-                    · {stats.emptyBuildings} vide
-                    {stats.emptyBuildings > 1 ? "s" : ""}
-                  </span>
-                )}
-              </p>
-            </div>
-            <NavArrowRight height={24} />
-          </div>
-        </Link>
+      <BuildingReleaseModal
+        building={releaseTarget}
+        onClose={() => setReleaseTarget(null)}
+      />
 
-        <Link
-          to="/game/building/buy"
-          className="card bg-base-100 shadow-md border border-base-300 hover:border-primary transition-colors"
-        >
-          <div className="p-4 flex flex-row items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">SeLoger</h3>
-              <p className="text-sm opacity-70">
-                {availableBuildingList.length} annonce
-                {availableBuildingList.length > 1 ? "s" : ""} disponible
-                {availableBuildingList.length > 1 ? "s" : ""}
-              </p>
-            </div>
-            <NavArrowRight height={24} />
+      <Link
+        to="/game/building/buy"
+        className="card bg-base-100 shadow-md border border-base-300 hover:border-primary transition-colors"
+      >
+        <div className="p-4 flex flex-row items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">SeLoger</h3>
+            <p className="text-sm opacity-70">
+              {availableBuildingList.length} annonce
+              {availableBuildingList.length > 1 ? "s" : ""} disponible
+              {availableBuildingList.length > 1 ? "s" : ""}
+            </p>
           </div>
-        </Link>
-      </div>
+          <NavArrowRight height={24} />
+        </div>
+      </Link>
     </div>
   );
 };

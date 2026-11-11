@@ -7,15 +7,16 @@ import {
   ComponentQuality,
   COMPONENT_TYPE_ORDER,
   ComponentType,
-  ProductionPerson,
   QUALITY_LABELS,
   QUALITY_TEXT_CLASS,
   hoursBeforeNextDecay,
   qualityFromAverage,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
+import { useTopMenu } from "@/data/hooks/useTopMenu";
+import { productTopMenuItems } from "@/pages/product/menu";
 import { PRODUCTION_THRESHOLD } from "@/data/redux/componentSlice";
-import { getRelevantStat } from "@/data/utils/component";
+import { getRelevantStat, isProductionPerson } from "@/data/utils/component";
 import { ComponentTypeBadge } from "@/components/component";
 
 const ReputationByTypeCard = () => {
@@ -58,10 +59,8 @@ const QUALITY_DOT_CLASS: Record<ComponentQuality, string> = {
   [ComponentQuality.EXCELLENT]: "bg-accent",
 };
 
-const isProductionPerson = (p: any): p is ProductionPerson =>
-  typeof p.codeStat === "number";
-
 export const ComponentPage: React.FC = (): ReactElement => {
+  useTopMenu(productTopMenuItems);
   const stock = useAppSelector((state) => state.component.stock);
   const employeList = useAppSelector((state) => state.employe.employeList);
   const time = useAppSelector((state) => state.engine.time);
@@ -85,7 +84,9 @@ export const ComponentPage: React.FC = (): ReactElement => {
     ComponentQuality.BACLE,
   ];
 
-  const countByQuality = (list: Component[]): Record<ComponentQuality, number> => {
+  const countByQuality = (
+    list: Component[],
+  ): Record<ComponentQuality, number> => {
     const counts = {
       [ComponentQuality.BACLE]: 0,
       [ComponentQuality.MEDIOCRE]: 0,

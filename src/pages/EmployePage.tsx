@@ -29,7 +29,6 @@ import { formatPrice } from "@/data/utils";
 
 export const pageTopMenuItems: TopMenuItem[] = [
   { name: "Accueil", link: "/game/employe" },
-  { name: "Fondateur", link: "/game/employe/me" },
   { name: "Employé", link: "/game/employe/list" },
   { name: "Pole Emploi", link: "/game/employe/recruit" },
 ];

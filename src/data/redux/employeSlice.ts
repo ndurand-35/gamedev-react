@@ -3,8 +3,10 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import {
   ComponentType,
   MAX_MORALE,
+  MAX_STAT_KEY_BY_TYPE,
   Person,
   ProductionPerson,
+  STAT_KEY_BY_TYPE,
 } from "@/data/interface";
 import { DEFAULT_EMPLOYE_STATE } from "@/data/utils/constant";
 
@@ -132,6 +134,29 @@ export const employeSlice = createSlice({
       employe.raiseCooldownUntil = action.payload.until;
       employe.pendingRaise = false;
     },
+    // Les salaires du marché montent avec les technologies (cf.
+    // `utils/technology`) : chaque 1er janvier, ce que chacun estime valoir
+    // suit. Le salaire versé, lui, ne bouge pas — l'écart pèse sur le moral
+    // (sous-paiement, cf. `utils/morale`). Le fondateur n'attend rien.
+    raiseExpectedSalaries(state, action: PayloadAction<number>) {
+      const ratio = action.payload;
+      if (!(ratio > 0)) return;
+      for (const e of state.employeList) {
+        if (e.id === 1) continue;
+        const base = e.expectedSalary ?? e.salary;
+        e.expectedSalary = Math.round((base * ratio) / 10) * 10;
+      }
+    },
+    // Prime versée : arme le délai avant la prochaine (cf. `utils/morale`).
+    setBonusCooldown(
+      state,
+      action: PayloadAction<{ employeId: number; until: number }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (employe) employe.bonusCooldownUntil = action.payload.until;
+    },
     setPendingRaise(
       state,
       action: PayloadAction<{ employeId: number; pending: boolean }>,
@@ -206,9 +231,18 @@ export const employeSlice = createSlice({
         (e: Person) => e.id === action.payload.employeId,
       ) as ProductionPerson | undefined;
       if (!employe) return;
-      employe.trainingType = action.payload.trainingType;
-      employe.trainingProgress = action.payload.trainingType ? 0 : undefined;
-      if (action.payload.trainingType) {
+      const type = action.payload.trainingType;
+      // Rien à apprendre au plafond : la demande est ignorée (l'UI grise le
+      // bouton, la garde reste pour les autres chemins).
+      if (
+        type &&
+        employe[STAT_KEY_BY_TYPE[type]] >= employe[MAX_STAT_KEY_BY_TYPE[type]]
+      ) {
+        return;
+      }
+      employe.trainingType = type;
+      employe.trainingProgress = type ? 0 : undefined;
+      if (type) {
         employe.assignedComponentType = null;
       }
     },
@@ -219,6 +253,7 @@ export const employeSlice = createSlice({
           employeId: number;
           progressDelta: number;
           completed?: { statKey: keyof ProductionPerson; newValue: number };
+          finished?: boolean;
         }>
       >,
     ) {
@@ -234,6 +269,15 @@ export const employeSlice = createSlice({
           employe.trainingProgress = 0;
         } else {
           employe.trainingProgress = current + update.progressDelta;
+        }
+        // Plafond atteint : fin de formation, et retour en production sur le
+        // type tout juste maîtrisé — l'affectation d'avant n'est pas conservée
+        // (`setTraining` l'efface), c'est le choix le plus utile.
+        if (update.finished) {
+          const trained = employe.trainingType ?? null;
+          employe.trainingType = null;
+          employe.trainingProgress = undefined;
+          if (trained) employe.assignedComponentType = trained;
         }
       }
     },
@@ -266,6 +310,8 @@ export const {
   rejectCandidate,
   setSalary,
   setRaiseCooldown,
+  setBonusCooldown,
+  raiseExpectedSalaries,
   setPendingRaise,
   assignBuilding,
   assignComponentType,

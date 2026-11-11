@@ -8,20 +8,20 @@ import {
   SendEuros,
 } from "iconoir-react";
 
+import { useFounderSkill } from "@/data/hooks/useFounderSkill";
+import { useMarketConfidence } from "@/data/hooks/useMarket";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
 import { selectLoanSummary } from "@/data/redux/selectors";
 import { formatPrice } from "@/data/utils";
 import {
+  FinanceProjection,
   MonthlyReport,
-  PROJECTION_HORIZON_MONTHS,
-  ProjectedMonth,
   averageNet,
-  computeCashProjection,
   computeMonthlyProjection,
   computeRunwayMonths,
 } from "@/data/utils/finance";
-import { financeTopMenuItems } from "@/pages/finance/menu";
+import { companyTopMenuItems } from "@/pages/company/menu";
 
 // Nombre de mois clôturés affichés dans l'historique (l'état en conserve 24).
 const HISTORY_MONTHS = 12;
@@ -64,18 +64,18 @@ const StatCard = ({
 };
 
 // Ligne du compte de résultat : libellé, montant signé, part de l'assiette.
+// Toutes les barres ont la même teinte : la longueur suffit à comparer les
+// flux, et la couleur reste réservée au résultat net et aux alertes.
 const PnlRow = ({
   label,
   value,
   share,
   hint,
-  bar,
 }: {
   label: string;
   value: number;
   share: number;
   hint?: string;
-  bar: string;
 }) => (
   <div className="space-y-1">
     <div className="flex flex-row items-baseline justify-between text-sm">
@@ -83,64 +83,17 @@ const PnlRow = ({
         {label}
         {hint && <span className="opacity-60 text-xs"> · {hint}</span>}
       </span>
-      <span
-        className={
-          "tabular-nums " + (value >= 0 ? "text-success" : "text-error")
-        }
-      >
+      <span className="tabular-nums">
         {value >= 0 ? "+" : "−"}
         {formatPrice(Math.abs(value))} €
       </span>
     </div>
     <div className="h-1.5 w-full rounded bg-base-200 overflow-hidden">
       <div
-        className={"h-full " + bar}
+        className="h-full bg-base-content/40"
         style={{ width: Math.min(100, share * 100) + "%" }}
       />
     </div>
-  </div>
-);
-
-// Une colonne de la projection : le mois, son résultat, la trésorerie qu'il
-// laisse derrière lui. Le mois de rupture est mis en évidence — c'est la seule
-// information que le joueur doit pouvoir lire sans compter.
-const ProjectionMonthCard = ({
-  month,
-  isBreach,
-}: {
-  month: ProjectedMonth;
-  isBreach: boolean;
-}) => (
-  <div
-    className={
-      "rounded-lg border p-3 space-y-1 " +
-      (isBreach ? "border-error bg-error/10" : "border-base-300")
-    }
-  >
-    <div className="flex flex-row items-baseline justify-between">
-      <span className="font-medium">{month.label}</span>
-      <span className="text-xs opacity-60">
-        {month.offset === 1 ? "mois en cours" : `+${month.offset - 1} mois`}
-      </span>
-    </div>
-    <p
-      className={
-        "text-sm tabular-nums " +
-        (month.net >= 0 ? "text-success" : "text-error")
-      }
-    >
-      {month.net >= 0 ? "+" : "−"}
-      {formatPrice(Math.abs(month.net))} € de résultat
-    </p>
-    <p
-      className={
-        "text-lg font-semibold tabular-nums " +
-        (month.moneyAfter < 0 ? "text-error" : "text-base-content")
-      }
-    >
-      {formatPrice(month.moneyAfter)} €
-    </p>
-    <p className="text-xs opacity-60">trésorerie après clôture</p>
   </div>
 );
 
@@ -163,7 +116,7 @@ const NetHistoryChart = ({ reports }: { reports: MonthlyReport[] }) => {
             <div className="h-1/2 flex flex-col justify-end">
               {positive && (
                 <div
-                  className="bg-success rounded-t"
+                  className="bg-base-content/40 rounded-t"
                   style={{ height: Math.max(2, ratio * 100) + "%" }}
                 />
               )}
@@ -185,70 +138,132 @@ const NetHistoryChart = ({ reports }: { reports: MonthlyReport[] }) => {
 };
 
 export const FinancePage: FC = (): ReactElement => {
-  useTopMenu(financeTopMenuItems);
+  useTopMenu(companyTopMenuItems);
 
   const money = useAppSelector((s) => s.company.money);
   const buildings = useAppSelector((s) => s.company.buildingList);
   const campaign = useAppSelector((s) => s.company.activeCampaign);
   const employes = useAppSelector((s) => s.employe.employeList);
   const products = useAppSelector((s) => s.product.products);
+  const rivals = useAppSelector((s) => s.competitor.products);
+  const confidence = useMarketConfidence();
   const loans = useAppSelector((s) => s.loan.loans);
   const time = useAppSelector((s) => s.engine.time);
   // Garde défensive : une partie chargée d'un slot antérieur au slice `finance`
   // n'a pas d'historique — on retombe sur un tableau vide, pas sur un crash.
-  const monthlyReports = useAppSelector(
-    (s) => s.finance?.monthlyReports ?? [],
-  );
+  const monthlyReports = useAppSelector((s) => s.finance?.monthlyReports ?? []);
   const loanSummary = useAppSelector(selectLoanSummary);
 
-  const projection = useMemo(
-    () =>
-      computeMonthlyProjection({
-        products,
-        buildings,
-        employes,
-        loans,
-        time,
-        campaign,
-      }),
-    [products, buildings, employes, loans, time, campaign],
-  );
+  // Projeter le mois en cours est une analyse : elle demande la compétence
+  // « Prévision de trésorerie » du fondateur. Sans elle, la page ne montre que
+  // des faits — les flux récurrents du dernier mois clôturé.
+  const hasForecast = useFounderSkill("cash_forecast");
+  const lastReport: MonthlyReport | undefined =
+    monthlyReports[monthlyReports.length - 1];
 
-  const cash = useMemo(
-    () =>
-      computeCashProjection({
+  const projection = useMemo<FinanceProjection>(() => {
+    if (hasForecast) {
+      return computeMonthlyProjection({
         products,
         buildings,
         employes,
         loans,
         time,
         campaign,
-        money,
-      }),
-    [products, buildings, employes, loans, time, campaign, money],
-  );
+        rivals,
+        confidence,
+      });
+    }
+    const maintenance = lastReport?.maintenance ?? 0;
+    const fixedCharges = lastReport?.fixedCharges ?? 0;
+    const variableCharges = lastReport?.variableCharges ?? 0;
+    const loanPayments = lastReport?.loanPayments ?? 0;
+    const payroll = lastReport?.payroll ?? 0;
+    const revenue = lastReport?.revenue ?? 0;
+    const expenses =
+      fixedCharges + variableCharges + loanPayments + payroll + maintenance;
+    return {
+      revenue,
+      fixedCharges,
+      variableCharges,
+      loanPayments,
+      payroll,
+      maintenance,
+      expenses,
+      net: revenue - expenses,
+    };
+  }, [
+    hasForecast,
+    lastReport,
+    products,
+    buildings,
+    employes,
+    loans,
+    time,
+    campaign,
+    rivals,
+    confidence,
+  ]);
+  // Portée des chiffres affichés, rappelée sous chaque libellé.
+  const scope = hasForecast
+    ? "au rythme actuel"
+    : lastReport
+      ? `clôture de ${lastReport.label}`
+      : "aucun mois clôturé";
 
   const history = useMemo(
     () => monthlyReports.slice(-HISTORY_MONTHS),
     [monthlyReports],
   );
 
-  const runway = computeRunwayMonths(money, projection.net);
-  const breach = cash.breach;
+  // La rupture de trésorerie à venir n'est plus projetée ici : c'est le
+  // centre d'alertes qui la signale, avec un lien vers cette page.
+  const runway = hasForecast
+    ? computeRunwayMonths(money, projection.net)
+    : null;
   const avg3 = averageNet(monthlyReports, 3);
 
   // Assiette des barres du compte de résultat : le plus gros flux du mois.
   const scale = Math.max(projection.revenue, projection.expenses, 1);
 
-  const expenseLines: { label: string; value: number; bg: string }[] = [
-    { label: "Charges fixes", value: projection.fixedCharges, bg: "bg-primary" },
+  // Segments de la répartition : un dégradé d'une seule teinte suffit à les
+  // distinguer avec la légende, sans concurrencer les couleurs d'alerte.
+  const expenseLines: {
+    label: string;
+    value: number;
+    bg: string;
+    fg: string;
+  }[] = [
+    {
+      label: "Charges fixes",
+      value: projection.fixedCharges,
+      bg: "bg-base-content/80",
+      fg: "text-base-100",
+    },
     {
       label: "Charges variables",
       value: projection.variableCharges,
-      bg: "bg-warning",
+      bg: "bg-base-content/60",
+      fg: "text-base-100",
     },
-    { label: "Masse salariale", value: projection.payroll, bg: "bg-secondary" },
-    { label: "Mensualités de prêt", value: projection.loanPayments, bg: "bg-info" },
+    {
+      label: "Masse salariale",
+      value: projection.payroll,
+      bg: "bg-base-content/40",
+      fg: "text-base-content",
+    },
+    {
+      label: "Mensualités de prêt",
+      value: projection.loanPayments,
+      bg: "bg-base-content/25",
+      fg: "text-base-content",
+    },
+    {
+      label: "Maintenance produits",
+      value: projection.maintenance,
+      bg: "bg-base-content/15",
+      fg: "text-base-content",
+    },
   ];
 
   return (
@@ -261,36 +276,32 @@ export const FinancePage: FC = (): ReactElement => {
           value={formatPrice(money) + " €"}
           icon={<Coins height={32} width={32} />}
           hint={
-            breach
-              ? `Rupture prévue en ${breach.label}`
+            !hasForecast
+              ? undefined
               : runway === null
                 ? "Résultat mensuel positif"
                 : `≈ ${runway} mois d'autonomie`
           }
-          tone={
-            money < 0 || (breach && breach.offset === 1)
-              ? "error"
-              : breach
-                ? "warning"
-                : "neutral"
-          }
+          tone={money < 0 ? "error" : "neutral"}
         />
         <StatCard
-          label="Revenus mensuels"
+          label={hasForecast ? "Revenus mensuels" : "Revenus du dernier mois"}
           value={formatPrice(projection.revenue) + " /mois"}
-          hint="Produits lancés, après obsolescence"
+          hint={
+            hasForecast ? "Produits lancés, après obsolescence" : `Produits, ${scope}`
+          }
           icon={<ReceiveEuros height={32} width={32} />}
-          tone={projection.revenue > 0 ? "success" : "neutral"}
         />
         <StatCard
-          label="Dépenses mensuelles"
+          label={
+            hasForecast ? "Dépenses mensuelles" : "Dépenses du dernier mois"
+          }
           value={formatPrice(projection.expenses) + " /mois"}
-          hint="Charges + salaires + prêts"
+          hint="Charges + salaires + prêts + maintenance"
           icon={<SendEuros height={32} width={32} />}
-          tone={projection.expenses > 0 ? "error" : "neutral"}
         />
         <StatCard
-          label="Résultat prévisionnel"
+          label={hasForecast ? "Résultat prévisionnel" : "Résultat récurrent"}
           value={
             (projection.net >= 0 ? "+" : "−") +
             formatPrice(Math.abs(projection.net)) +
@@ -313,17 +324,20 @@ export const FinancePage: FC = (): ReactElement => {
           <div className="p-4 space-y-3">
             <div className="flex flex-row items-center justify-between">
               <h2 className="text-lg font-semibold">
-                Compte de résultat prévisionnel
+                {hasForecast
+                  ? "Compte de résultat prévisionnel"
+                  : "Compte de résultat"}
               </h2>
-              <span className="text-xs opacity-60">au rythme actuel</span>
+              <span className="text-xs opacity-60">{scope}</span>
             </div>
 
             <PnlRow
               label="Revenus produits"
               value={projection.revenue}
               share={projection.revenue / scale}
-              bar="bg-success"
-              hint={campaign ? `campagne ${campaign.type}` : undefined}
+              hint={
+                hasForecast && campaign ? `campagne ${campaign.type}` : undefined
+              }
             />
 
             <div className="divider my-1" />
@@ -334,7 +348,6 @@ export const FinancePage: FC = (): ReactElement => {
                 label={line.label}
                 value={-line.value}
                 share={line.value / scale}
-                bar={line.bg}
               />
             ))}
 
@@ -353,17 +366,18 @@ export const FinancePage: FC = (): ReactElement => {
               </span>
             </div>
 
-            {breach ? (
-              <p className="text-xs text-error">
-                ⚠️ À ce rythme, la clôture de {breach.label} ne passe plus : il y
-                manquerait {formatPrice(-breach.moneyAfter)} €.
+            {runway !== null && (
+              <p className="text-xs text-warning">
+                ⚠️ À ce rythme, la trésorerie tient ≈ {runway} mois.
               </p>
-            ) : (
-              runway !== null && (
-                <p className="text-xs text-warning">
-                  ⚠️ À ce rythme, la trésorerie tient ≈ {runway} mois.
-                </p>
-              )
+            )}
+            {!hasForecast && (
+              <p className="text-xs opacity-60">
+                Flux récurrents du dernier mois clôturé, hors mouvements
+                ponctuels. Le prévisionnel et l'autonomie de trésorerie
+                s'apprennent : formation « Prévision de trésorerie » du
+                fondateur.
+              </p>
             )}
           </div>
         </div>
@@ -390,10 +404,7 @@ export const FinancePage: FC = (): ReactElement => {
                     return (
                       <div
                         key={`share_${line.label}`}
-                        className={
-                          line.bg +
-                          " flex items-center justify-center text-xs text-base-100"
-                        }
+                        className={`${line.bg} ${line.fg} flex items-center justify-center text-xs`}
                         style={{ width: pct + "%" }}
                         title={`${line.label} — ${formatPrice(line.value)} €`}
                       >
@@ -409,7 +420,9 @@ export const FinancePage: FC = (): ReactElement => {
                       key={`legend_${line.label}`}
                       className="flex flex-row items-center space-x-2"
                     >
-                      <span className={"inline-block w-3 h-3 rounded " + line.bg} />
+                      <span
+                        className={"inline-block w-3 h-3 rounded " + line.bg}
+                      />
                       <span>
                         {line.label} : {formatPrice(line.value)} €
                       </span>
@@ -442,55 +455,6 @@ export const FinancePage: FC = (): ReactElement => {
               <NavArrowRight height={24} />
             </Link>
           </div>
-        </div>
-      </div>
-
-      <div
-        className={
-          "card bg-base-100 shadow-md border " +
-          (breach ? "border-error" : "border-base-300")
-        }
-      >
-        <div className="p-4 space-y-3">
-          <div className="flex flex-row items-center justify-between">
-            <h2 className="text-lg font-semibold">
-              Projection de trésorerie — {PROJECTION_HORIZON_MONTHS} mois
-            </h2>
-            <span className="text-xs opacity-60">
-              effectifs et charges constants
-            </span>
-          </div>
-
-          <div className="grid md:grid-cols-3 grid-cols-1 gap-3">
-            {cash.months.map((m) => (
-              <ProjectionMonthCard
-                key={`proj_${m.offset}`}
-                month={m}
-                isBreach={breach?.offset === m.offset}
-              />
-            ))}
-          </div>
-
-          {breach ? (
-            <p className="text-sm text-error">
-              Rupture de trésorerie à la clôture de <b>{breach.label}</b>
-              {breach.offset > 1 && ` (dans ${breach.offset - 1} mois)`} :
-              il manquerait {formatPrice(-breach.moneyAfter)} €. Sans prêt de
-              sauvetage, le mois ne se clôture pas.
-            </p>
-          ) : (
-            <p className="text-sm text-success">
-              Aucune rupture sur l'horizon : {formatPrice(cash.endingMoney)} €
-              attendus après {PROJECTION_HORIZON_MONTHS} clôtures.
-            </p>
-          )}
-
-          <p className="text-xs opacity-60">
-            Les revenus produits sont érodés mois après mois par l'obsolescence
-            et les mensualités suivent l'échéancier réel des prêts — un prêt
-            soldé cesse de peser. Contrats et achats ponctuels ne sont pas
-            projetés.
-          </p>
         </div>
       </div>
 
@@ -530,11 +494,16 @@ export const FinancePage: FC = (): ReactElement => {
                     {[...history].reverse().map((r) => (
                       <tr key={`row_${r.time}`}>
                         <td>{r.label}</td>
-                        <td className="text-right text-success">
+                        <td className="text-right">
                           +{formatPrice(r.revenue)}
                         </td>
                         <td className="text-right">
-                          −{formatPrice(r.fixedCharges + r.variableCharges)}
+                          −
+                          {formatPrice(
+                            r.fixedCharges +
+                              r.variableCharges +
+                              (r.maintenance ?? 0),
+                          )}
                         </td>
                         <td className="text-right">
                           −{formatPrice(r.payroll)}
@@ -544,12 +513,7 @@ export const FinancePage: FC = (): ReactElement => {
                             ? "−" + formatPrice(r.loanPayments)
                             : "—"}
                         </td>
-                        <td
-                          className={
-                            "text-right " +
-                            (r.other >= 0 ? "text-success" : "text-error")
-                          }
-                        >
+                        <td className="text-right">
                           {r.other === 0
                             ? "—"
                             : (r.other > 0 ? "+" : "−") +
@@ -574,8 +538,10 @@ export const FinancePage: FC = (): ReactElement => {
               </div>
 
               <p className="text-xs opacity-60">
-                « Autres » regroupe les mouvements ponctuels du mois : contrats
-                encaissés, achats de bâtiment, indemnités, versements de prêt.
+                « Charges » réunit charges immobilières et maintenance des
+                produits. « Autres » regroupe les mouvements ponctuels du mois :
+                contrats encaissés, achats de bâtiment, indemnités, versements
+                de prêt.
               </p>
             </>
           )}

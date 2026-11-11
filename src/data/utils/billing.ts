@@ -1,9 +1,6 @@
 import {
-  PAID_MORALE_BONUS,
-  ProductStatus,
   RESIGNATION_CHANCE_PER_TICK,
   RESIGNATION_MORALE_THRESHOLD,
-  computeDecayedRevenue,
   getBuildingMonthlyCharges,
 } from "@/data/interface";
 import {
@@ -11,10 +8,8 @@ import {
   clearCampaign,
   setMoney,
 } from "@/data/redux/companySlice";
-import {
-  adjustMorale,
-  resignEmploye,
-} from "@/data/redux/employeSlice";
+import { resignEmploye } from "@/data/redux/employeSlice";
+import { processMonthlyMorale } from "@/data/utils/morale";
 import {
   clearRescueLoan,
   recordMonthlyNet,
@@ -29,13 +24,16 @@ import { pushNotification } from "@/data/redux/notificationSlice";
 import { AppDispatch, RootState } from "@/data/redux/store";
 import { formatPrice } from "@/data/utils";
 import {
+  computeMaintenanceCost,
+  computeProductRevenue,
+} from "@/data/utils/product";
+import {
   ActiveCampaign,
   LOAN_MAX_MISSED,
   LOAN_OFFERS,
   Loan,
   applyLoanRepayment,
   campaignMonthlyReputation,
-  campaignRevenueMultiplier,
   evaluateBankruptcy,
   evaluateLoanDefault,
   findRescueOffer,
@@ -142,6 +140,8 @@ export interface MonthlyBillingPlan {
   /** Échéances de prêt réellement dues ce mois (dernière échéance soldée). */
   loanPayments: number;
   payroll: number;
+  /** Maintenance des produits lancés. */
+  maintenance: number;
   /** Campagne marketing active au moment de la clôture, si elle tourne. */
   campaign?: ActiveCampaign;
   /** Trésorerie projetée après clôture ; < 0 ⇒ le mois n'est pas finançable. */
@@ -172,23 +172,22 @@ export const planMonthlyBilling = (state: RootState): MonthlyBillingPlan => {
   )
     ? state.company.activeCampaign
     : undefined;
-  const revenueMult = campaignRevenueMultiplier(campaign);
-
-  let totalRevenue = 0;
-  for (const p of state.product.products) {
-    if (p.status === ProductStatus.LAUNCHED) {
-      totalRevenue += Math.round(
-        computeDecayedRevenue(p, state.engine.time) * revenueMult,
-      );
-    }
-  }
+  const totalRevenue = computeProductRevenue(
+    state.product.products,
+    state.engine.time,
+    campaign,
+    state.competitor?.products ?? [],
+    state.product.confidence,
+  );
+  const maintenance = computeMaintenanceCost(state.product.products);
 
   const loans = state.loan?.loans ?? [];
   const loanPayments = loans.reduce(
     (acc, l) =>
       acc +
       (l.remainingMonths <= 1
-        ? Math.round(l.outstandingBalance * l.monthlyRate) + l.outstandingBalance
+        ? Math.round(l.outstandingBalance * l.monthlyRate) +
+          l.outstandingBalance
         : l.monthlyPayment),
     0,
   );
@@ -203,6 +202,7 @@ export const planMonthlyBilling = (state: RootState): MonthlyBillingPlan => {
     totalRevenue,
     loanPayments,
     payroll,
+    maintenance,
     campaign,
     moneyAfter:
       state.company.money -
@@ -210,7 +210,8 @@ export const planMonthlyBilling = (state: RootState): MonthlyBillingPlan => {
       totalVariableCharges +
       totalRevenue -
       loanPayments -
-      payroll,
+      payroll -
+      maintenance,
   };
 };
 
@@ -312,6 +313,7 @@ export const runMonthlyBilling = (
   money -= plan.totalCharges;
   money -= plan.totalVariableCharges;
   money += plan.totalRevenue;
+  money -= plan.maintenance;
 
   // Mensualités de prêt (MYL-12) — prélevées AVANT les salaires (dette senior).
   // Le test de solvabilité garantit qu'elles sont couvertes : la passe de
@@ -347,6 +349,7 @@ export const runMonthlyBilling = (
       variableCharges: plan.totalVariableCharges,
       loanPayments,
       payroll,
+      maintenance: plan.maintenance,
       other: moneyAtOpen - lastCloseMoney,
       net: money - lastCloseMoney,
       moneyAfter: money,
@@ -355,44 +358,39 @@ export const runMonthlyBilling = (
 
   dispatch(setMoney(money));
 
-  for (const e of staff) {
-    dispatch(adjustMorale({ employeId: e.id, delta: PAID_MORALE_BONUS }));
-  }
+  // Moral du mois : la paie versée, moins ce dont chacun a à se plaindre
+  // (salaire, bureaux pleins, désœuvrement) — cf. `utils/morale`.
+  processMonthlyMorale(dispatch, state);
 
-  if (staff.length > 0) {
-    dispatch(
-      pushNotification({
-        message: `Paie versée : ${formatPrice(payroll)} (${staff.length} employé${staff.length > 1 ? "s" : ""})`,
-        type: "success",
-      }),
-    );
-  }
-
-  if (plan.totalCharges > 0) {
-    dispatch(
-      pushNotification({
-        message: `Charges fixes payées : ${formatPrice(plan.totalCharges)}`,
-        type: "info",
-      }),
-    );
-  }
-
-  if (plan.totalVariableCharges > 0) {
-    dispatch(
-      pushNotification({
-        message: `Charges variables (occupation) : ${formatPrice(
-          plan.totalVariableCharges,
-        )}`,
-        type: "info",
-      }),
-    );
-  }
-
+  // Une seule ligne au journal par clôture : les postes du mois, puis ce
+  // qu'ils laissent. (Cinq toasts séparés noyaient le reste de l'activité.)
+  const closing: string[] = [];
   if (plan.totalRevenue > 0) {
+    closing.push(`revenus produits +${formatPrice(plan.totalRevenue)}`);
+  }
+  if (staff.length > 0) {
+    closing.push(
+      `paie −${formatPrice(payroll)} (${staff.length} employé${staff.length > 1 ? "s" : ""})`,
+    );
+  }
+  const buildingCharges = plan.totalCharges + plan.totalVariableCharges;
+  if (buildingCharges > 0) {
+    closing.push(`charges −${formatPrice(buildingCharges)}`);
+  }
+  if (loanPayments > 0) {
+    closing.push(`prêts −${formatPrice(loanPayments)}`);
+  }
+  if (plan.maintenance > 0) {
+    closing.push(`maintenance −${formatPrice(plan.maintenance)}`);
+  }
+  if (closing.length > 0) {
+    const monthNet = money - moneyAtOpen;
     dispatch(
       pushNotification({
-        message: `Revenu produits : +${formatPrice(plan.totalRevenue)}`,
-        type: "success",
+        message: `Clôture ${label} : ${closing.join(", ")}. Solde du mois : ${
+          monthNet >= 0 ? "+" : "−"
+        }${formatPrice(Math.abs(monthNet))} €.`,
+        type: monthNet >= 0 ? "success" : "info",
       }),
     );
   }
@@ -431,7 +429,8 @@ export const runMonthlyBilling = (
     dispatch(setGameSpeed(0));
     dispatch(
       pushNotification({
-        message: "Saisie bancaire : défaut de paiement répété. Partie terminée.",
+        message:
+          "Saisie bancaire : défaut de paiement répété. Partie terminée.",
         type: "error",
       }),
     );
@@ -500,10 +499,7 @@ export const processCampaignTick = (
   );
 };
 
-export const processMoraleTick = (
-  dispatch: AppDispatch,
-  state: RootState,
-) => {
+export const processMoraleTick = (dispatch: AppDispatch, state: RootState) => {
   for (const emp of state.employe.employeList) {
     if (emp.id === 1) continue; // le fondateur ne démissionne pas
     if (emp.morale >= RESIGNATION_MORALE_THRESHOLD) continue;

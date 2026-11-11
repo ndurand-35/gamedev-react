@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import {
   Notification,
   NotificationType,
-  dismissNotification,
+  hideToast,
 } from "@/data/redux/notificationSlice";
 
 const TOAST_TTL_MS = 5000;
@@ -30,8 +30,9 @@ const Toast = ({ notification }: { notification: Notification }) => {
   useEffect(() => {
     const elapsed = Date.now() - notification.createdAt;
     const remaining = Math.max(0, TOAST_TTL_MS - elapsed);
+    // Le toast se masque ; l'entrée reste au journal (centre de notifications).
     const id = setTimeout(() => {
-      dispatch(dismissNotification(notification.id));
+      dispatch(hideToast(notification.id));
     }, remaining);
     return () => clearTimeout(id);
   }, [dispatch, notification.id, notification.createdAt]);
@@ -50,7 +51,7 @@ const Toast = ({ notification }: { notification: Notification }) => {
         type="button"
         aria-label="Fermer"
         className="btn btn-xs btn-circle btn-ghost"
-        onClick={() => dispatch(dismissNotification(notification.id))}
+        onClick={() => dispatch(hideToast(notification.id))}
       >
         <Xmark width={14} height={14} />
       </button>
@@ -60,12 +61,18 @@ const Toast = ({ notification }: { notification: Notification }) => {
 
 export const ToastContainer = () => {
   const list = useAppSelector((s) => s.notification.list);
-  if (list.length === 0) return null;
+  // Seules les entrées récentes et pas encore vues s'affichent en toast : le
+  // journal, persisté, contient aussi tout l'historique de la partie.
+  const now = Date.now();
+  const toasts = list
+    .filter((n) => !n.toastDismissed && now - n.createdAt < TOAST_TTL_MS)
+    .slice(-5);
+  if (toasts.length === 0) return null;
 
   return (
     <div className="fixed top-16 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
       <div className="flex flex-col gap-2 pointer-events-auto">
-        {list.slice(-5).map((n) => (
+        {toasts.map((n) => (
           <Toast key={n.id} notification={n} />
         ))}
       </div>

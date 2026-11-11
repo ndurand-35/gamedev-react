@@ -9,6 +9,11 @@ import { getTimeAsDate } from "@/data/utils/time";
 import { generateCompanyList } from "@/data/redux/companySlice";
 import { expireCandidates } from "@/data/redux/employeSlice";
 import { generateAvailableContractList } from "@/data/redux/taskSlice";
+import {
+  CompetitorState,
+  initializeCompetitorState,
+} from "@/data/redux/competitorSlice";
+import { buildRoster } from "@/data/utils/competitor";
 import { treatTasks } from "@/data/utils/task";
 import { decayComponents, produceComponents } from "@/data/utils/component";
 import {
@@ -18,7 +23,16 @@ import {
 } from "@/data/utils/billing";
 import { processTrainingTick } from "@/data/utils/training";
 import { processRaiseTick } from "@/data/utils/events";
+import { processResearchTick } from "@/data/utils/research";
+import {
+  processProductLifecycle,
+  processPromotionTick,
+} from "@/data/utils/productLifecycle";
+import { processCompetitorMarket } from "@/data/utils/competitorMarket";
 import { writeAutoSave } from "@/data/utils/saveStorage";
+import { processMarketTick } from "@/data/utils/market";
+import { crossedMilestone } from "@/data/utils/milestone";
+import { pushNotification } from "@/data/redux/notificationSlice";
 import type { CompanyState } from "@/data/redux/companySlice";
 import type { EngineState } from "@/data/redux/engineSlice";
 import type { EmployeState } from "@/data/redux/employeSlice";
@@ -31,6 +45,7 @@ interface GameLoopState {
   employe: EmployeState;
   task: TaskState;
   component: ComponentState;
+  competitor: CompetitorState;
 }
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -100,6 +115,13 @@ export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
           processCampaignTick(store.dispatch as any, state as any);
           processMoraleTick(store.dispatch as any, state as any);
           processRaiseTick(store.dispatch as any, state as any);
+          processResearchTick(store.dispatch as any, state as any);
+          // Le marché d'abord (technologies, tendances, confiance), puis la vie
+          // des produits qui en dépend (bouche-à-oreille).
+          processMarketTick(store.dispatch as any, state as any);
+          processProductLifecycle(store.dispatch as any, state as any);
+          processPromotionTick(store.dispatch as any, state as any);
+          processCompetitorMarket(store.dispatch as any, state as any);
 
           // Snapshot quotidien de la trésorerie pour le graphique d'accueil
           const date = getTimeAsDate(state.engine.time);
@@ -140,10 +162,18 @@ export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
           // Les profils ramenés par une recherche ne patientent pas
           // indéfiniment : on purge le vivier des candidats arrivés à échéance.
           store.dispatch(expireCandidates(state.engine.time));
+          // Partie antérieure au marché (slice absent de la sauvegarde) : on
+          // le peuple à partir du carnet existant avant le premier lot.
+          if (state.competitor.roster.length === 0) {
+            store.dispatch(
+              initializeCompetitorState(buildRoster(state.task.clients)),
+            );
+          }
           store.dispatch(
             generateAvailableContractList({
               time: state.engine.time,
               reputation: state.company.reputation,
+              competitors: store.getState().competitor.roster,
             }),
           );
           store.dispatch(
@@ -152,6 +182,21 @@ export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
               reputation: state.company.reputation,
             }),
           );
+          // Palier de réputation franchi pour la première fois : on le dit,
+          // avec ce qu'il ouvre. À évaluer AVANT `trackRunPeaks`, qui remonte
+          // le pic auquel on se compare.
+          const milestone = crossedMilestone(
+            state.engine.peakReputation ?? 0,
+            state.company.reputation,
+          );
+          if (milestone) {
+            store.dispatch(
+              pushNotification({
+                message: `Palier atteint : ${milestone.name} (réputation ${milestone.threshold}). ${milestone.unlocks}`,
+                type: "success",
+              }),
+            );
+          }
           // Suit l'effectif max et la réputation max de la partie (écran de
           // bilan WF-3) à partir de l'état committé du tick courant.
           store.dispatch(

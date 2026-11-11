@@ -1,7 +1,11 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
-import { Building, ComponentType } from "@/data/interface";
+import {
+  Building,
+  ComponentType,
+  getBuildingResaleValue,
+} from "@/data/interface";
 import { generateNewBuilding } from "@/data/utils/building";
 import {
   DEFAULT_COMPANY_STATE,
@@ -97,6 +101,7 @@ export const companySlice = createSlice({
         type: CampaignType;
         effectiveness: number;
         time: number;
+        marketerId?: number;
       }>,
     ) {
       // Une seule campagne à la fois (cf. spec UX §8).
@@ -109,6 +114,7 @@ export const companySlice = createSlice({
         effectiveness: action.payload.effectiveness,
         startTime: action.payload.time,
         endTime: action.payload.time + CAMPAIGN_DURATION_HOURS,
+        marketerId: action.payload.marketerId,
       };
     },
     clearCampaign(state) {
@@ -127,6 +133,18 @@ export const companySlice = createSlice({
         (b) => b.id !== action.payload,
       );
     },
+    // Se sépare d'un bâtiment : crédite sa valeur de revente et arrête ses
+    // charges. L'occupation n'est pas connue ici — c'est le thunk
+    // `releaseEmptyBuilding` (utils/building) qui garantit qu'il est vide.
+    releaseBuilding(state, action: PayloadAction<number>) {
+      const building = state.buildingList.find((b) => b.id === action.payload);
+      if (!building) return;
+
+      state.money += getBuildingResaleValue(building);
+      state.buildingList = state.buildingList.filter(
+        (b) => b.id !== action.payload,
+      );
+    },
   },
 });
 
@@ -140,6 +158,7 @@ export const {
   applyContractMalus,
   paySeverance,
   renameBuilding,
+  releaseBuilding,
   launchCampaign,
   clearCampaign,
 } = companySlice.actions;

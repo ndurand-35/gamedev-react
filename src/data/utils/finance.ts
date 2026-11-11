@@ -16,21 +16,23 @@
 
 import {
   Building,
+  CompetitorProduct,
   Person,
   Product,
-  ProductStatus,
-  computeDecayedRevenue,
   getBuildingMonthlyCharges,
 } from "@/data/interface";
 import {
   ActiveCampaign,
   Loan,
   applyLoanRepayment,
-  campaignRevenueMultiplier,
   getBuildingVariableCharges,
-  isCampaignActive,
 } from "@/data/utils/economy";
+import {
+  computeMaintenanceCost,
+  computeProductRevenue,
+} from "@/data/utils/product";
 import { addMonthsToTime, getTimeAsDate } from "@/data/utils/time";
+import type { MarketConfidence } from "@/data/utils/marketDemand";
 
 /** Nombre de mois clôturés conservés dans l'historique (glissant). */
 export const MONTHLY_REPORT_HISTORY = 24;
@@ -50,6 +52,8 @@ export interface MonthlyReport {
   loanPayments: number;
   /** Salaires versés (toujours intégraux : aucun impayé n'est possible). */
   payroll: number;
+  /** Maintenance des produits lancés (absente des rapports antérieurs). */
+  maintenance?: number;
   /** Résidu one-shot du mois (contrats, achats, indemnités…), signé. */
   other: number;
   /** Variation réelle de trésorerie sur le mois (récurrent + one-shots). */
@@ -65,7 +69,9 @@ export interface FinanceProjection {
   variableCharges: number;
   loanPayments: number;
   payroll: number;
-  /** Somme des sorties récurrentes (charges + prêts + salaires). */
+  /** Maintenance mensuelle des produits lancés. */
+  maintenance: number;
+  /** Somme des sorties récurrentes (charges + prêts + salaires + maintenance). */
   expenses: number;
   /** revenue − expenses. */
   net: number;
@@ -78,28 +84,11 @@ interface ProjectionInput {
   loans: Loan[];
   time: number;
   campaign?: ActiveCampaign;
+  /** Produits des studios concurrents : ils diluent nos parts de segment. */
+  rivals?: CompetitorProduct[];
+  /** Confiance du public par segment : elle module la demande. */
+  confidence?: MarketConfidence;
 }
-
-/**
- * Revenu produit mensuel attendu, érodé par l'obsolescence et boosté par la
- * campagne active. Même formule que `processMonthlyBilling` : la projection ne
- * peut pas diverger de la facturation réelle.
- */
-export const computeProductRevenue = (
-  products: Product[],
-  time: number,
-  campaign?: ActiveCampaign,
-): number => {
-  const mult = campaignRevenueMultiplier(
-    isCampaignActive(campaign, time) ? campaign : undefined,
-  );
-  let total = 0;
-  for (const p of products) {
-    if (p.status !== ProductStatus.LAUNCHED) continue;
-    total += Math.round(computeDecayedRevenue(p, time) * mult);
-  }
-  return total;
-};
 
 /** Charges immobilières du mois, ventilées fixe / variable (occupation). */
 export const computeBuildingCharges = (
@@ -124,21 +113,32 @@ export const computeMonthlyProjection = ({
   loans,
   time,
   campaign,
+  rivals = [],
+  confidence,
 }: ProjectionInput): FinanceProjection => {
-  const revenue = computeProductRevenue(products, time, campaign);
+  const revenue = computeProductRevenue(
+    products,
+    time,
+    campaign,
+    rivals,
+    confidence,
+  );
   const { fixedCharges, variableCharges } = computeBuildingCharges(
     buildings,
     employes,
   );
   const loanPayments = loans.reduce((acc, l) => acc + l.monthlyPayment, 0);
   const payroll = employes.reduce((acc, e) => acc + e.salary, 0);
-  const expenses = fixedCharges + variableCharges + loanPayments + payroll;
+  const maintenance = computeMaintenanceCost(products);
+  const expenses =
+    fixedCharges + variableCharges + loanPayments + payroll + maintenance;
   return {
     revenue,
     fixedCharges,
     variableCharges,
     loanPayments,
     payroll,
+    maintenance,
     expenses,
     net: revenue - expenses,
   };
@@ -194,6 +194,8 @@ export const computeCashProjection = ({
   time,
   campaign,
   money,
+  rivals = [],
+  confidence,
   months = PROJECTION_HORIZON_MONTHS,
 }: CashProjectionInput): CashProjection => {
   const { fixedCharges, variableCharges } = computeBuildingCharges(
@@ -201,6 +203,7 @@ export const computeCashProjection = ({
     employes,
   );
   const payroll = employes.reduce((acc, e) => acc + e.salary, 0);
+  const maintenance = computeMaintenanceCost(products);
 
   // Échéancier rejoué mois par mois : les prêts déjà soldés n'en font pas partie.
   let schedule = loans.filter((l) => l.remainingMonths > 0);
@@ -209,7 +212,13 @@ export const computeCashProjection = ({
 
   for (let offset = 1; offset <= months; offset++) {
     const monthTime = addMonthsToTime(time, offset - 1);
-    const revenue = computeProductRevenue(products, monthTime, campaign);
+    const revenue = computeProductRevenue(
+      products,
+      monthTime,
+      campaign,
+      rivals,
+      confidence,
+    );
 
     let loanPayments = 0;
     const remaining: Loan[] = [];
@@ -220,7 +229,8 @@ export const computeCashProjection = ({
     }
     schedule = remaining;
 
-    const expenses = fixedCharges + variableCharges + loanPayments + payroll;
+    const expenses =
+      fixedCharges + variableCharges + loanPayments + payroll + maintenance;
     const net = revenue - expenses;
     running += net;
 
@@ -232,6 +242,7 @@ export const computeCashProjection = ({
       variableCharges,
       loanPayments,
       payroll,
+      maintenance,
       expenses,
       net,
       moneyAfter: running,
@@ -260,10 +271,11 @@ export const computeRunwayMonths = (
 };
 
 /** Moyenne du résultat net sur les N derniers mois clôturés (0 si aucun). */
-export const averageNet = (reports: MonthlyReport[], months: number): number => {
+export const averageNet = (
+  reports: MonthlyReport[],
+  months: number,
+): number => {
   const slice = reports.slice(-months);
   if (slice.length === 0) return 0;
-  return Math.round(
-    slice.reduce((acc, r) => acc + r.net, 0) / slice.length,
-  );
+  return Math.round(slice.reduce((acc, r) => acc + r.net, 0) / slice.length);
 };

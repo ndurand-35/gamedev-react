@@ -1,5 +1,6 @@
 import {
   Client,
+  Competitor,
   ComponentQuality,
   ComponentRequirement,
   ComponentType,
@@ -41,6 +42,9 @@ import {
   setMoney,
 } from "@/data/redux/companySlice";
 import { MAX_CONTRACT_DIFFICULTY } from "./constant";
+import { pickContractIssuer } from "@/data/utils/competitor";
+import { applyMissedDeadlineShock } from "@/data/utils/morale";
+import { SortState, nextSort, sortBy } from "@/data/utils/sort";
 
 /** Part de la durée allouée en deçà de laquelle la livraison est « anticipée ». */
 export const EARLY_DELIVERY_RATIO = 0.7;
@@ -67,8 +71,9 @@ export const contractDeadlineHours = (
   totalQty: number,
   marginPercent: number,
 ): number =>
-  Math.round((totalQty * CONTRACT_HOURS_PER_COMPONENT * marginPercent) / 100 / 24) *
-  24;
+  Math.round(
+    (totalQty * CONTRACT_HOURS_PER_COMPONENT * marginPercent) / 100 / 24,
+  ) * 24;
 
 const minQualityForDifficulty = (
   difficulty: number,
@@ -85,7 +90,10 @@ const requirementsForType = (
   difficulty: number,
 ): ComponentRequirement[] => {
   const qty = (multiplier: number) =>
-    Math.max(1, Math.round((difficulty / 10) * multiplier) + randomIntFromInterval(1, 3));
+    Math.max(
+      1,
+      Math.round((difficulty / 10) * multiplier) + randomIntFromInterval(1, 3),
+    );
   const minQuality = minQualityForDifficulty(difficulty);
 
   switch (contractType) {
@@ -110,30 +118,38 @@ const requirementsForType = (
 };
 
 /**
- * Lot de contrats disponibles. Chaque contrat porte un client : un habitué tiré
- * du registre (au plus une fois par lot, pondéré par la relation) ou un inconnu
- * fraîchement nommé. Un client fidèle revient avec une prime sur l'acompte et
- * le solde — c'est le rendement de la relation, pas du talent.
+ * Lot de contrats disponibles. Chaque contrat est émis par un studio du marché
+ * (`competitors`) : un habitué tiré du carnet (au plus une fois par lot,
+ * pondéré par la relation), sinon un studio du roster qui n'a pas encore de
+ * contrat dans le lot — jamais un studio rompu. Sans roster (partie antérieure
+ * au marché, ou tout le monde rompu), un inconnu de passage est nommé.
+ *
+ * La prime de fidélité suit la relation, quel que soit le chemin de tirage :
+ * c'est le rendement de la relation, pas du talent.
  */
 export const generateNewContract = (
   reputation: number,
   clients: Record<string, Client> = {},
+  competitors: Competitor[] = [],
 ): Contract[] => {
   let nbGenerated = 8;
   let contractDifficulty = 2;
   if (reputation === 100) {
     nbGenerated = 15;
     contractDifficulty = MAX_CONTRACT_DIFFICULTY;
-  } else if (reputation > 75) {
+  } else if (reputation >= 75) {
     nbGenerated = 12;
-  } else if (reputation > 50) nbGenerated = 9;
-  else if (reputation > 25) nbGenerated = 7;
+  } else if (reputation >= 50) nbGenerated = 10;
+  // Chaque palier franchi élargit le lot : l'ancien barème retombait à 7
+  // contrats au-dessus de 25, soit moins qu'au départ.
+  else if (reputation >= 25) nbGenerated = 9;
   if (reputation > 1)
     contractDifficulty = MAX_CONTRACT_DIFFICULTY * (reputation / 100);
 
-  // Un même client ne monopolise pas la liste : une place par lot au plus.
+  // Un même studio ne monopolise pas la liste : un habitué revient au plus une
+  // fois par lot, et le reste se répartit sur le marché entier.
   const candidates = returningCandidates(clients);
-  const alreadyPlaced = new Set<string>();
+  const issued = new Map<string, number>();
 
   let generated: Contract[] = [];
   for (let i = 0; i < nbGenerated; i++) {
@@ -153,21 +169,24 @@ export const generateNewContract = (
       ),
     );
 
-    let priceDeposit = 150 + randomIntFromInterval(complexity * 6, complexity * 9);
+    let priceDeposit =
+      150 + randomIntFromInterval(complexity * 6, complexity * 9);
     let priceAdditional =
       600 + randomIntFromInterval(complexity * 22, complexity * 28);
     let priceMalus = randomIntFromInterval(priceDeposit * 2, priceDeposit * 3);
 
     const returning =
       Math.random() < CLIENT_RETURN_CHANCE
-        ? pickReturningClient(
-            candidates.filter((c) => !alreadyPlaced.has(c.id)),
-          )
+        ? pickReturningClient(candidates.filter((c) => !issued.has(c.id)))
         : undefined;
-    if (returning) alreadyPlaced.add(returning.id);
+    const client =
+      returning ??
+      pickContractIssuer(competitors, clients, issued) ??
+      newClientIdentity();
+    issued.set(client.id, (issued.get(client.id) ?? 0) + 1);
 
-    const client = returning ?? newClientIdentity();
-    const bonus = returning ? loyaltyBonus(returning.relation) : 0;
+    const known = clients[client.id];
+    const bonus = known && !known.lost ? loyaltyBonus(known.relation) : 0;
     // Le malus reste au tarif du contrat nu : la fidélité paie mieux, elle
     // n'assure pas contre l'échec.
     priceDeposit = Math.round(priceDeposit * (1 + bonus));
@@ -383,7 +402,11 @@ export const treatTasks = (dispatch: AppDispatch, state: RootState) => {
 
   // N'écrit dans le store que si la liste change réellement : sans résolution
   // automatique, la grande majorité des ticks ne touche plus aux contrats.
-  if (expired) dispatch(setTaskList({ taskList: remaining }));
+  if (expired) {
+    dispatch(setTaskList({ taskList: remaining }));
+    // Un échec public pèse aussi sur l'équipe (cf. `utils/morale`).
+    applyMissedDeadlineShock(dispatch, state);
+  }
 };
 
 function randomContractType(): ContractType {
@@ -391,3 +414,36 @@ function randomContractType(): ContractType {
   const randomIndex = Math.floor(Math.random() * contractTypes.length);
   return contractTypes[randomIndex] as ContractType;
 }
+
+// ---------------------------------------------------------------------------
+// Tri du tableau des contrats disponibles (TaskPage) — mécanique dans sort.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * Colonnes triables du tableau des contrats disponibles, par clé d'accès. La
+ * colonne des composants se trie sur la quantité totale demandée.
+ */
+export const CONTRACT_SORT_ACCESSORS = {
+  name: (c: Contract) => c.name,
+  client: (c: Contract) => c.clientName,
+  difficulty: (c: Contract) => c.taskDifficulty,
+  time: (c: Contract) => c.time,
+  deposit: (c: Contract) => c.priceDeposit,
+  additional: (c: Contract) => c.priceAdditional,
+  malus: (c: Contract) => c.priceMalus,
+  requirements: (c: Contract) => totalRequirementQuantity(c.requirements),
+} satisfies Record<string, (c: Contract) => string | number>;
+
+export type ContractSortKey = keyof typeof CONTRACT_SORT_ACCESSORS;
+
+export type ContractSort = SortState<ContractSortKey>;
+
+export const sortContracts = (
+  contracts: Contract[],
+  sort: ContractSort | null,
+): Contract[] => sortBy(contracts, CONTRACT_SORT_ACCESSORS, sort);
+
+export const nextContractSort = (
+  current: ContractSort | null,
+  key: ContractSortKey,
+): ContractSort | null => nextSort(current, key);

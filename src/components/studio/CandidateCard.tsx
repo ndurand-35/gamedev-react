@@ -7,6 +7,7 @@ import {
   ProductionPerson,
   jobLabel,
 } from "@/data/interface";
+import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 import { formatPrice } from "@/data/utils";
 import { InlineSvg } from "@/components/studio/InlineSvg";
 import {
@@ -46,6 +47,9 @@ export const CandidateCard = ({
       : ACCENT_BY_ROLE[role];
   const roleText = jobLabel(candidate);
   const done = !!candidate.revealedStats;
+  // Salaire attendu : connu après entretien, ou sur dossier avec la
+  // compétence « Lecture de CV » du fondateur.
+  const knowsExpected = useFounderSkill("cv_reading") || done;
 
   const drive = (root: HTMLElement) => {
     const set = (id: string, text: string) => {
@@ -54,7 +58,12 @@ export const CandidateCard = ({
     };
     set("name", `${candidate.firstName} ${candidate.lastName}`);
     set("role", roleText);
-    set("expected", formatPrice(candidate.expectedSalary ?? candidate.salary));
+    set(
+      "expected",
+      knowsExpected
+        ? formatPrice(candidate.expectedSalary ?? candidate.salary)
+        : "?",
+    );
 
     // Toggle de l'état d'entretien (Requis amber → Fait vert).
     const grp = root.querySelector("#interview");

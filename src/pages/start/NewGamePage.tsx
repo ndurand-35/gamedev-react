@@ -20,6 +20,10 @@ import { initializeProductState } from "@/data/redux/productSlice";
 import { initializeLoanState } from "@/data/redux/loanSlice";
 import { initializeFinanceState } from "@/data/redux/financeSlice";
 import { initializeStudioState } from "@/data/redux/studioSlice";
+import { initializeResearchState } from "@/data/redux/researchSlice";
+import { clearNotifications } from "@/data/redux/notificationSlice";
+import { initializeCompetitorState } from "@/data/redux/competitorSlice";
+import { buildRoster } from "@/data/utils/competitor";
 import { MAX_STAT_POSSIBLE } from "@/data/utils";
 import { getRelevantStat } from "@/data/utils/component";
 import { DEFAULT_COMPANY_STATE } from "@/data/utils/constant";
@@ -131,6 +135,10 @@ const NewGamePage: React.FC = () => {
       dispatch(initializeLoanState());
       dispatch(initializeFinanceState());
       dispatch(initializeStudioState());
+      dispatch(initializeResearchState());
+      // Le journal d'activité appartient à la partie : la nouvelle repart vide.
+      dispatch(clearNotifications());
+      dispatch(initializeCompetitorState(buildRoster()));
 
       navigate("/game");
     },

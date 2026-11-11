@@ -169,6 +169,11 @@ export interface ActiveCampaign {
   effectiveness: number; // 0..1, figé au lancement d'après les stats du marketeur
   startTime: number;
   endTime: number;
+  /**
+   * Marketeur qui mène la campagne : il ne peut pas promouvoir un produit en
+   * même temps. Absent d'une campagne lancée avant ce suivi.
+   */
+  marketerId?: number;
 }
 
 // Efficacité 0.25..1 dérivée des stats du marketeur (chaque stat /20). Plancher

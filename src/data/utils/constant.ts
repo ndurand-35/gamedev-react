@@ -7,11 +7,24 @@ import { ComponentType } from "@/data/interface";
 
 import { faker } from "@faker-js/faker";
 
+/**
+ * Vitesses de jeu, en millisecondes entre deux ticks (0 = pause). Source
+ * unique pour les boutons de la barre du bas, l'écran de pause et les
+ * raccourcis clavier 1/2/3.
+ */
+export const GAME_SPEEDS = {
+  PAUSE: 0,
+  X1: 600,
+  X2: 200,
+  X3: 50,
+} as const;
+
 export const DEFAULT_ENGINE_STATE: EngineState = {
   time: 0,
-  gameSpeed: 600,
+  gameSpeed: GAME_SPEEDS.X1,
   gameName: undefined,
   currentTopMenu: [],
+  currentBuildingId: undefined,
   moneyHistory: [],
   lastSnapshotTime: -1,
   gameOver: false,

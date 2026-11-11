@@ -21,6 +21,8 @@ import {
   applyProductionTick,
 } from "@/data/redux/componentSlice";
 import { computeComponentDecay } from "@/data/interface";
+import { FOUNDER_ID, isFounderResearching } from "@/data/utils/research";
+import { techProductivity } from "@/data/utils/technology";
 
 export const isProductionPerson = (p: Person): p is ProductionPerson =>
   typeof (p as ProductionPerson).codeStat === "number";
@@ -105,10 +107,7 @@ export const totalRequirementQuantity = (
   requirements: ComponentRequirement[],
 ): number => requirements.reduce((acc, r) => acc + r.quantity, 0);
 
-export const produceComponents = (
-  dispatch: AppDispatch,
-  state: RootState,
-) => {
+export const produceComponents = (dispatch: AppDispatch, state: RootState) => {
   const time = state.engine.time;
   const progress: Record<number, number> = {
     ...state.component.productionProgress,
@@ -123,6 +122,12 @@ export const produceComponents = (
     }
   }
 
+  // Le fondateur en formation ne produit pas ; son avancement est conservé.
+  const founderBusy = isFounderResearching(state);
+  // Outils et langages progressent avec les technologies : à stat égale, on
+  // produit plus vite en 1995 qu'en 1970 (cf. `utils/technology`).
+  const productivity = techProductivity(time);
+
   for (const employe of state.employe.employeList) {
     if (!isProductionPerson(employe)) continue;
     const type = employe.assignedComponentType;
@@ -133,13 +138,17 @@ export const produceComponents = (
       continue;
     }
     if (employe.buildingId == null) continue;
+    if (founderBusy && employe.id === FOUNDER_ID) continue;
 
     const stat = getRelevantStat(employe, type);
     const synergy = buildingSynergyMultiplier(
       occupantsByBuilding[employe.buildingId] ?? 1,
     );
     const effectiveStat =
-      stat * moraleProductivityMultiplier(employe.morale) * synergy;
+      stat *
+      moraleProductivityMultiplier(employe.morale) *
+      synergy *
+      productivity;
     let current = (progress[employe.id] ?? 0) + effectiveStat;
 
     while (current >= PRODUCTION_THRESHOLD) {

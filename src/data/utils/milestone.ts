@@ -5,17 +5,62 @@
 export interface ReputationMilestone {
   name: string;
   threshold: number;
+  /**
+   * Ce que le palier ouvre, en clair. Reflète les barèmes de
+   * `generateNewContract` (contrats), `generateNewBuilding` (annonces) et
+   * `LOAN_OFFERS` (prêts) : à tenir à jour avec eux.
+   */
+  unlocks: string;
 }
 
 // `Garage` est le palier de départ (seuil 0) : il n'est jamais compté comme un
 // jalon « atteint » dans le ruban (cf. getReachedMilestone).
 export const REPUTATION_MILESTONES: ReputationMilestone[] = [
-  { name: "Garage", threshold: 0 },
-  { name: "Studio indé", threshold: 25 },
-  { name: "Studio reconnu", threshold: 50 },
-  { name: "Studio AAA", threshold: 75 },
-  { name: "Studio légendaire", threshold: 100 },
+  {
+    name: "Garage",
+    threshold: 0,
+    unlocks: "Micro-crédit, 8 contrats et 3 annonces immobilières par semaine.",
+  },
+  {
+    name: "Studio indé",
+    threshold: 25,
+    unlocks: "Prêt PME (50 000 €), 9 contrats et 5 annonces par semaine.",
+  },
+  {
+    name: "Studio reconnu",
+    threshold: 50,
+    unlocks: "Prêt expansion (150 000 €), 10 contrats et 7 annonces par semaine.",
+  },
+  {
+    name: "Studio AAA",
+    threshold: 75,
+    unlocks:
+      "Prêt institutionnel (500 000 €), 12 contrats et 9 annonces par semaine.",
+  },
+  {
+    name: "Studio légendaire",
+    threshold: 100,
+    unlocks:
+      "15 contrats et 15 annonces par semaine, à la difficulté maximale.",
+  },
 ];
+
+/**
+ * Jalon franchi pour la PREMIÈRE fois quand la réputation passe de l'ancien
+ * pic à sa valeur courante, ou `null`. Repasser un seuil déjà atteint (après
+ * une chute de réputation) ne compte pas : on compare au pic de la partie.
+ */
+export const crossedMilestone = (
+  previousPeak: number,
+  reputation: number,
+): ReputationMilestone | null => {
+  if (reputation <= previousPeak) return null;
+  let crossed: ReputationMilestone | null = null;
+  for (const m of REPUTATION_MILESTONES) {
+    if (m.threshold > previousPeak && reputation >= m.threshold) crossed = m;
+  }
+  return crossed;
+};
 
 export interface MilestoneProgress {
   reputation: number;

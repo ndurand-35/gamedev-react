@@ -1,3 +1,5 @@
+import { adjustMorale } from "@/data/redux/employeSlice";
+import { MORALE_MISSED_DEADLINE } from "@/data/utils/morale";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -57,9 +59,11 @@ const stateWith = (over: {
   stock?: Component[];
   money?: number;
   time?: number;
+  employes?: { id: number }[];
 }): RootState =>
   ({
     task: { taskList: over.taskList ?? [] },
+    employe: { employeList: over.employes ?? [] },
     component: { stock: over.stock ?? [] },
     company: { money: over.money ?? 5000 },
     engine: { time: over.time ?? 0 },
@@ -172,5 +176,24 @@ describe("treatTasks — deadlines uniquement", () => {
       addReputation(DEADLINE_REPUTATION_MALUS),
     );
     expect(dispatch).toHaveBeenCalledWith(setTaskList({ taskList: [running] }));
+  });
+
+  it("une deadline manquée entame le moral de l'équipe, fondateur exclu", () => {
+    const dispatch = vi.fn();
+    treatTasks(
+      dispatch as never,
+      stateWith({
+        taskList: [makeContract({ id: 1, time: 100 })],
+        time: 200,
+        employes: [{ id: 1 }, { id: 2 }],
+      }),
+    );
+
+    expect(dispatch).toHaveBeenCalledWith(
+      adjustMorale({ employeId: 2, delta: -MORALE_MISSED_DEADLINE }),
+    );
+    expect(dispatch).not.toHaveBeenCalledWith(
+      adjustMorale({ employeId: 1, delta: -MORALE_MISSED_DEADLINE }),
+    );
   });
 });

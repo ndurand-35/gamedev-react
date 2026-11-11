@@ -18,6 +18,8 @@ import {
   dismissNotification,
 } from "@/data/redux/notificationSlice";
 import { formatPrice } from "@/data/utils";
+import { hasFounderSkill } from "@/data/utils/research";
+import { getTimeAsDate } from "@/data/utils/time";
 
 const ALERT_LEVEL_CLASS: Record<Alert["level"], string> = {
   error: "text-error",
@@ -53,15 +55,21 @@ const NOTIF_ICON: Record<NotificationType, React.ReactElement> = {
   info: <InfoCircle width={16} height={16} />,
 };
 
-const formatRelativeTime = (createdAt: number): string => {
-  const elapsed = Math.max(0, Date.now() - createdAt);
-  const sec = Math.round(elapsed / 1000);
-  if (sec < 60) return `il y a ${sec}s`;
-  const min = Math.round(sec / 60);
-  if (min < 60) return `il y a ${min} min`;
-  const hr = Math.round(min / 60);
-  return `il y a ${hr} h`;
-};
+/** Date de JEU d'une entrée du journal : c'est elle qui situe l'événement. */
+const formatGameDate = (gameTime: number | undefined): string =>
+  gameTime === undefined
+    ? ""
+    : getTimeAsDate(gameTime).format("DD/MM/YYYY · HH[h]");
+
+type JournalFilter = "all" | "important";
+
+const JOURNAL_FILTERS: { id: JournalFilter; label: string }[] = [
+  { id: "all", label: "Tout" },
+  { id: "important", label: "Important" },
+];
+
+const isImportant = (n: Notification): boolean =>
+  n.type === "error" || n.type === "warning";
 
 /** Facture d'une alerte. Une alerte à 0 € n'affiche rien : rien ne brûle. */
 const AlertCost = ({
@@ -82,13 +90,28 @@ export const NotificationCenter = () => {
   const notifications = useAppSelector((s) => s.notification.list);
   const dispatch = useAppDispatch();
   const [open, setOpen] = useState(false);
+  const [journalFilter, setJournalFilter] = useState<JournalFilter>("all");
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const costed = useAppSelector((s) =>
+    hasFounderSkill(s.research.acquired, "management_control"),
+  );
 
   const total = alerts.length;
   const hasError = alerts.some((a) => a.level === "error");
-  // `useAlerts` trie déjà par facture décroissante : la tête de liste est la
-  // seule chose à regarder maintenant, le reste attend son tour.
-  const [costliest, ...others] = alerts;
+  // Avec « Contrôle de gestion », `useAlerts` trie par facture décroissante :
+  // la tête de liste est la seule chose à regarder maintenant. Sans cette
+  // compétence, aucune alerte n'est chiffrée — toutes s'affichent à plat.
+  const costliest: Alert | undefined = costed ? alerts[0] : undefined;
+  const others = costed ? alerts.slice(1) : alerts;
+
+  // Journal : du plus récent au plus ancien.
+  const journal = (
+    journalFilter === "important"
+      ? notifications.filter(isImportant)
+      : notifications
+  )
+    .slice()
+    .reverse();
 
   useEffect(() => {
     if (!open) return;
@@ -171,7 +194,7 @@ export const NotificationCenter = () => {
           </div>
 
           <div className="overflow-y-auto flex-1">
-            {!costliest ? (
+            {total === 0 ? (
               <section className="px-3 py-2">
                 <h3 className="text-xs font-semibold opacity-70 mb-1">
                   Alertes (0)
@@ -182,6 +205,7 @@ export const NotificationCenter = () => {
               </section>
             ) : (
               <>
+                {costliest && (
                 <section className="px-3 py-2">
                   <h3 className="text-xs font-semibold opacity-70 mb-1">
                     Ce qui coûte le plus cher
@@ -225,11 +249,12 @@ export const NotificationCenter = () => {
                     </div>
                   </div>
                 </section>
+                )}
 
                 {others.length > 0 && (
-                  <section className="px-3 pb-2">
+                  <section className={costliest ? "px-3 pb-2" : "px-3 py-2"}>
                     <h3 className="text-xs font-semibold opacity-70 mb-1">
-                      Ensuite ({others.length})
+                      {costliest ? "Ensuite" : "Alertes"} ({others.length})
                     </h3>
                     <ul className="flex flex-col divide-y divide-base-content/10">
                       {others.map((a) => (
@@ -271,53 +296,70 @@ export const NotificationCenter = () => {
             <section className="px-3 py-2 border-t border-base-content/10">
               <div className="flex flex-row items-center justify-between mb-1">
                 <h3 className="text-xs font-semibold opacity-70">
-                  Activité ({notifications.length})
+                  Journal ({journal.length})
                 </h3>
-                {notifications.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => dispatch(clearNotifications())}
-                    className="text-xs underline opacity-70 hover:opacity-100"
-                  >
-                    Effacer
-                  </button>
-                )}
+                <div className="flex flex-row items-center gap-2">
+                  <div className="join">
+                    {JOURNAL_FILTERS.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        aria-pressed={journalFilter === f.id}
+                        onClick={() => setJournalFilter(f.id)}
+                        className={
+                          "btn btn-xs join-item " +
+                          (journalFilter === f.id ? "btn-neutral" : "btn-ghost")
+                        }
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  {notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => dispatch(clearNotifications())}
+                      className="text-xs underline opacity-70 hover:opacity-100"
+                    >
+                      Effacer
+                    </button>
+                  )}
+                </div>
               </div>
-              {notifications.length === 0 ? (
+              {journal.length === 0 ? (
                 <p className="text-xs opacity-60 italic py-1">
-                  Aucune activité récente.
+                  {notifications.length === 0
+                    ? "Rien au journal pour l'instant."
+                    : "Aucune entrée importante."}
                 </p>
               ) : (
                 <ul className="flex flex-col divide-y divide-base-content/10">
-                  {[...notifications]
-                    .slice()
-                    .reverse()
-                    .map((n: Notification) => (
-                      <li
-                        key={n.id}
-                        className="py-2 flex flex-row items-start justify-between gap-2"
-                      >
-                        <div className="flex flex-row items-start gap-2 flex-1 min-w-0">
-                          <span className={NOTIF_LEVEL_CLASS[n.type]}>
-                            {NOTIF_ICON[n.type]}
+                  {journal.map((n: Notification) => (
+                    <li
+                      key={n.id}
+                      className="py-2 flex flex-row items-start justify-between gap-2"
+                    >
+                      <div className="flex flex-row items-start gap-2 flex-1 min-w-0">
+                        <span className={NOTIF_LEVEL_CLASS[n.type]}>
+                          {NOTIF_ICON[n.type]}
+                        </span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs">{n.message}</span>
+                          <span className="text-[10px] opacity-50 tabular-nums">
+                            {formatGameDate(n.gameTime)}
                           </span>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs">{n.message}</span>
-                            <span className="text-[10px] opacity-50">
-                              {formatRelativeTime(n.createdAt)}
-                            </span>
-                          </div>
                         </div>
-                        <button
-                          type="button"
-                          aria-label="Effacer"
-                          onClick={() => dispatch(dismissNotification(n.id))}
-                          className="btn btn-xs btn-ghost btn-circle"
-                        >
-                          <Xmark width={12} height={12} />
-                        </button>
-                      </li>
-                    ))}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Effacer"
+                        onClick={() => dispatch(dismissNotification(n.id))}
+                        className="btn btn-xs btn-ghost btn-circle"
+                      >
+                        <Xmark width={12} height={12} />
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               )}
             </section>

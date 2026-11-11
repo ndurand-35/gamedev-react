@@ -10,5 +10,7 @@ export * from "@/pages/BuildingPage";
 export * from "@/pages/building";
 
 export * from "@/pages/SaveManagerPage";
+export * from "@/pages/ResearchPage";
+export * from "@/pages/CompetitorPage";
 
 export * from "@/pages/finance";

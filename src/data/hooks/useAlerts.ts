@@ -20,6 +20,8 @@ import {
 } from "@/data/utils/alertCost";
 import { isProductionPerson } from "@/data/utils/component";
 import { computeCashProjection } from "@/data/utils/finance";
+import { useMarketConfidence } from "@/data/hooks/useMarket";
+import { FOUNDER_ID, hasFounderSkill } from "@/data/utils/research";
 
 export interface Alert extends CostedAlert {
   id: string;
@@ -42,6 +44,14 @@ export interface Alert extends CostedAlert {
  * Chaque montant est chiffré par `utils/alertCost`, à partir des règles que le
  * moteur applique vraiment ; l'unité est toujours la même : des euros sur le
  * mois en cours.
+ *
+ * Ce chiffrage n'est pas offert : c'est une analyse, donc une compétence du
+ * fondateur (cf. `utils/research`).
+ *   • sans « Contrôle de gestion », les alertes ne font que constater : aucun
+ *     montant (`monthlyCost` à 0), et l'ordre retombe sur la seule gravité ;
+ *   • sans « Prévision de trésorerie », la rupture à venir n'est pas annoncée ;
+ *   • sans « Arbitrage de livraison », une deadline proche ne dit pas si le
+ *     contrat est encore livrable — le verdict vient du conseiller.
  */
 export const useAlerts = (): Alert[] => {
   const money = useAppSelector((s) => s.company.money);
@@ -50,6 +60,8 @@ export const useAlerts = (): Alert[] => {
   const campaign = useAppSelector((s) => s.company.activeCampaign);
   const employes = useAppSelector((s) => s.employe.employeList);
   const products = useAppSelector((s) => s.product.products);
+  const rivals = useAppSelector((s) => s.competitor.products);
+  const confidence = useMarketConfidence();
   const loans = useAppSelector((s) => s.loan.loans);
   const tasks = useAppSelector((s) => s.task.taskList);
   const stock = useAppSelector((s) => s.component.stock);
@@ -57,22 +69,35 @@ export const useAlerts = (): Alert[] => {
     (s) => s.component.productionProgress,
   );
   const time = useAppSelector((s) => s.engine.time);
+  const acquired = useAppSelector((s) => s.research.acquired);
+  const founderResearching = useAppSelector(
+    (s) => s.research.current !== null,
+  );
 
   return useMemo(() => {
     const out: Alert[] = [];
+    const costed = hasFounderSkill(acquired, "management_control");
+    const forecast = hasFounderSkill(acquired, "cash_forecast");
+    const advisor = hasFounderSkill(acquired, "delivery_advisor");
+    /** Un montant n'est affiché que si le fondateur sait le calculer. */
+    const cost = (compute: () => number): number => (costed ? compute() : 0);
 
     // Rupture de trésorerie : on annonce le MOIS où la clôture ne passera plus
     // (obsolescence des revenus et échéancier des prêts compris), au lieu
     // d'attendre que le mois en cours soit déjà infinançable.
-    const { breach } = computeCashProjection({
-      products,
-      buildings,
-      employes,
-      loans,
-      time,
-      campaign,
-      money,
-    });
+    const breach = forecast
+      ? computeCashProjection({
+          products,
+          buildings,
+          employes,
+          loans,
+          time,
+          campaign,
+          money,
+          rivals,
+          confidence,
+        }).breach
+      : null;
     if (breach) {
       out.push({
         id: "cash_breach",
@@ -81,7 +106,7 @@ export const useAlerts = (): Alert[] => {
           breach.offset === 1
             ? `Rupture de trésorerie dès la clôture de ${breach.label} : il manque ${formatPrice(-breach.moneyAfter)} €.`
             : `Rupture de trésorerie prévue en ${breach.label}, dans ${breach.offset - 1} mois au rythme actuel.`,
-        monthlyCost: cashBreachCost(breach),
+        monthlyCost: cost(() => cashBreachCost(breach)),
         costLabel:
           breach.offset === 1
             ? "à trouver avant la clôture"
@@ -96,7 +121,7 @@ export const useAlerts = (): Alert[] => {
         id: "no_building",
         level: "warning",
         message: `${noBuilding.length} employé${noBuilding.length > 1 ? "s" : ""} sans bâtiment.`,
-        monthlyCost: unhousedPayroll(noBuilding),
+        monthlyCost: cost(() => unhousedPayroll(noBuilding)),
         costLabel: "salaires versés sans production possible",
         link: { to: "/game/employe/list", label: "Affecter" },
       });
@@ -113,9 +138,11 @@ export const useAlerts = (): Alert[] => {
         message: `${critical.length} employé${critical.length > 1 ? "s" : ""} au bord de la démission.`,
         // Le départ est quasi certain sur un mois : au débit amputé s'ajoute
         // le coût de remplacement, pondéré par le risque.
-        monthlyCost: Math.round(
-          moraleProductivityLoss(critical) +
-            resignationExposure(critical, reputation),
+        monthlyCost: cost(() =>
+          Math.round(
+            moraleProductivityLoss(critical) +
+              resignationExposure(critical, reputation),
+          ),
         ),
         costLabel: "production amputée + remplacement probable",
         link: { to: "/game/employe/list", label: "Voir" },
@@ -125,7 +152,7 @@ export const useAlerts = (): Alert[] => {
         id: "morale_low",
         level: "warning",
         message: `${lowMorale.length} employé${lowMorale.length > 1 ? "s" : ""} avec moral bas.`,
-        monthlyCost: Math.round(moraleProductivityLoss(lowMorale)),
+        monthlyCost: cost(() => Math.round(moraleProductivityLoss(lowMorale))),
         costLabel: "part du salaire perdue en productivité",
         link: { to: "/game/employe/list", label: "Voir" },
       });
@@ -141,14 +168,23 @@ export const useAlerts = (): Alert[] => {
         level: "warning",
         message: `${dueSoon.length} contrat${dueSoon.length > 1 ? "s" : ""} avec deadline < 24h.`,
         // Seuls les contrats qu'aucun instant ne rend livrables sont facturés :
-        // les autres sont à un clic de l'encaissement, pas d'une pénalité.
-        monthlyCost: contractMalusExposure({
-          contracts: dueSoon,
-          stock,
-          employes,
-          productionProgress,
-          time,
-        }),
+        // les autres sont à un clic de l'encaissement, pas d'une pénalité. Ce
+        // verdict est celui du conseiller de livraison : sans la compétence,
+        // l'alerte se tait sur la faisabilité. Le fondateur en formation ne
+        // produit pas, la projection l'ignore (comme `ContractDelivery`).
+        monthlyCost: advisor
+          ? cost(() =>
+              contractMalusExposure({
+                contracts: dueSoon,
+                stock,
+                employes: founderResearching
+                  ? employes.filter((e) => e.id !== FOUNDER_ID)
+                  : employes,
+                productionProgress,
+                time,
+              }),
+            )
+          : 0,
         costLabel: "malus des contrats non livrables à temps",
         link: { to: "/game/product/contract", label: "Voir" },
       });
@@ -163,9 +199,11 @@ export const useAlerts = (): Alert[] => {
         level: "error",
         message: `${overdue.length} contrat${overdue.length > 1 ? "s" : ""} en retard.`,
         // Plus rien à sauver : `treatTasks` prélève le malus au prochain tick.
-        monthlyCost: overdue.reduce(
-          (acc: number, t: StartedContract) => acc + t.priceMalus,
-          0,
+        monthlyCost: cost(() =>
+          overdue.reduce(
+            (acc: number, t: StartedContract) => acc + t.priceMalus,
+            0,
+          ),
         ),
         costLabel: "malus prélevé à la prochaine heure de jeu",
         link: { to: "/game/product/contract", label: "Voir" },
@@ -180,7 +218,7 @@ export const useAlerts = (): Alert[] => {
         id: "empty_buildings",
         level: "info",
         message: `${emptyBuildings.length} bâtiment${emptyBuildings.length > 1 ? "s" : ""} vide${emptyBuildings.length > 1 ? "s" : ""} (charges sans production).`,
-        monthlyCost: emptyBuildingCharges(emptyBuildings, employes),
+        monthlyCost: cost(() => emptyBuildingCharges(emptyBuildings, employes)),
         costLabel: "charges fixes de locaux inoccupés",
         link: { to: "/game/building", label: "Voir" },
       });
@@ -197,7 +235,7 @@ export const useAlerts = (): Alert[] => {
         id: "idle_prod",
         level: "info",
         message: `${idleProd.length} employé${idleProd.length > 1 ? "s" : ""} de prod libre${idleProd.length > 1 ? "s" : ""}.`,
-        monthlyCost: idlePayroll(idleProd),
+        monthlyCost: cost(() => idlePayroll(idleProd)),
         costLabel: "salaires versés sans affectation",
         link: { to: "/game/employe/list", label: "Affecter" },
       });
@@ -209,6 +247,8 @@ export const useAlerts = (): Alert[] => {
     reputation,
     buildings,
     products,
+    rivals,
+    confidence,
     loans,
     campaign,
     tasks,
@@ -216,5 +256,7 @@ export const useAlerts = (): Alert[] => {
     productionProgress,
     money,
     time,
+    acquired,
+    founderResearching,
   ]);
 };

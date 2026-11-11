@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 import { listSaves } from "@/data/redux/saveSlice";
+import { GAME_SPEEDS } from "@/data/utils/constant";
 import { openSavePanel } from "@/components/layout/SavePanel";
 
 export const PauseIndicator = () => {
@@ -39,7 +40,7 @@ export const PauseIndicator = () => {
     >
       <button
         className="btn btn-primary"
-        onClick={() => dispatch(setGameSpeed(600))}
+        onClick={() => dispatch(setGameSpeed(GAME_SPEEDS.X1))}
       >
         <Play />
         Reprendre

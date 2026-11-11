@@ -1,14 +1,16 @@
 import dayjs from "dayjs";
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 import { TopMenuItem } from "@/data/interface";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 import { selectLoanSummary } from "@/data/redux/selectors";
-// Sous-menu de la section Finance : source unique partagée avec les pages
-// (elles le passent aussi à `useTopMenu`), pour éviter deux listes qui dérivent.
-import { financeTopMenuItems } from "@/pages/finance/menu";
+import { GAME_SPEEDS } from "@/data/utils/constant";
+// Sous-menus de section : source unique partagée avec les pages (elles les
+// passent aussi à `useTopMenu`), pour éviter deux listes qui dérivent.
+import { companyTopMenuItems } from "@/pages/company/menu";
+import { BuildingSwitcher } from "@/components/building/BuildingSwitcher";
 import { productTopMenuItems } from "@/pages/product/menu";
 
 import {
@@ -20,9 +22,9 @@ import {
   User,
   Home,
   Building,
-  Packages,
-  Rocket,
-  Bank,
+  Industry,
+  Leaderboard,
+  Suitcase,
 } from "iconoir-react";
 
 const NAV_ITEMS: {
@@ -31,6 +33,13 @@ const NAV_ITEMS: {
   ariaLabel: string;
   icon: JSX.Element;
   subMenu: TopMenuItem[];
+  /**
+   * Préfixes d'URL sur lesquels l'entrée est active, quand ses pages ne
+   * partagent pas toutes le préfixe de `to` (routes historiques conservées).
+   */
+  activePrefixes?: string[];
+  /** Pastille d'état portée par l'icône (dépend du store, rendue au rendu). */
+  badge?: "loans";
 }[] = [
   {
     to: "/game",
@@ -45,22 +54,16 @@ const NAV_ITEMS: {
     icon: <User className="h-6 w-6" />,
     subMenu: [
       { name: "Accueil", link: "/game/employe" },
-      { name: "Fondateur", link: "/game/employe/me" },
       { name: "Employé", link: "/game/employe/list" },
       { name: "Pole Emploi", link: "/game/employe/recruit" },
     ],
   },
   {
     to: "/game/component",
-    ariaLabel: "Composants",
-    icon: <Packages className="h-6 w-6" />,
-    subMenu: [],
-  },
-  {
-    to: "/game/product",
-    ariaLabel: "Produits",
-    icon: <Rocket className="h-6 w-6" />,
+    ariaLabel: "Production",
+    icon: <Industry className="h-6 w-6" />,
     subMenu: productTopMenuItems,
+    activePrefixes: ["/game/component", "/game/product"],
   },
   {
     to: "/game/building",
@@ -72,6 +75,22 @@ const NAV_ITEMS: {
       { name: "SeLoger", link: "/game/building/buy" },
     ],
   },
+  {
+    to: "/game/competitor",
+    ariaLabel: "Concurrents",
+    icon: <Leaderboard className="h-6 w-6" />,
+    subMenu: [],
+  },
+  // Entreprise : formation du fondateur, trésorerie, dette. Les routes
+  // historiques /game/research et /game/finance sont conservées.
+  {
+    to: "/game/finance",
+    ariaLabel: "Entreprise",
+    icon: <Suitcase className="h-6 w-6" />,
+    subMenu: companyTopMenuItems,
+    activePrefixes: ["/game/finance", "/game/research"],
+    badge: "loans",
+  },
 ];
 
 const SPEED_BUTTONS: {
@@ -81,26 +100,26 @@ const SPEED_BUTTONS: {
   ariaLabel: string;
 }[] = [
   {
-    speed: 0,
-    label: "Pause",
+    speed: GAME_SPEEDS.PAUSE,
+    label: "Pause (Échap)",
     icon: <Pause height={20} width={20} />,
     ariaLabel: "Mettre en pause",
   },
   {
-    speed: 600,
-    label: "Vitesse x1",
+    speed: GAME_SPEEDS.X1,
+    label: "Vitesse x1 (1)",
     icon: <Play height={20} width={20} />,
     ariaLabel: "Vitesse x1",
   },
   {
-    speed: 200,
-    label: "Vitesse x2",
+    speed: GAME_SPEEDS.X2,
+    label: "Vitesse x2 (2)",
     icon: <NavArrowRight height={20} width={20} />,
     ariaLabel: "Vitesse x2",
   },
   {
-    speed: 50,
-    label: "Vitesse x3",
+    speed: GAME_SPEEDS.X3,
+    label: "Vitesse x3 (3)",
     icon: <FastArrowRight height={20} width={20} />,
     ariaLabel: "Vitesse x3",
   },
@@ -113,6 +132,8 @@ export const BottomNavigation = () => {
   const gameSpeed = useAppSelector((state) => state.engine.gameSpeed);
   const currentTopMenu = useAppSelector((state) => state.engine.currentTopMenu);
   const loanSummary = useAppSelector(selectLoanSummary);
+
+  const { pathname } = useLocation();
 
   const [hoveredSubMenu, setHoveredSubMenu] = useState<TopMenuItem[] | null>(
     null,
@@ -147,6 +168,9 @@ export const BottomNavigation = () => {
         </div>
       )}
       <div className="items-center justify-start text-base-content flex flex-wrap">
+        <div className="flex items-center -ml-3 sm:-ml-6 pr-2 mr-1 border-r border-base-content/20">
+          <BuildingSwitcher />
+        </div>
         <div className="hidden sm:flex items-center p-2 border-r border-base-content/20">
           <Timer height={14} width={14} aria-label="Temps" />
           <span className="ml-1 text-sm">{displayTime}</span>
@@ -175,41 +199,38 @@ export const BottomNavigation = () => {
 
       <div className="flex items-center justify-center mx-auto space-x-4">
         {NAV_ITEMS.map((item) => (
-          <NavLink
+          <div
+            className="tooltip"
+            data-tip={item.ariaLabel}
             key={`nav_${item.to}`}
-            to={item.to}
-            end={item.end}
-            aria-label={item.ariaLabel}
-            onMouseEnter={() => setHoveredSubMenu(item.subMenu)}
-            className={({ isActive }) =>
-              isActive ? "btn btn-circle btn-neutral" : "btn btn-circle"
-            }
           >
-            {item.icon}
-          </NavLink>
+            <NavLink
+              to={item.to}
+              end={item.end}
+              aria-label={item.ariaLabel}
+              onMouseEnter={() => setHoveredSubMenu(item.subMenu)}
+              className={({ isActive }) =>
+                "relative btn btn-circle" +
+                (isActive ||
+                item.activePrefixes?.some((p) => pathname.startsWith(p))
+                  ? " btn-neutral"
+                  : "")
+              }
+            >
+              {item.icon}
+              {item.badge === "loans" && loanSummary.count > 0 && (
+                <span
+                  className={
+                    "absolute -top-1 -right-1 min-w-4 h-4 px-1 flex items-center justify-center rounded-full text-[10px] font-bold text-white " +
+                    (loanSummary.hasMissed ? "bg-error" : "bg-neutral")
+                  }
+                >
+                  {loanSummary.count}
+                </span>
+              )}
+            </NavLink>
+          </div>
         ))}
-        <div className="tooltip" data-tip="Finances">
-          <NavLink
-            to="/game/finance"
-            onMouseEnter={() => setHoveredSubMenu(financeTopMenuItems)}
-            aria-label="Finances"
-            className={({ isActive }) =>
-              "relative btn btn-circle" + (isActive ? " btn-neutral" : "")
-            }
-          >
-            <Bank className="h-6 w-6" />
-            {loanSummary.count > 0 && (
-              <span
-                className={
-                  "absolute -top-1 -right-1 min-w-4 h-4 px-1 flex items-center justify-center rounded-full text-[10px] font-bold text-white " +
-                  (loanSummary.hasMissed ? "bg-error" : "bg-neutral")
-                }
-              >
-                {loanSummary.count}
-              </span>
-            )}
-          </NavLink>
-        </div>
       </div>
     </div>
   );

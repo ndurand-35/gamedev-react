@@ -1,6 +1,12 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { Client, Contract, StartedContract, Task } from "@/data/interface";
+import {
+  Client,
+  Competitor,
+  Contract,
+  StartedContract,
+  Task,
+} from "@/data/interface";
 import { generateNewContract } from "@/data/utils/task";
 import { clampRelation } from "@/data/utils/client";
 import { DEFAULT_TASK_STATE } from "@/data/utils/constant";
@@ -42,13 +48,19 @@ export const taskSlice = createSlice({
     },
     generateAvailableContractList(
       state,
-      action: PayloadAction<{ reputation: number; time: number }>,
+      action: PayloadAction<{
+        reputation: number;
+        time: number;
+        /** Le marché (`competitor.roster`) : les studios qui émettent les contrats. */
+        competitors?: Competitor[];
+      }>,
     ) {
       if (action.payload.time - state.lastContractGeneration > 168) {
         state.lastContractGeneration = action.payload.time;
         const contracts = generateNewContract(
           action.payload.reputation,
           ensureClients(state),
+          action.payload.competitors ?? [],
         );
         state.availableContractList = contracts.map((c) => ({
           ...c,
@@ -62,8 +74,8 @@ export const taskSlice = createSlice({
       );
       state.taskList.push(action.payload);
 
-      // Le client entre au carnet à la signature, pas à la génération : la
-      // liste hebdomadaire brasse des inconnus qu'on ne rencontrera jamais.
+      // Le client entre au carnet à la signature, pas à la génération : on ne
+      // mémorise une relation qu'avec les studios pour qui on a travaillé.
       const { clientId, clientName, clientImage, startDate } = action.payload;
       const clients = ensureClients(state);
       if (clientId && !clients[clientId]) {

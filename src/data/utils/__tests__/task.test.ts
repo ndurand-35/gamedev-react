@@ -6,9 +6,11 @@ import {
   CONTRACT_HOURS_PER_COMPONENT,
   contractDeadlineHours,
   generateNewContract,
+  nextContractSort,
+  sortContracts,
 } from "@/data/utils/task";
 import { totalRequirementQuantity } from "@/data/utils/component";
-import { ComponentType, ContractType } from "@/data/interface";
+import { ComponentType, Contract, ContractType } from "@/data/interface";
 
 // Couvre la balance des contrats (MYL-11) : depuis le rééquilibrage, chaque
 // contrat demande au moins deux types de composants et garantit un gain
@@ -19,8 +21,8 @@ describe("balance des contrats — generateNewContract", () => {
 
   it("génère le bon nombre de contrats selon la réputation", () => {
     expect(generateNewContract(0)).toHaveLength(8);
-    expect(generateNewContract(30)).toHaveLength(7);
-    expect(generateNewContract(60)).toHaveLength(9);
+    expect(generateNewContract(30)).toHaveLength(9);
+    expect(generateNewContract(60)).toHaveLength(10);
     expect(generateNewContract(80)).toHaveLength(12);
     expect(generateNewContract(100)).toHaveLength(15);
   });
@@ -96,10 +98,12 @@ describe("balance des contrats — generateNewContract", () => {
         const qty = totalRequirementQuantity(c.requirements);
         const solo = qty * CONTRACT_HOURS_PER_COMPONENT;
         expect(c.time).toBeGreaterThanOrEqual(
-          Math.round((solo * CONTRACT_DEADLINE_MIN_MARGIN) / 100 / 24) * 24 - 24,
+          Math.round((solo * CONTRACT_DEADLINE_MIN_MARGIN) / 100 / 24) * 24 -
+            24,
         );
         expect(c.time).toBeLessThanOrEqual(
-          Math.round((solo * CONTRACT_DEADLINE_MAX_MARGIN) / 100 / 24) * 24 + 24,
+          Math.round((solo * CONTRACT_DEADLINE_MAX_MARGIN) / 100 / 24) * 24 +
+            24,
         );
         // Toujours un nombre entier de jours.
         expect(c.time % 24).toBe(0);
@@ -124,5 +128,102 @@ describe("balance des contrats — generateNewContract", () => {
       expect(c.priceMalus).toBeGreaterThanOrEqual(c.priceDeposit * 2);
       expect(c.priceMalus).toBeLessThanOrEqual(c.priceDeposit * 3);
     }
+  });
+});
+
+describe("tri des contrats disponibles — sortContracts", () => {
+  const makeContract = (over: Partial<Contract> = {}): Contract => ({
+    id: 1,
+    name: "Contrat",
+    time: 1000,
+    clientId: "acme",
+    clientName: "ACME",
+    clientImage: "",
+    loyaltyBonus: 0,
+    priceDeposit: 100,
+    priceAdditional: 1000,
+    priceMalus: 300,
+    type: ContractType.DEV,
+    taskDifficulty: 10,
+    requirements: [{ type: ComponentType.CODE, quantity: 2 }],
+    ...over,
+  });
+
+  const contracts = [
+    makeContract({
+      id: 1,
+      name: "Zèbre",
+      clientName: "Éole",
+      priceDeposit: 300,
+    }),
+    makeContract({
+      id: 2,
+      name: "alpha",
+      clientName: "acme",
+      priceDeposit: 100,
+    }),
+    makeContract({
+      id: 3,
+      name: "Été",
+      clientName: "Bravo",
+      priceDeposit: 200,
+    }),
+  ];
+  const ids = (list: Contract[]) => list.map((c) => c.id);
+
+  it("renvoie la liste telle quelle sans tri", () => {
+    expect(sortContracts(contracts, null)).toBe(contracts);
+  });
+
+  it("trie les nombres dans les deux sens sans muter l'entrée", () => {
+    expect(
+      ids(sortContracts(contracts, { key: "deposit", direction: "asc" })),
+    ).toEqual([2, 3, 1]);
+    expect(
+      ids(sortContracts(contracts, { key: "deposit", direction: "desc" })),
+    ).toEqual([1, 3, 2]);
+    expect(ids(contracts)).toEqual([1, 2, 3]);
+  });
+
+  it("trie les textes à la française, sans tenir compte de la casse ni des accents", () => {
+    expect(
+      ids(sortContracts(contracts, { key: "name", direction: "asc" })),
+    ).toEqual([2, 3, 1]);
+    expect(
+      ids(sortContracts(contracts, { key: "client", direction: "asc" })),
+    ).toEqual([2, 3, 1]);
+  });
+
+  it("trie les composants demandés sur la quantité totale", () => {
+    const list = [
+      makeContract({
+        id: 1,
+        requirements: [
+          { type: ComponentType.CODE, quantity: 3 },
+          { type: ComponentType.UX, quantity: 3 },
+        ],
+      }),
+      makeContract({
+        id: 2,
+        requirements: [{ type: ComponentType.VISUEL, quantity: 1 }],
+      }),
+    ];
+    expect(
+      ids(sortContracts(list, { key: "requirements", direction: "asc" })),
+    ).toEqual([2, 1]);
+  });
+
+  it("cycle croissant → décroissant → ordre d'arrivée sur une même colonne", () => {
+    const asc = nextContractSort(null, "malus");
+    expect(asc).toEqual({ key: "malus", direction: "asc" });
+    const desc = nextContractSort(asc, "malus");
+    expect(desc).toEqual({ key: "malus", direction: "desc" });
+    expect(nextContractSort(desc, "malus")).toBeNull();
+  });
+
+  it("repart en croissant quand on change de colonne", () => {
+    expect(
+      nextContractSort({ key: "malus", direction: "desc" }, "time"),
+    ).toEqual({ key: "time", direction: "asc" });
   });
 });

@@ -11,6 +11,7 @@ import {
   Column,
   ColumnDef,
   FilterFn,
+  Row,
   RowSelectionState,
   OnChangeFn,
   SortingState,
@@ -37,7 +38,8 @@ interface TableProps<T> {
   title: string;
   columns: ColumnDef<T, any>[];
   defaultData: T[];
-  isRowSelectable: boolean;
+  /** Cases à cocher : pour toutes les lignes, ou selon un prédicat par ligne. */
+  isRowSelectable: boolean | ((row: Row<T>) => boolean);
   rowSelection: RowSelectionState;
   setRowSelection: OnChangeFn<RowSelectionState>;
   action: ReactElement;

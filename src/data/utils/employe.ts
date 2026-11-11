@@ -124,9 +124,18 @@ const pickTemperament = (): Temperament =>
 // (borné dans l'enveloppe du rôle → masse salariale de départ inchangée en
 // espérance), on tire un tempérament et on masque les stats tant que l'entretien
 // n'a pas eu lieu. `salary` affiché = `expectedSalary` (prix demandé de départ).
-const enrichCandidate = (candidate: Person, reputation: number): Person => {
+const enrichCandidate = (
+  candidate: Person,
+  reputation: number,
+  salaryIndex: number,
+): Person => {
   const noise = Math.random() * 2 - 1; // U(-1,1) → ±SALARY_NOISE dans le calcul
-  const expectedSalary = computeExpectedSalary(candidate, reputation, noise);
+  const expectedSalary = computeExpectedSalary(
+    candidate,
+    reputation,
+    noise,
+    salaryIndex,
+  );
   return {
     ...candidate,
     expectedSalary,
@@ -146,6 +155,8 @@ export const generateCandidatesForRole = (
   role: SearchRole,
   count: number,
   reputation: number,
+  /** Indice des salaires du marché à l'heure de la recherche (1 en 1970). */
+  salaryIndex: number = 1,
 ): Person[] => {
   const n = Math.max(
     SEARCH_MIN_CANDIDATES,
@@ -153,7 +164,9 @@ export const generateCandidatesForRole = (
   );
   const generated: Person[] = [];
   for (let i = 0; i < n; i++) {
-    generated.push(enrichCandidate(generateCandidateForRole(role), reputation));
+    generated.push(
+      enrichCandidate(generateCandidateForRole(role), reputation, salaryIndex),
+    );
   }
   return generated;
 };

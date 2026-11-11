@@ -8,6 +8,7 @@ import {
 
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setGameSpeed } from "@/data/redux/engineSlice";
+import { GAME_SPEEDS } from "@/data/utils/constant";
 import { useStudioOpenChime } from "@/audio/useStudioOpenChime";
 
 import {
@@ -26,9 +27,10 @@ import {
   EmployePage,
   TaskPage,
   BuildingPage,
-  FondateurPage,
   PoleEmploiPage,
   EmployeListPage,
+  ResearchPage,
+  CompetitorPage,
   SelogerPage,
   ComponentPage,
   ProductPage,
@@ -53,7 +55,6 @@ const router = createBrowserRouter([
     children: [
       { path: "/game", element: <HomePage /> },
       { path: "/game/employe", element: <EmployePage /> },
-      { path: "/game/employe/me", element: <FondateurPage /> },
       { path: "/game/employe/list", element: <EmployeListPage /> },
       { path: "/game/employe/recruit", element: <PoleEmploiPage /> },
       { path: "/game/component", element: <ComponentPage /> },
@@ -62,6 +63,8 @@ const router = createBrowserRouter([
       { path: "/game/building", element: <BuildingPage /> },
       { path: "/game/building/owned", element: <OwnedPage /> },
       { path: "/game/building/buy", element: <SelogerPage /> },
+      { path: "/game/research", element: <ResearchPage /> },
+      { path: "/game/competitor", element: <CompetitorPage /> },
       { path: "/game/finance", element: <FinancePage /> },
       { path: "/game/finance/bank", element: <BankPage /> },
     ],
@@ -72,10 +75,36 @@ function App() {
   return <RouterProvider router={router} />;
 }
 
+// Raccourcis clavier de vitesse, sur `event.code` (position physique de la
+// touche) : sur un clavier AZERTY, la rangée du haut sans Maj donne « & é " »
+// dans `event.key`, ce qui rendrait 1/2/3 inaccessibles.
+const SPEED_SHORTCUTS: Record<string, number> = {
+  Digit1: GAME_SPEEDS.X1,
+  Numpad1: GAME_SPEEDS.X1,
+  Digit2: GAME_SPEEDS.X2,
+  Numpad2: GAME_SPEEDS.X2,
+  Digit3: GAME_SPEEDS.X3,
+  Numpad3: GAME_SPEEDS.X3,
+};
+
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+  );
+};
+
 function Game() {
   const dispatch = useAppDispatch();
   const gameName = useAppSelector((state) => state.engine.gameName);
   const gameSpeed = useAppSelector((state) => state.engine.gameSpeed);
+  const gameOver = useAppSelector((state) => state.engine.gameOver);
+  const pendingRescue = useAppSelector((state) => state.engine.pendingRescue);
+  const pendingDecision = useAppSelector((state) => state.events.pending);
+  // Une modale bloquante (décision, prêt de sauvetage, faillite) impose la
+  // pause : le clavier ne doit pas pouvoir relancer le jeu par-dessus.
+  const speedLocked = gameOver || !!pendingRescue || !!pendingDecision;
 
   // MapMonde §7 / Audio (MYL-22) : sting de succès au déblocage d'un studio,
   // accroché au hook `studio.pendingReveal` du Stage 1. Monté ici (niveau jeu)
@@ -93,12 +122,19 @@ function Game() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" || event.key === "Esc") {
-        dispatch(setGameSpeed(0));
+        dispatch(setGameSpeed(GAME_SPEEDS.PAUSE));
+        return;
       }
+      const speed = SPEED_SHORTCUTS[event.code];
+      if (speed === undefined || speedLocked) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      dispatch(setGameSpeed(speed));
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch]);
+  }, [dispatch, speedLocked]);
 
   if (gameName === undefined) {
     return <Navigate to="/" replace />;

@@ -3,6 +3,7 @@ import companyReducer, {
   addReputation,
   applyContractMalus,
   buyBuilding,
+  releaseBuilding,
   renameBuilding,
   setMoney,
 } from "@/data/redux/companySlice";
@@ -62,6 +63,37 @@ describe("companySlice / buyBuilding", () => {
     const state = baseState();
     const next = companyReducer(state, buyBuilding(999));
     expect(next).toEqual(state);
+  });
+});
+
+describe("companySlice / releaseBuilding", () => {
+  it("crédite la moitié du prix d'achat et retire le bâtiment", () => {
+    const state = baseState({
+      money: 1000,
+      buildingList: [sampleBuilding({ id: 7, price: 30000 })],
+    });
+    const next = companyReducer(state, releaseBuilding(7));
+    expect(next.money).toBe(16000);
+    expect(next.buildingList).toHaveLength(0);
+  });
+
+  it("ne rend rien pour le bâtiment de départ (prix 0)", () => {
+    const state = baseState({
+      money: 1000,
+      buildingList: [sampleBuilding({ id: 1, name: "Garage", price: 0 })],
+    });
+    const next = companyReducer(state, releaseBuilding(1));
+    expect(next.money).toBe(1000);
+    expect(next.buildingList).toHaveLength(0);
+  });
+
+  it("ignore un bâtiment inconnu ou non possédé", () => {
+    const state = baseState({
+      buildingList: [sampleBuilding({ id: 7 })],
+      availableBuildingList: [sampleBuilding({ id: 8 })],
+    });
+    expect(companyReducer(state, releaseBuilding(999))).toEqual(state);
+    expect(companyReducer(state, releaseBuilding(8))).toEqual(state);
   });
 });
 

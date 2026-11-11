@@ -16,12 +16,16 @@ import companyReducer from "@/data/redux/companySlice";
 import employeReducer from "@/data/redux/employeSlice";
 import taskReducer from "@/data/redux/taskSlice";
 import componentReducer from "@/data/redux/componentSlice";
-import notificationReducer from "@/data/redux/notificationSlice";
+import notificationReducer, {
+  notificationStampMiddleware,
+} from "@/data/redux/notificationSlice";
 import productReducer from "@/data/redux/productSlice";
 import eventsReducer from "@/data/redux/eventsSlice";
 import loanReducer from "@/data/redux/loanSlice";
 import financeReducer from "@/data/redux/financeSlice";
 import studioReducer from "@/data/redux/studioSlice";
+import researchReducer from "@/data/redux/researchSlice";
+import competitorReducer from "@/data/redux/competitorSlice";
 import saveReducer, { hydrateFromSave } from "@/data/redux/saveSlice";
 import { gameLoopMiddleware } from "@/data/redux/gameLoopMiddleware";
 
@@ -37,6 +41,12 @@ const reducers = combineReducers({
   loan: loanReducer,
   finance: financeReducer,
   studio: studioReducer,
+  // Compétences du fondateur (recherche / formation). Slice absent des saves
+  // antérieures : redux-persist le remonte sur son état initial, pas de purge.
+  research: researchReducer,
+  // Studios concurrents (le marché). Slice absent des saves antérieures : il
+  // remonte vide et la boucle de jeu le peuple au premier tick (`buildRoster`).
+  competitor: competitorReducer,
   // Vue de l'écran de sauvegarde (non persistée — reconstruite via `listSaves`).
   save: saveReducer,
 });
@@ -51,7 +61,8 @@ const persistConfig = {
   // `events` n'est pas persisté : une décision en attente ne doit pas survivre à
   // un rechargement (sinon modal figé à speed 0 sans moyen de reprendre).
   // `save` (MYL-24) est une vue d'UI reconstruite via `listSaves` au montage.
-  blacklist: ["notification", "events", "save"],
+  // `notification` EST persisté : c'est le journal d'activité de la partie.
+  blacklist: ["events", "save"],
   // `currentVersion` est toujours `config.version` (10) : comparer dessus ne
   // purge jamais rien. On compare à la version réellement *stockée* dans la
   // sauvegarde (`_state._persist.version`) pour que le bump jette bien les
@@ -70,7 +81,7 @@ const persistedReducer = persistReducer(persistConfig, reducers);
 // Reducer racine : intercepte l'hydratation depuis une sauvegarde (MYL-24).
 // Le payload (slices désérialisées, sans `_persist` ni slices runtime) écrase
 // l'état global ; on conserve les méta `_persist` et les slices runtime non
-// embarquées (notification/events/save) pour ne pas casser redux-persist ni
+// embarquées (events/save) pour ne pas casser redux-persist ni
 // l'écran de gestion. Le passage par `persistedReducer` re-persiste aussitôt
 // l'état chargé dans localStorage → le « resume » reflète la partie chargée.
 type StoreState = ReturnType<typeof persistedReducer>;
@@ -98,7 +109,7 @@ const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(gameLoopMiddleware),
+    }).concat(notificationStampMiddleware, gameLoopMiddleware),
 });
 
 const persistor = persistStore(store);

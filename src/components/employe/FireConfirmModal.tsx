@@ -5,6 +5,10 @@ import { Employe } from "@/data/interface";
 import { PRODUCTION_THRESHOLD } from "@/data/redux/componentSlice";
 import { useAppSelector } from "@/data/redux/hooks";
 import { formatPrice } from "@/data/utils";
+import {
+  MORALE_FIRING_ELSEWHERE,
+  MORALE_FIRING_SAME_BUILDING,
+} from "@/data/utils/morale";
 
 interface FireConfirmModalProps {
   /** Employés ciblés par le licenciement, ou null quand la modale est fermée. */
@@ -142,6 +146,12 @@ export const FireConfirmModal: FC<FireConfirmModalProps> = ({
             );
           })}
         </div>
+
+        {/* Ceux qui restent : règle fixe de `utils/morale`. */}
+        <p className="text-sm text-warning mb-3">
+          Le moral de l'équipe baissera : −{MORALE_FIRING_SAME_BUILDING} dans le
+          même bâtiment, −{MORALE_FIRING_ELSEWHERE} ailleurs.
+        </p>
 
         {/* Places de bâtiment libérées. */}
         {Object.keys(placesByBuilding).length > 0 && (

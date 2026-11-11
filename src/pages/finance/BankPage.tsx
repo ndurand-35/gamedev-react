@@ -27,7 +27,7 @@ import {
   isLoanOfferAvailable,
   loanTotalCost,
 } from "@/data/utils/economy";
-import { financeTopMenuItems } from "@/pages/finance/menu";
+import { companyTopMenuItems } from "@/pages/company/menu";
 
 const hoursToDays = (hours: number): number => Math.ceil(hours / 24);
 
@@ -169,8 +169,8 @@ const SimulationModal: FC<{
               <li key={row.month} className="flex justify-between">
                 <span>Mois {row.month}</span>
                 <span>
-                  -{formatPrice(row.payment)} (int. {formatPrice(row.interest)} /
-                  cap. {formatPrice(row.principal)})
+                  -{formatPrice(row.payment)} (int. {formatPrice(row.interest)}{" "}
+                  / cap. {formatPrice(row.principal)})
                 </span>
               </li>
             ))}
@@ -179,8 +179,8 @@ const SimulationModal: FC<{
               <li className="flex justify-between">
                 <span>Mois {last.month}</span>
                 <span>
-                  -{formatPrice(last.payment)} (solde {formatPrice(last.balance)}{" "}
-                  €)
+                  -{formatPrice(last.payment)} (solde{" "}
+                  {formatPrice(last.balance)} €)
                 </span>
               </li>
             )}
@@ -224,12 +224,14 @@ const SimulationModal: FC<{
 };
 
 export const BankPage: FC = (): ReactElement => {
-  useTopMenu(financeTopMenuItems);
+  useTopMenu(companyTopMenuItems);
 
   const dispatch = useAppDispatch();
   const money = useAppSelector((s) => s.company.money);
   const peakReputation = useAppSelector((s) => s.engine.peakReputation);
-  const monthlyRevenue = useAppSelector((s) => s.engine.lastMonthlyRevenue ?? 0);
+  const monthlyRevenue = useAppSelector(
+    (s) => s.engine.lastMonthlyRevenue ?? 0,
+  );
   const time = useAppSelector((s) => s.engine.time);
   const loans = useAppSelector((s) => s.loan.loans);
   const lastLoanTime = useAppSelector((s) => s.loan.lastLoanTime);
@@ -363,8 +365,8 @@ export const BankPage: FC = (): ReactElement => {
               <h2 className="text-lg font-semibold">Offres de prêt</h2>
               {cooldownRemainingHours > 0 && (
                 <span className="text-xs opacity-70">
-                  ⏳ Prochain emprunt dans{" "}
-                  {hoursToDays(cooldownRemainingHours)} j
+                  ⏳ Prochain emprunt dans {hoursToDays(cooldownRemainingHours)}{" "}
+                  j
                 </span>
               )}
             </div>
@@ -503,7 +505,9 @@ const DebtSection: FC<{
         <p className="font-medium opacity-70">TOTAL</p>
         <div className="flex justify-between">
           <span className="opacity-70">Capital restant dû</span>
-          <span className="tabular-nums">{formatPrice(outstandingTotal)} €</span>
+          <span className="tabular-nums">
+            {formatPrice(outstandingTotal)} €
+          </span>
         </div>
         <div className="flex justify-between">
           <span className="opacity-70">Mensualité totale</span>
@@ -575,7 +579,8 @@ const DebtSection: FC<{
       })}
 
       <p className="text-xs opacity-60 flex items-start gap-1">
-        ℹ️ Les mensualités sont prélevées chaque fin de mois, avant les salaires.
+        ℹ️ Les mensualités sont prélevées chaque fin de mois, avant les
+        salaires.
       </p>
     </div>
   );

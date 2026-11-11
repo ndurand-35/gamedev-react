@@ -1,10 +1,7 @@
 import { FC, ReactElement } from "react";
 import { CoffeeCup, GraduationCap } from "iconoir-react";
 
-import {
-  COMPONENT_ICON,
-  COMPONENT_TEXT_CLASS,
-} from "@/components/component";
+import { COMPONENT_ICON, COMPONENT_TEXT_CLASS } from "@/components/component";
 import {
   ComponentType,
   Employe,
@@ -38,12 +35,16 @@ const COMPONENT_ACCENT_BORDER: Record<ComponentType, string> = {
   [ComponentType.UX]: "border-l-accent",
 };
 
+const COMPONENT_PROGRESS_CLASS: Record<ComponentType, string> = {
+  [ComponentType.CODE]: "progress-primary",
+  [ComponentType.VISUEL]: "progress-secondary",
+  [ComponentType.UX]: "progress-accent",
+};
+
 export interface EmployeActivity {
   /** `work` : produit un composant. `training` : se forme. `idle` : rien. */
   kind: "work" | "training" | "idle" | "role";
   label: string;
-  /** Détail secondaire (progression de formation, rôle). */
-  detail?: string;
   Icon: IconComponent;
   /** Couleur du texte / de l'icône. */
   textClass: string;
@@ -51,6 +52,8 @@ export interface EmployeActivity {
   softClass: string;
   /** Liseré latéral de la carte. */
   accentBorderClass: string;
+  /** Barre d'avancement de la tâche (même teinte que le type). */
+  progressClass: string;
 }
 
 const IDLE_ACTIVITY: EmployeActivity = {
@@ -60,6 +63,7 @@ const IDLE_ACTIVITY: EmployeActivity = {
   textClass: "text-base-content/50",
   softClass: "bg-base-content/5 border-base-content/20",
   accentBorderClass: "border-l-base-content/20",
+  progressClass: "",
 };
 
 /**
@@ -80,19 +84,22 @@ export const employeActivity = (emp: Employe): EmployeActivity => {
       textClass: COMPONENT_TEXT_CLASS[assigned],
       softClass: COMPONENT_SOFT_CLASS[assigned],
       accentBorderClass: COMPONENT_ACCENT_BORDER[assigned],
+      progressClass: COMPONENT_PROGRESS_CLASS[assigned],
     };
   }
 
+  // L'avancement de la formation n'est plus dans le libellé : il passe par
+  // `TaskProgressBar`, comme celui de la production.
   const training = prod?.trainingType ?? null;
   if (training) {
     return {
       kind: "training",
       label: `Formation ${training}`,
-      detail: `${Math.round(prod?.trainingProgress ?? 0)} %`,
       Icon: GraduationCap,
       textClass: COMPONENT_TEXT_CLASS[training],
       softClass: COMPONENT_SOFT_CLASS[training],
       accentBorderClass: COMPONENT_ACCENT_BORDER[training],
+      progressClass: COMPONENT_PROGRESS_CLASS[training],
     };
   }
 
@@ -106,6 +113,7 @@ export const employeActivity = (emp: Employe): EmployeActivity => {
     textClass: "text-base-content/70",
     softClass: "bg-base-content/5 border-base-content/20",
     accentBorderClass: "border-l-base-content/20",
+    progressClass: "",
   };
 };
 
@@ -144,14 +152,13 @@ export const ActivityBadge: FC<ActivityBadgeProps> = ({
   variant = "chip",
 }) => {
   const activity = employeActivity(employe);
-  const { Icon, label, detail, textClass, softClass } = activity;
+  const { Icon, label, textClass, softClass } = activity;
 
   if (variant === "text") {
     return (
       <span className={`inline-flex items-center gap-1.5 ${textClass}`}>
         <Icon width={14} height={14} />
         {label}
-        {detail && <span className="opacity-70">{detail}</span>}
       </span>
     );
   }
@@ -162,7 +169,45 @@ export const ActivityBadge: FC<ActivityBadgeProps> = ({
     >
       <Icon width={13} height={13} />
       {label}
-      {detail && <span className="opacity-70">{detail}</span>}
+    </span>
+  );
+};
+
+// ── Avancement de la tâche ───────────────────────────────────────────────────
+
+interface TaskProgressBarProps {
+  activity: EmployeActivity;
+  /** Avancement 0..1 (cf. `employeTaskProgress`). */
+  ratio: number;
+  /** `full` : libellé + pourcentage au-dessus de la barre. `bar` : la barre seule. */
+  variant?: "full" | "bar";
+}
+
+/**
+ * Barre d'avancement de la tâche courante, dans la teinte de l'activité. Le
+ * pourcentage chiffré accompagne toujours la barre : la couleur et la longueur
+ * ne portent jamais l'info seules.
+ */
+export const TaskProgressBar = ({
+  activity,
+  ratio,
+  variant = "full",
+}: TaskProgressBarProps): ReactElement => {
+  const pct = Math.round(ratio * 100);
+  return (
+    <span className="block w-full">
+      {variant === "full" && (
+        <span className="mb-0.5 flex items-center justify-between gap-2 text-xs">
+          <span className="opacity-70">Avancement</span>
+          <span className="tabular-nums">{pct} %</span>
+        </span>
+      )}
+      <progress
+        className={`progress ${activity.progressClass} h-1.5 w-full`}
+        value={pct}
+        max={100}
+        aria-label={`Avancement ${pct} %`}
+      />
     </span>
   );
 };

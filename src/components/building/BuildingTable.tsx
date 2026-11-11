@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Text } from "iconoir-react";
+import { LogOut, Text } from "iconoir-react";
 import { createColumnHelper } from "@tanstack/react-table";
 
 import { Building, getBuildingMonthlyCharges } from "@/data/interface";
@@ -8,6 +8,7 @@ import { getBuildingEmploye } from "@/data/utils";
 import { formatPrice } from "@/data/utils";
 import { MyTable } from "@/components/Table";
 import { BuildingNameModal } from "./BuildingNameModal";
+import { BuildingReleaseModal } from "./BuildingReleaseModal";
 
 export const BuildingTable = () => {
   const buildingList = useAppSelector((state) => state.company.buildingList);
@@ -15,17 +16,16 @@ export const BuildingTable = () => {
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [currentBuilding, setCurrentBuilding] = useState<Building | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<Building | null>(null);
 
   const columns = useMemo(() => {
     const columnHelper = createColumnHelper<Building>();
     return [
-      {
+      columnHelper.accessor("name", {
         header: "Nom",
         enableColumnFilter: false,
-        cell: (props: any) => (
-          <div className="font-bold">{props.row.original.name}</div>
-        ),
-      },
+        cell: (props) => <div className="font-bold">{props.getValue()}</div>,
+      }),
       columnHelper.display({
         header: "Charges / Mois",
         cell: (props) => {
@@ -52,22 +52,38 @@ export const BuildingTable = () => {
       }),
       columnHelper.display({
         header: "Action",
-        cell: (props) => (
-          <button
-            aria-label="Renommer le bâtiment"
-            className="btn btn-sm btn-circle"
-            onClick={() => {
-              setCurrentBuilding(props.row.original);
-              (
-                document.getElementById(
-                  "building_name_modal",
-                ) as HTMLFormElement
-              )?.showModal();
-            }}
-          >
-            <Text />
-          </button>
-        ),
+        cell: (props) => {
+          const b = props.row.original;
+          const occupants = getBuildingEmploye(employeList, b).length;
+          return (
+            <div className="flex flex-row items-center gap-1">
+              <button
+                aria-label="Renommer le bâtiment"
+                className="btn btn-sm btn-circle"
+                onClick={() => setCurrentBuilding(b)}
+              >
+                <Text />
+              </button>
+              <div
+                className="tooltip"
+                data-tip={
+                  occupants > 0
+                    ? `Occupé par ${occupants} employé${occupants > 1 ? "s" : ""} : réaffectez-les d'abord`
+                    : "Libérer ce bâtiment"
+                }
+              >
+                <button
+                  aria-label="Libérer le bâtiment"
+                  className="btn btn-sm btn-circle btn-ghost text-warning"
+                  disabled={occupants > 0}
+                  onClick={() => setReleaseTarget(b)}
+                >
+                  <LogOut />
+                </button>
+              </div>
+            </div>
+          );
+        },
       }),
     ];
   }, [employeList]);
@@ -87,12 +103,14 @@ export const BuildingTable = () => {
         setRowSelection={setRowSelection}
         action={<></>}
       />
-      {currentBuilding && (
-        <BuildingNameModal
-          building={currentBuilding}
-          setCurrentBuilding={setCurrentBuilding}
-        />
-      )}
+      <BuildingNameModal
+        building={currentBuilding}
+        onClose={() => setCurrentBuilding(null)}
+      />
+      <BuildingReleaseModal
+        building={releaseTarget}
+        onClose={() => setReleaseTarget(null)}
+      />
     </div>
   );
 };

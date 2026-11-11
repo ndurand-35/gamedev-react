@@ -5,6 +5,7 @@ import {
   ComponentRequirement,
   ComponentType,
   ConsumedComponent,
+  Contract,
   Person,
   STAT_KEY_BY_TYPE,
   StartedContract,
@@ -98,7 +99,12 @@ export const forecastProduction = (
     // franchit k paliers : c'est exactement la boucle `while` de la production.
     for (let k = 1; k <= count; k++) {
       const ticks = Math.ceil((k * PRODUCTION_THRESHOLD - progress) / output);
-      forecast.push({ at: from + ticks, type, quality, producedBy: employe.id });
+      forecast.push({
+        at: from + ticks,
+        type,
+        quality,
+        producedBy: employe.id,
+      });
     }
   }
 
@@ -361,4 +367,54 @@ export const adviseDelivery = ({
       : "deliver";
 
   return { now, wait, deliverableAt, lastEarlyTime, deadline, recommendation };
+};
+
+// --- Estimation avant signature (compétence « Estimation de délai ») --------
+
+export interface ContractLeadTimeInput {
+  contract: Contract;
+  stock: Component[];
+  employes: Person[];
+  productionProgress: Record<number, number>;
+  time: number;
+}
+
+/**
+ * Heures nécessaires, à partir de maintenant, pour pouvoir livrer un contrat
+ * NON signé avec le stock et l'effectif actuels : 0 si le stock suffit déjà,
+ * `null` si les composants ne seront pas réunis avant la fin du délai proposé.
+ * Chaque contrat est estimé seul — deux contrats peuvent convoiter le même
+ * stock, l'estimation ne l'arbitre pas.
+ */
+export const estimateContractLeadTime = ({
+  contract,
+  stock,
+  employes,
+  productionProgress,
+  time,
+}: ContractLeadTimeInput): number | null => {
+  const deadline = time + contract.time;
+  const requiredTypes = new Set(contract.requirements.map((r) => r.type));
+  const deliverableAt = (at: number): boolean =>
+    selectBestComponents(
+      projectStock(stock, forecast, at),
+      contract.requirements,
+    ).missing.length === 0;
+
+  const forecast = forecastProduction(
+    employes,
+    productionProgress,
+    time,
+    deadline,
+  ).filter((f) => requiredTypes.has(f.type));
+
+  if (deliverableAt(time)) return 0;
+
+  // Seule une sortie de production peut rendre livrable ce qui ne l'est pas.
+  const events = [...new Set(forecast.map((f) => f.at))].sort((a, b) => a - b);
+  for (const at of events) {
+    if (at > deadline) break;
+    if (deliverableAt(at)) return at - time;
+  }
+  return null;
 };

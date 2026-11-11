@@ -1,6 +1,6 @@
 import { ReactElement, useMemo, useState } from "react";
 
-import { FireFlame } from "iconoir-react";
+import { Crown, FireFlame } from "iconoir-react";
 
 import { MyTable } from "@/components/Table";
 
@@ -18,9 +18,9 @@ import {
 } from "@/data/redux/employeSlice";
 import { clearEmployeProgress } from "@/data/redux/componentSlice";
 import { paySeverance } from "@/data/redux/companySlice";
+import { applyFiringShock } from "@/data/utils/morale";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
-import { selectEmployesWithoutFondateur } from "@/data/redux/selectors";
-import { createColumnHelper } from "@tanstack/react-table";
+import { Row, createColumnHelper } from "@tanstack/react-table";
 import { RoleBadge } from "@/components/employe/RoleBadge";
 import {
   CAMPAIGN_PANEL_ID,
@@ -33,21 +33,26 @@ const openCampaignPanel = () =>
     document.getElementById(CAMPAIGN_PANEL_ID) as HTMLDialogElement | null
   )?.showModal();
 
+const isFondateur = (e: Employe): boolean => e.id === 1;
+
+// Le fondateur figure dans la liste (affectation, bâtiment, moral) mais ne se
+// licencie pas : pas de case à cocher pour lui, donc jamais dans un batch.
+const canSelectRow = (row: Row<Employe>): boolean => !isFondateur(row.original);
+
 export const EmployeList: React.FC = (): ReactElement => {
   const dispatch = useAppDispatch();
   const buildingList = useAppSelector((state) => state.company.buildingList);
-  const allEmployes = useAppSelector((state) => state.employe.employeList);
-  const employes = useAppSelector(selectEmployesWithoutFondateur);
+  const employes = useAppSelector((state) => state.employe.employeList);
 
   const occupancyByBuilding = useMemo(() => {
     const map: Record<number, number> = {};
-    for (const e of allEmployes) {
+    for (const e of employes) {
       if (e.buildingId !== undefined) {
         map[e.buildingId] = (map[e.buildingId] ?? 0) + 1;
       }
     }
     return map;
-  }, [allEmployes]);
+  }, [employes]);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -71,10 +76,13 @@ export const EmployeList: React.FC = (): ReactElement => {
   // fired(id) → clearEmployeProgress(id) par employé (purge l'entrée orpheline
   // de productionProgress, bug latent corrigé ici). Fondateur exclu.
   const confirmFire = () => {
-    const targets = (fireTargets ?? []).filter((e) => e.id !== 1);
+    const targets = (fireTargets ?? []).filter((e) => !isFondateur(e));
     if (targets.length === 0) return;
     const totalSalary = targets.reduce((sum, e) => sum + e.salary, 0);
     dispatch(paySeverance(totalSalary));
+    // Ceux qui restent accusent le coup — avant `fired`, tant que le bâtiment
+    // des partants est encore lisible.
+    dispatch(applyFiringShock(targets.map((e) => e.id)));
     targets.forEach((e) => {
       dispatch(fired(e.id));
       dispatch(clearEmployeProgress(e.id));
@@ -103,7 +111,15 @@ export const EmployeList: React.FC = (): ReactElement => {
               <div className="font-bold">
                 {props.row.original.firstName} {props.row.original.lastName}
               </div>
-              <RoleBadge personType={props.row.original.personType} />
+              <div className="flex flex-wrap items-center gap-1">
+                <RoleBadge personType={props.row.original.personType} />
+                {isFondateur(props.row.original) && (
+                  <span className="badge badge-primary badge-sm gap-1">
+                    <Crown width={12} height={12} />
+                    Fondateur
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ),
@@ -144,8 +160,7 @@ export const EmployeList: React.FC = (): ReactElement => {
                 const isFull = !isCurrent && occupants >= b.place;
                 return (
                   <option key={b.id} value={b.id} disabled={isFull}>
-                    {b.name} ({occupants}/{b.place})
-                    {isFull ? " — complet" : ""}
+                    {b.name} ({occupants}/{b.place}){isFull ? " — complet" : ""}
                   </option>
                 );
               })}
@@ -188,8 +203,7 @@ export const EmployeList: React.FC = (): ReactElement => {
               value={e.assignedComponentType ?? ""}
               onChange={(ev) => {
                 const v = ev.target.value;
-                const next =
-                  v === "" ? null : (v as ComponentType);
+                const next = v === "" ? null : (v as ComponentType);
                 dispatch(
                   assignComponentType({
                     employeId: e.id,
@@ -230,7 +244,7 @@ export const EmployeList: React.FC = (): ReactElement => {
       columnHelper.display({
         header: "Action",
         cell: (props) =>
-          props.row.original.id !== 1 && (
+          !isFondateur(props.row.original) && (
             <div className="tooltip" data-tip="Licencier">
               <button
                 aria-label="Licencier"
@@ -258,7 +272,7 @@ export const EmployeList: React.FC = (): ReactElement => {
           title={
             employes.length + " Employé" + (employes.length > 1 ? "s" : "")
           }
-          isRowSelectable={true}
+          isRowSelectable={canSelectRow}
           rowSelection={rowSelection}
           setRowSelection={setRowSelection}
           action={

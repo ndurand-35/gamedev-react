@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 
-import { Building, Person, Product, ProductStatus } from "@/data/interface";
+import {
+  Building,
+  Person,
+  Product,
+  ProductGenre,
+  ProductStatus,
+} from "@/data/interface";
 import {
   REVENUE_DECAY_GRACE_MONTHS,
   VARIABLE_CHARGE_PER_EMPLOYEE,
-  revenueDecayMultiplier,
   type Loan,
 } from "@/data/utils/economy";
 import {
@@ -12,11 +17,17 @@ import {
   computeBuildingCharges,
   computeCashProjection,
   computeMonthlyProjection,
-  computeProductRevenue,
   computeRunwayMonths,
   type MonthlyReport,
 } from "@/data/utils/finance";
+import {
+  LAUNCH_SPIKE_MONTHS,
+  MAINTENANCE_FIXED,
+  MAINTENANCE_PER_COMPONENT,
+  computeProductRevenue,
+} from "@/data/utils/product";
 import { addMonthsToTime } from "@/data/utils/time";
+import { segmentDemand } from "@/data/utils/marketDemand";
 
 const building = (id: number, rent: number): Building => ({
   id,
@@ -32,19 +43,47 @@ const building = (id: number, rent: number): Building => ({
 const employe = (id: number, salary: number, buildingId?: number) =>
   ({ id, salary, buildingId }) as unknown as Person;
 
+/**
+ * Outil de 15 composants à qualité moyenne 2,5 : attractivité 15, soit
+ * exactement la concurrence diffuse du segment → 50 % de 12 000 € = 6 000 €
+ * par mois, une fois le pic de lancement passé. Maintenance : 250 + 20 × 15.
+ */
+const OUTIL_SIZE = 15;
+// Revenu d'un outil seul sur son segment (moitié de la demande, qui
+// varie avec l'année de jeu — cf. `utils/marketDemand`).
+const outilRevenueAt = (time: number): number =>
+  Math.round(segmentDemand(ProductGenre.OUTIL, time) / 2);
+const OUTIL_MAINTENANCE =
+  MAINTENANCE_FIXED + MAINTENANCE_PER_COMPONENT * OUTIL_SIZE;
+
 const product = (
   id: number,
-  monthlyRevenue: number,
   status: ProductStatus,
-): Product =>
-  ({
-    id,
-    name: `P${id}`,
-    status,
-    monthlyRevenue,
-    qualitySum: 0,
-    qualityCount: 0,
-  }) as unknown as Product;
+  launchTime = 0,
+): Product => ({
+  id,
+  name: `P${id}`,
+  status,
+  genre: ProductGenre.OUTIL,
+  features: [],
+  requirements: {
+    Code: OUTIL_SIZE,
+    Visuel: 0,
+    UX: 0,
+  } as Product["requirements"],
+  invested: { Code: OUTIL_SIZE, Visuel: 0, UX: 0 } as Product["invested"],
+  qualitySum: 2.5 * OUTIL_SIZE,
+  qualityCount: OUTIL_SIZE,
+  launchTime,
+  freshAt: launchTime,
+  bugs: 0,
+  hype: 0,
+  updates: 0,
+});
+
+/** Instant où le pic de lancement d'un produit sorti à `launchTime` est passé. */
+const afterSpike = (launchTime = 0): number =>
+  addMonthsToTime(launchTime, LAUNCH_SPIKE_MONTHS);
 
 const loan = (monthlyPayment: number): Loan =>
   ({ id: 1, monthlyPayment }) as unknown as Loan;
@@ -65,15 +104,8 @@ const amortizingLoan = (
     missedPayments: 0,
   }) as unknown as Loan;
 
-const launchedProduct = (
-  id: number,
-  monthlyRevenue: number,
-  launchTime: number,
-): Product =>
-  ({
-    ...product(id, monthlyRevenue, ProductStatus.LAUNCHED),
-    launchTime,
-  }) as Product;
+const launchedProduct = (id: number, launchTime = 0): Product =>
+  product(id, ProductStatus.LAUNCHED, launchTime);
 
 const report = (net: number, time: number): MonthlyReport => ({
   time,
@@ -91,12 +123,13 @@ const report = (net: number, time: number): MonthlyReport => ({
 describe("computeProductRevenue", () => {
   it("ne compte que les produits lancés", () => {
     const products = [
-      product(1, 1000, ProductStatus.LAUNCHED),
-      product(2, 500, ProductStatus.DEVELOPING),
-      product(3, 300, ProductStatus.RETIRED),
+      product(1, ProductStatus.LAUNCHED),
+      product(2, ProductStatus.DEVELOPING),
+      product(3, ProductStatus.RETIRED),
     ];
-    // Sans `launchTime`, aucune obsolescence n'est appliquée.
-    expect(computeProductRevenue(products, 0)).toBe(1000);
+    expect(computeProductRevenue(products, afterSpike())).toBe(
+      outilRevenueAt(afterSpike()),
+    );
   });
 
   it("renvoie 0 sans produit", () => {
@@ -131,20 +164,21 @@ describe("computeBuildingCharges", () => {
 describe("computeMonthlyProjection", () => {
   it("agrège revenus, charges, salaires et mensualités de prêt", () => {
     const projection = computeMonthlyProjection({
-      products: [product(1, 10_000, ProductStatus.LAUNCHED)],
+      products: [launchedProduct(1)],
       buildings: [building(1, 1000)],
       employes: [employe(1, 2000, 1), employe(2, 3000, 1)],
       loans: [loan(800)],
-      time: 0,
+      time: afterSpike(),
     });
 
-    expect(projection.revenue).toBe(10_000);
+    expect(projection.revenue).toBe(outilRevenueAt(afterSpike()));
     expect(projection.fixedCharges).toBe(1150);
     expect(projection.variableCharges).toBe(2 * VARIABLE_CHARGE_PER_EMPLOYEE);
     expect(projection.payroll).toBe(5000);
     expect(projection.loanPayments).toBe(800);
+    expect(projection.maintenance).toBe(OUTIL_MAINTENANCE);
     expect(projection.expenses).toBe(
-      1150 + 2 * VARIABLE_CHARGE_PER_EMPLOYEE + 5000 + 800,
+      1150 + 2 * VARIABLE_CHARGE_PER_EMPLOYEE + 5000 + 800 + OUTIL_MAINTENANCE,
     );
     expect(projection.net).toBe(projection.revenue - projection.expenses);
   });
@@ -181,11 +215,11 @@ describe("computeCashProjection", () => {
 
   it("aligne le premier mois sur la projection du mois en cours", () => {
     const input = {
-      products: [launchedProduct(1, 10_000, 0)],
+      products: [launchedProduct(1)],
       buildings: [building(1, 1000)],
       employes: [employe(1, 2000, 1)],
       loans: [],
-      time: 0,
+      time: afterSpike(),
     };
     const monthly = computeMonthlyProjection(input);
     const [first] = computeCashProjection({ ...input, money: 0 }).months;
@@ -198,10 +232,10 @@ describe("computeCashProjection", () => {
   it("érode les revenus produits d'un mois sur l'autre", () => {
     // Lancé juste avant la fin du palier de grâce : le 2e mois projeté est le
     // premier à subir l'obsolescence.
-    const launchTime = 0;
-    const time = addMonthsToTime(launchTime, REVENUE_DECAY_GRACE_MONTHS);
+    const products = [launchedProduct(1)];
+    const time = addMonthsToTime(0, REVENUE_DECAY_GRACE_MONTHS);
     const cash = computeCashProjection({
-      products: [launchedProduct(1, 10_000, launchTime)],
+      products,
       buildings: [],
       employes: [],
       loans: [],
@@ -209,10 +243,11 @@ describe("computeCashProjection", () => {
       money: 0,
     });
 
-    expect(cash.months[0].revenue).toBe(10_000);
+    expect(cash.months[0].revenue).toBe(outilRevenueAt(time));
     expect(cash.months[1].revenue).toBe(
-      Math.round(10_000 * revenueDecayMultiplier(REVENUE_DECAY_GRACE_MONTHS + 1)),
+      computeProductRevenue(products, addMonthsToTime(time, 1)),
     );
+    expect(cash.months[1].revenue).toBeLessThan(cash.months[0].revenue);
     expect(cash.months[2].revenue).toBeLessThan(cash.months[1].revenue);
   });
 

@@ -6,6 +6,7 @@ import {
 } from "@/data/redux/employeSlice";
 import { setMoney } from "@/data/redux/companySlice";
 import { generateCandidatesForRole } from "@/data/utils/employe";
+import { techSalaryIndex } from "@/data/utils/technology";
 import { formatPrice } from "@/data/utils";
 import {
   SEARCH_CANDIDATE_LIFETIME,
@@ -110,7 +111,12 @@ export const searchCandidates =
     dispatch(setMoney(money - cost));
     dispatch(
       addCandidates(
-        generateCandidatesForRole(payload.role, count, reputation).map((c) => ({
+        generateCandidatesForRole(
+          payload.role,
+          count,
+          reputation,
+          techSalaryIndex(state.engine.time),
+        ).map((c) => ({
           ...c,
           expiresAt,
         })),

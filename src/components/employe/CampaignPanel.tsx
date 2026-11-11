@@ -9,11 +9,10 @@ import {
 } from "@/data/utils/economy";
 import { launchCampaign } from "@/data/redux/companySlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
-import {
-  selectActiveCampaign,
-  selectBestMarketer,
-} from "@/data/redux/selectors";
+import { selectActiveCampaign, selectMarketers } from "@/data/redux/selectors";
 import { formatPrice } from "@/data/utils";
+import { busyMarketerIds } from "@/data/utils/popularity";
+import { Marketing } from "@/data/interface";
 
 export const CAMPAIGN_PANEL_ID = "campaign_panel";
 
@@ -50,16 +49,28 @@ export const CampaignPanel: FC = () => {
   const money = useAppSelector((s) => s.company.money);
   const time = useAppSelector((s) => s.engine.time);
   const activeCampaign = useAppSelector(selectActiveCampaign);
-  const bestMarketer = useAppSelector(selectBestMarketer);
+  const products = useAppSelector((s) => s.product.products);
+  const marketers = useAppSelector(selectMarketers);
+  // Un marketeur ne mène qu'une campagne à la fois : ceux qui promeuvent un
+  // produit ne sont pas disponibles pour la campagne du studio. Parmi les
+  // libres, le plus efficace la prend en charge.
+  const busy = busyMarketerIds(products, activeCampaign, time);
+  const effectivenessOf = (m: Marketing) =>
+    campaignEffectiveness(m.communicationStat, m.campaignManagementStat);
+  const bestMarketer = marketers
+    .filter((m) => !busy.has(m.id))
+    .reduce<Marketing | undefined>(
+      (best, m) =>
+        !best || effectivenessOf(m) > effectivenessOf(best) ? m : best,
+      undefined,
+    );
+  const runner = activeCampaign?.marketerId
+    ? marketers.find((m) => m.id === activeCampaign.marketerId)
+    : undefined;
 
   const [selected, setSelected] = useState<CampaignType>(CampaignType.NOTORIETY);
 
-  const effectiveness = bestMarketer
-    ? campaignEffectiveness(
-        bestMarketer.communicationStat,
-        bestMarketer.campaignManagementStat,
-      )
-    : 0;
+  const effectiveness = bestMarketer ? effectivenessOf(bestMarketer) : 0;
 
   const def = CAMPAIGNS[selected];
   const insufficientFunds = money < def.cost;
@@ -71,7 +82,12 @@ export const CampaignPanel: FC = () => {
   const launch = () => {
     if (launchDisabled || !bestMarketer) return;
     dispatch(
-      launchCampaign({ type: selected, effectiveness, time }),
+      launchCampaign({
+        type: selected,
+        effectiveness,
+        time,
+        marketerId: bestMarketer.id,
+      }),
     );
   };
 
@@ -90,7 +106,10 @@ export const CampaignPanel: FC = () => {
 
         {campaignRunning && activeCampaign ? (
           <div className="space-y-3">
-            <p className="text-sm opacity-70">Campagne en cours :</p>
+            <p className="text-sm opacity-70">
+              Campagne en cours
+              {runner ? `, menée par ${runner.firstName} ${runner.lastName}` : ""} :
+            </p>
             <CampaignProgress campaign={activeCampaign} time={time} />
             <p className="text-xs opacity-60">
               Une seule campagne à la fois — patientez la fin de celle-ci.
@@ -100,10 +119,15 @@ export const CampaignPanel: FC = () => {
           <>
             {noMarketer && (
               <p className="text-sm text-error mb-2">
-                Aucun marketeur recruté : embauchez un profil Marketing pour
-                lancer une campagne.
+                {marketers.length === 0
+                  ? "Aucun marketeur recruté : embauchez un profil Marketing pour lancer une campagne."
+                  : "Tous vos marketeurs promeuvent déjà un produit : un marketeur ne mène qu'une campagne à la fois."}
               </p>
             )}
+            <p className="text-xs opacity-60 mb-2">
+              Campagne pour tout le studio. Pour rendre un produit précis plus
+              populaire, lancez une promotion depuis la page Produits.
+            </p>
             <div className="space-y-2 mb-3">
               {CAMPAIGN_ORDER.map((type) => {
                 const c = CAMPAIGNS[type];

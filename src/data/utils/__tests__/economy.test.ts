@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import dayjs from "dayjs";
 
 import {
   ACQUISITION_MAX_REVENUE_BONUS,
@@ -44,16 +43,6 @@ import {
   type ActiveCampaign,
   type Loan,
 } from "@/data/utils/economy";
-import {
-  Product,
-  ProductStatus,
-  computeDecayedRevenue,
-} from "@/data/interface";
-
-// Convertit un nombre de mois calendaires (depuis l'epoch) en heures, pour
-// piloter computeDecayedRevenue qui raisonne en heures comme le moteur.
-const monthsToHours = (months: number): number =>
-  dayjs("1970-01-01").add(months, "month").diff(dayjs("1970-01-01"), "hour");
 
 describe("revenueDecayMultiplier", () => {
   it("reste à 100 % pendant le palier de grâce", () => {
@@ -142,48 +131,6 @@ describe("evaluateBankruptcy", () => {
   });
 });
 
-const launchedProduct = (overrides: Partial<Product> = {}): Product => ({
-  id: 1,
-  name: "Jeu",
-  status: ProductStatus.LAUNCHED,
-  requirements: { Code: 0, Visuel: 0, UX: 0 } as Product["requirements"],
-  invested: { Code: 0, Visuel: 0, UX: 0 } as Product["invested"],
-  qualitySum: 0,
-  qualityCount: 0,
-  monthlyRevenue: 1000,
-  launchTime: 0,
-  ...overrides,
-});
-
-describe("computeDecayedRevenue", () => {
-  it("renvoie le revenu de base pendant le palier de grâce", () => {
-    const p = launchedProduct();
-    expect(computeDecayedRevenue(p, monthsToHours(REVENUE_DECAY_GRACE_MONTHS))).toBe(
-      1000,
-    );
-  });
-
-  it("érode le revenu passé le palier", () => {
-    const p = launchedProduct();
-    const value = computeDecayedRevenue(
-      p,
-      monthsToHours(REVENUE_DECAY_GRACE_MONTHS + 1),
-    );
-    expect(value).toBe(Math.round(1000 * (1 - REVENUE_DECAY_RATE)));
-  });
-
-  it("respecte le plancher sur le long terme", () => {
-    const p = launchedProduct();
-    const value = computeDecayedRevenue(p, monthsToHours(120));
-    expect(value).toBe(Math.round(1000 * REVENUE_DECAY_FLOOR));
-  });
-
-  it("renvoie le revenu de base si le produit n'a pas de launchTime", () => {
-    const p = launchedProduct({ launchTime: undefined });
-    expect(computeDecayedRevenue(p, monthsToHours(50))).toBe(1000);
-  });
-});
-
 // ── Phase 2 — Levier QA ──────────────────────────────────────────────────────
 
 describe("aggregateQaDetection", () => {
@@ -245,7 +192,10 @@ describe("computeQaBugOutcome", () => {
 
 describe("campaignEffectiveness", () => {
   it("plancher à 25% pour un marketeur nul", () => {
-    expect(campaignEffectiveness(0, 0)).toBeCloseTo(CAMPAIGN_MIN_EFFECTIVENESS, 5);
+    expect(campaignEffectiveness(0, 0)).toBeCloseTo(
+      CAMPAIGN_MIN_EFFECTIVENESS,
+      5,
+    );
   });
 
   it("atteint 100% à stats maximales", () => {
@@ -270,27 +220,32 @@ describe("campaignRevenueMultiplier", () => {
   });
 
   it("Acquisition booste le revenu jusqu'à +50%", () => {
-    expect(campaignRevenueMultiplier(campaign(CampaignType.ACQUISITION, 1))).toBeCloseTo(
-      1 + ACQUISITION_MAX_REVENUE_BONUS,
-      5,
-    );
+    expect(
+      campaignRevenueMultiplier(campaign(CampaignType.ACQUISITION, 1)),
+    ).toBeCloseTo(1 + ACQUISITION_MAX_REVENUE_BONUS, 5);
   });
 
   it("Notoriété n'affecte pas le revenu", () => {
-    expect(campaignRevenueMultiplier(campaign(CampaignType.NOTORIETY, 1))).toBe(1);
+    expect(campaignRevenueMultiplier(campaign(CampaignType.NOTORIETY, 1))).toBe(
+      1,
+    );
   });
 
   it("Rétention booste moins qu'Acquisition à efficacité égale", () => {
     expect(
       campaignRevenueMultiplier(campaign(CampaignType.RETENTION, 1)),
-    ).toBeLessThan(campaignRevenueMultiplier(campaign(CampaignType.ACQUISITION, 1)));
+    ).toBeLessThan(
+      campaignRevenueMultiplier(campaign(CampaignType.ACQUISITION, 1)),
+    );
   });
 });
 
 describe("campaignMonthlyReputation", () => {
   it("0 sans campagne ou hors Notoriété", () => {
     expect(campaignMonthlyReputation(undefined)).toBe(0);
-    expect(campaignMonthlyReputation(campaign(CampaignType.ACQUISITION, 1))).toBe(0);
+    expect(
+      campaignMonthlyReputation(campaign(CampaignType.ACQUISITION, 1)),
+    ).toBe(0);
   });
 
   it("Notoriété rapporte de la réputation (≥1), bornée par l'efficacité", () => {
@@ -457,7 +412,15 @@ describe("isLoanOfferAvailable", () => {
     // Pic 25 → palier PME (75000). PME principal 50000, mais dette déjà 40000
     // → disponible 35000 < 50000.
     const existing = loanFrom(MICRO, { outstandingBalance: 40000 });
-    const r = isLoanOfferAvailable(PME, 25, 999999, 1_000_000, [existing], null, 0);
+    const r = isLoanOfferAvailable(
+      PME,
+      25,
+      999999,
+      1_000_000,
+      [existing],
+      null,
+      0,
+    );
     expect(r.available).toBe(false);
     expect(r.reason).toBe("capacity");
   });
@@ -487,15 +450,7 @@ describe("isLoanOfferAvailable", () => {
   });
 
   it("la réputation prime sur le cooldown", () => {
-    const r = isLoanOfferAvailable(
-      EXPANSION,
-      10,
-      999999,
-      1_000_000,
-      [],
-      0,
-      1,
-    );
+    const r = isLoanOfferAvailable(EXPANSION, 10, 999999, 1_000_000, [], 0, 1);
     expect(r.reason).toBe("reputation");
   });
 
@@ -553,7 +508,9 @@ describe("evaluateLoanDefault", () => {
   it("capitalise la pénalité de retard et incrémente les impayés", () => {
     const loan = loanFrom(MICRO);
     const out = evaluateLoanDefault(loan);
-    expect(out.penalty).toBe(Math.round(loan.monthlyPayment * LOAN_LATE_FEE_RATE));
+    expect(out.penalty).toBe(
+      Math.round(loan.monthlyPayment * LOAN_LATE_FEE_RATE),
+    );
     expect(out.updatedLoan.outstandingBalance).toBe(
       loan.outstandingBalance + out.penalty,
     );

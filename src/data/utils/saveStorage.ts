@@ -9,8 +9,11 @@
 //
 // Écriture atomique : meta + payload dans UNE seule transaction readwrite.
 
+import { Client, Product } from "@/data/interface";
 import { getTimeAsDate } from "@/data/utils/time";
 import { getMilestoneProgress } from "@/data/utils/milestone";
+import { buildRoster } from "@/data/utils/competitor";
+import { normalizeProduct } from "@/data/utils/product";
 
 // --- Constantes ------------------------------------------------------------
 
@@ -27,7 +30,13 @@ export const GAME_VERSION = "0.0.0";
 // 1 ; tout changement de forme de l'état persisté dans un slot incrémente cette
 // valeur ET ajoute une entrée dans `migrations`.
 // 2 : carnet de clients persistants (`task.clients`).
-export const SAVE_SCHEMA_VERSION = 2;
+// 3 : compétences du fondateur (`research`).
+// 4 : marché des studios concurrents (`competitor.roster`).
+// 5 : produits à genre / segment, bugs, fraîcheur, maintenance.
+// 6 : produits des studios concurrents (`competitor.products`).
+// 7 : produits assemblés de fonctionnalités (`product.products[].features`).
+// 8 : journal d'activité embarqué (`notification.list`).
+export const SAVE_SCHEMA_VERSION = 8;
 
 // Slots manuels exposés au joueur (wireframe §4 : 3 slots).
 export const MANUAL_SLOT_IDS = ["slot_1", "slot_2", "slot_3"] as const;
@@ -43,9 +52,9 @@ export type AutoSlotId = typeof AUTO_SLOT_A | typeof AUTO_SLOT_B;
 export const AUTO_POINTER_ID = "__auto_current__";
 
 // Slices runtime exclues du payload — mêmes que la blacklist redux-persist
-// (store.ts). Une décision en attente / une notif ne doit pas voyager avec une
-// sauvegarde.
-const RUNTIME_BLACKLIST = ["notification", "events"] as const;
+// (store.ts). Une décision en attente ne doit pas voyager avec une sauvegarde.
+// Le journal d'activité (`notification`), lui, fait partie de la partie.
+const RUNTIME_BLACKLIST = ["events"] as const;
 
 // --- Types ----------------------------------------------------------------
 
@@ -141,6 +150,75 @@ export const migrations: Record<
     const task = (state.task ?? {}) as Record<string, unknown>;
     return { ...state, task: { ...task, clients: task.clients ?? {} } };
   },
+  // 2 → 3 : recherche / formation du fondateur. Une partie d'avant repart sans
+  // compétence ni formation en cours ; sans ce défaut, l'hydratation garderait
+  // le slice `research` de la partie précédemment chargée.
+  2: (state) => ({
+    ...state,
+    research: state.research ?? { acquired: [], current: null },
+  }),
+  // 3 → 4 : marché des studios concurrents. Les clients déjà au carnet en
+  // font partie d'office (on ne perd aucune relation), complétés d'inconnus
+  // jusqu'à la taille du marché.
+  3: (state) => {
+    if (state.competitor) return state;
+    const task = (state.task ?? {}) as { clients?: Record<string, Client> };
+    return { ...state, competitor: { roster: buildRoster(task.clients) } };
+  },
+  // 4 → 5 : produits sur segments. Chaque produit reçoit un genre déduit de
+  // son mix de composants, des compteurs de vie à zéro et une fraîcheur calée
+  // sur son lancement ; le revenu se recalcule désormais à chaque clôture.
+  4: (state) => {
+    const product = (state.product ?? {}) as {
+      products?: Product[];
+      lastLifecycleTime?: number | null;
+    };
+    return {
+      ...state,
+      product: {
+        ...product,
+        products: (product.products ?? []).map(normalizeProduct),
+        lastLifecycleTime: product.lastLifecycleTime ?? null,
+      },
+    };
+  },
+  // 5 → 6 : produits concurrents. Le marché repart sans produit en cours ;
+  // les studios lanceront les leurs au fil des mois.
+  5: (state) => {
+    const competitor = (state.competitor ?? { roster: [] }) as {
+      roster: unknown[];
+      products?: unknown[];
+      nextProductId?: number;
+      lastMarketTime?: number | null;
+    };
+    return {
+      ...state,
+      competitor: {
+        ...competitor,
+        products: competitor.products ?? [],
+        nextProductId: competitor.nextProductId ?? 1,
+        lastMarketTime: competitor.lastMarketTime ?? null,
+      },
+    };
+  },
+  // 6 → 7 : fonctionnalités. Un produit d'avant garde sa taille brute comme
+  // attractivité (aucune fonctionnalité) ; il pourra en recevoir.
+  6: (state) => {
+    const product = (state.product ?? {}) as { products?: Product[] };
+    return {
+      ...state,
+      product: {
+        ...product,
+        products: (product.products ?? []).map(normalizeProduct),
+      },
+    };
+  },
+  // 7 → 8 : journal d'activité. Une sauvegarde d'avant n'en a pas ; sans ce
+  // défaut, l'hydratation garderait le journal de la partie précédente.
+  7: (state) => ({
+    ...state,
+    notification: state.notification ?? { list: [] },
+  }),
 };
 
 /**
@@ -344,10 +422,7 @@ export const readPayload = async (
  * Cœur de validation, pur (testable hors IndexedDB) : à partir d'un meta et de
  * la string JSON stockée, détermine l'intégrité et renvoie l'état migré.
  */
-export const validateLoaded = (
-  meta: SaveMeta,
-  json: string,
-): LoadedPayload => {
+export const validateLoaded = (meta: SaveMeta, json: string): LoadedPayload => {
   // Version de schéma stockée plus récente que celle du build → load bloqué.
   if (meta.schemaVersion > SAVE_SCHEMA_VERSION) {
     return { integrity: "outdated", state: null, meta };
@@ -390,9 +465,8 @@ export const deleteSlot = async (slotId: string): Promise<void> => {
 // --- Rotation auto-save A/B ------------------------------------------------
 
 /** Choisit le slot physique INACTIF à écrire selon le pointeur courant. */
-export const pickAutoWriteTarget = (
-  current: AutoSlotId | null,
-): AutoSlotId => (current === AUTO_SLOT_A ? AUTO_SLOT_B : AUTO_SLOT_A);
+export const pickAutoWriteTarget = (current: AutoSlotId | null): AutoSlotId =>
+  current === AUTO_SLOT_A ? AUTO_SLOT_B : AUTO_SLOT_A;
 
 /**
  * IO abstrait de la rotation A/B — permet de tester l'algorithme sans

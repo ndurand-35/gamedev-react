@@ -40,6 +40,16 @@ export const selectEmployeById = createSelector(
     id == null ? undefined : employeList.find((e: Person) => e.id === id),
 );
 
+/**
+ * Bâtiment courant de la vue studio : celui choisi dans le sélecteur du menu
+ * du bas, sinon le premier possédé (bâtiment libéré, nouvelle partie…).
+ */
+export const selectCurrentBuilding = createSelector(
+  [selectBuildingList, (state: RootState) => state.engine.currentBuildingId],
+  (buildings, id) =>
+    buildings.find((b: Building) => b.id === id) ?? buildings[0],
+);
+
 export const selectBuildingById = createSelector(
   [
     selectBuildingList,
@@ -56,8 +66,9 @@ export const selectEmployesWithoutFondateur = createSelector(
 
 // ── Phase 2 — couverture QA & marketing ──────────────────────────────────────
 
-export const selectQaTesters = createSelector([selectEmployeList], (list) =>
-  list.filter((e: Person) => e.personType === PersonType.QA) as QA[],
+export const selectQaTesters = createSelector(
+  [selectEmployeList],
+  (list) => list.filter((e: Person) => e.personType === PersonType.QA) as QA[],
 );
 
 /** Couverture QA agrégée : effectif + effet dérivé sur les bugs critiques. */
@@ -71,10 +82,12 @@ export const selectQaCoverage = createSelector([selectQaTesters], (testers) => {
   };
 });
 
-export const selectMarketers = createSelector([selectEmployeList], (list) =>
-  list.filter(
-    (e: Person) => e.personType === PersonType.MARKETING,
-  ) as Marketing[],
+export const selectMarketers = createSelector(
+  [selectEmployeList],
+  (list) =>
+    list.filter(
+      (e: Person) => e.personType === PersonType.MARKETING,
+    ) as Marketing[],
 );
 
 /** Meilleur marketeur disponible (max d'efficacité de campagne), ou undefined. */
@@ -83,7 +96,10 @@ export const selectBestMarketer = createSelector(
   (marketers) =>
     marketers.reduce<Marketing | undefined>((best, m) => {
       if (!best) return m;
-      const e = campaignEffectiveness(m.communicationStat, m.campaignManagementStat);
+      const e = campaignEffectiveness(
+        m.communicationStat,
+        m.campaignManagementStat,
+      );
       const eBest = campaignEffectiveness(
         best.communicationStat,
         best.campaignManagementStat,

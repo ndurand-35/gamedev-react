@@ -4,7 +4,7 @@
 
 import { faker } from "@faker-js/faker/locale/en";
 
-import { Client, CLIENT_RELATION_MAX } from "@/data/interface";
+import { Client, CLIENT_RELATION_MAX, Competitor } from "@/data/interface";
 
 /**
  * Probabilité, par contrat généré, qu'un client connu reprenne la place d'un
@@ -27,13 +27,9 @@ export const CLIENT_LOYALTY_STEP = 0.08;
 export const CLIENT_LOYALTY_MAX = 0.4;
 
 /** Identité d'un donneur d'ordre, portée telle quelle par ses contrats. */
-export interface ClientIdentity {
-  id: string;
-  name: string;
-  image: string;
-}
+export type ClientIdentity = Competitor;
 
-/** Nouveau client anonyme : le seul endroit où un nom de société est tiré. */
+/** Nouvelle société : le seul endroit où un nom de studio est tiré. */
 export const newClientIdentity = (): ClientIdentity => ({
   id: faker.string.uuid(),
   name: faker.company.name(),

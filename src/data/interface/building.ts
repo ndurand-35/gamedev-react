@@ -13,6 +13,14 @@ export interface Building {
 export const getBuildingMonthlyCharges = (b: Building): number =>
   b.rent + b.electricity + b.internet;
 
+// Part du prix d'achat récupérée quand on se sépare d'un bâtiment : assez pour
+// que libérer des locaux vides soit préférable à les garder, pas assez pour
+// que la revente serve de tirelire (acheter puis revendre coûte toujours).
+export const BUILDING_RESALE_RATIO = 0.5;
+
+export const getBuildingResaleValue = (b: Building): number =>
+  Math.round(b.price * BUILDING_RESALE_RATIO);
+
 // Bonus de synergie : plus d'employés dans un même bâtiment = production
 // boostée. Calibré pour rester modeste (max +20%).
 export const buildingSynergyMultiplier = (occupants: number): number => {

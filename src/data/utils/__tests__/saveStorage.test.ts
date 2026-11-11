@@ -20,7 +20,10 @@ import {
 } from "@/data/utils/saveStorage";
 
 // Fabrique un en-tête valide pour une string JSON donnée.
-const metaFor = (json: string, overrides: Partial<SaveMeta> = {}): SaveMeta => ({
+const metaFor = (
+  json: string,
+  overrides: Partial<SaveMeta> = {},
+): SaveMeta => ({
   slotId: "slot_1",
   slotName: "Test",
   slotType: "manual",
@@ -65,22 +68,23 @@ describe("serializeState / deserializeState", () => {
     product: { productsLaunched: 3 },
     loan: { loans: [] },
     studio: { foo: "bar" },
-    // Slices runtime + méta redux-persist : doivent être exclues.
-    notification: { items: ["ne doit pas voyager"] },
+    // Le journal d'activité fait partie de la partie : il voyage.
+    notification: { list: [{ id: "n_1", message: "Paie versée" }] },
+    // Slice runtime + méta redux-persist : doivent être exclues.
     events: { pending: { id: "x" } },
     _persist: { version: 10, rehydrated: true },
   };
 
-  it("exclut _persist et les slices runtime (notification, events)", () => {
+  it("exclut _persist et la slice runtime events, garde le journal", () => {
     const parsed = deserializeState(serializeState(fullState));
     expect(parsed).not.toHaveProperty("_persist");
-    expect(parsed).not.toHaveProperty("notification");
     expect(parsed).not.toHaveProperty("events");
+    expect(parsed).toHaveProperty("notification");
   });
 
   it("round-trip fidèle des slices embarquées", () => {
     const parsed = deserializeState(serializeState(fullState));
-    const { notification, events, _persist, ...embedded } = fullState;
+    const { events, _persist, ...embedded } = fullState;
     expect(parsed).toEqual(embedded);
   });
 });
@@ -132,6 +136,124 @@ describe("runMigrations (migration ascendante)", () => {
     });
   });
 
+  it("migre 2 → 3 en dotant l'état d'un slice `research` vierge", () => {
+    const out = migrations[2]({ company: { money: 1 } });
+    expect(out.research).toEqual({ acquired: [], current: null });
+    // Un slice déjà présent (état plus récent) n'est pas écrasé.
+    const kept = migrations[2]({
+      research: { acquired: ["delivery_advisor"], current: null },
+    });
+    expect(kept.research).toEqual({
+      acquired: ["delivery_advisor"],
+      current: null,
+    });
+  });
+
+  it("migre 3 → 4 en bâtissant le marché à partir du carnet", () => {
+    const acme = {
+      id: "acme",
+      name: "Acme",
+      image: "",
+      relation: 3,
+      delivered: 2,
+      early: 1,
+      lost: false,
+      lastSeen: 10,
+    };
+    const out = migrations[3]({ task: { clients: { acme } } }) as {
+      competitor: { roster: { id: string; name: string; image: string }[] };
+    };
+    expect(out.competitor.roster[0]).toEqual({
+      id: "acme",
+      name: "Acme",
+      image: "",
+    });
+    expect(out.competitor.roster.length).toBeGreaterThan(1);
+    // Un marché déjà présent (état plus récent) n'est pas écrasé.
+    const kept = migrations[3]({ competitor: { roster: [] } });
+    expect(kept.competitor).toEqual({ roster: [] });
+  });
+
+  it("migre 4 → 5 en donnant un genre et des compteurs de vie aux produits", () => {
+    const legacy = {
+      id: 1,
+      name: "Vieux",
+      status: "En production",
+      requirements: { Code: 2, Visuel: 6, UX: 1 },
+      invested: { Code: 2, Visuel: 6, UX: 1 },
+      qualitySum: 20,
+      qualityCount: 9,
+      monthlyRevenue: 450,
+      launchTime: 500,
+    };
+    const out = migrations[4]({
+      product: { products: [legacy], nextProductId: 2, productsLaunched: 1 },
+    }) as {
+      product: {
+        products: Record<string, unknown>[];
+        lastLifecycleTime: unknown;
+      };
+    };
+    expect(out.product.products[0]).toMatchObject({
+      genre: "Jeu",
+      freshAt: 500,
+      bugs: 0,
+      hype: 0,
+      updates: 0,
+    });
+    expect(out.product.lastLifecycleTime).toBeNull();
+    // Sans slice produit : un état vide, pas un crash.
+    expect(
+      (migrations[4]({}) as { product: { products: unknown[] } }).product
+        .products,
+    ).toEqual([]);
+  });
+
+  it("migre 5 → 6 en ouvrant le marché aux produits concurrents", () => {
+    const roster = [{ id: "acme", name: "Acme", image: "" }];
+    const out = migrations[5]({ competitor: { roster } }) as {
+      competitor: Record<string, unknown>;
+    };
+    expect(out.competitor).toEqual({
+      roster,
+      products: [],
+      nextProductId: 1,
+      lastMarketTime: null,
+    });
+    // Un marché déjà peuplé (état plus récent) n'est pas écrasé.
+    const kept = migrations[5]({
+      competitor: { roster, products: [{ id: 7 }], nextProductId: 8 },
+    }) as { competitor: { products: unknown[]; nextProductId: number } };
+    expect(kept.competitor.products).toEqual([{ id: 7 }]);
+    expect(kept.competitor.nextProductId).toBe(8);
+  });
+
+  it("migre 6 → 7 en donnant un catalogue de fonctionnalités vide aux produits", () => {
+    const legacy = {
+      id: 1,
+      name: "Vieux",
+      status: "En production",
+      genre: "Outil",
+      requirements: { Code: 5, Visuel: 3, UX: 2 },
+      invested: { Code: 5, Visuel: 3, UX: 2 },
+      qualitySum: 20,
+      qualityCount: 10,
+      launchTime: 500,
+      freshAt: 500,
+      bugs: 1,
+      hype: 0,
+      updates: 0,
+    };
+    const out = migrations[6]({ product: { products: [legacy] } }) as {
+      product: { products: Record<string, unknown>[] };
+    };
+    expect(out.product.products[0]).toMatchObject({ features: [], bugs: 1 });
+    const kept = migrations[6]({
+      product: { products: [{ ...legacy, features: ["core_tool"] }] },
+    }) as { product: { products: Record<string, unknown>[] } };
+    expect(kept.product.products[0].features).toEqual(["core_tool"]);
+  });
+
   it("applique séquentiellement les migrations de from → to", () => {
     migrations[1] = (s) => ({ ...s, step1: true });
     migrations[2] = (s) => ({ ...s, step2: true });
@@ -146,7 +268,7 @@ describe("runMigrations (migration ascendante)", () => {
 
   it("lève si une migration intermédiaire manque", () => {
     migrations[1] = (s) => s;
-    // migrations[2] absente
+    delete migrations[2]; // trou volontaire (restauré par afterEach)
     expect(() => runMigrations({}, 1, 3)).toThrow();
   });
 });
@@ -175,7 +297,9 @@ describe("pickMostRecentValid (sélecteur « partie la plus récente valide »)"
   });
 
   it("renvoie null quand aucun slot n'existe", () => {
-    expect(pickMostRecentValid({ auto: null, manual: [null, null, null] })).toBeNull();
+    expect(
+      pickMostRecentValid({ auto: null, manual: [null, null, null] }),
+    ).toBeNull();
   });
 
   it("renvoie le slot valide au plus grand realTimestamp, auto/manuel confondus", () => {
@@ -205,7 +329,11 @@ describe("pickMostRecentValid (sélecteur « partie la plus récente valide »)"
   it("ignore les slots non chargeables (corrupt / outdated)", () => {
     const result = pickMostRecentValid({
       auto: slot(AUTO_SLOT_A, 8000, "corrupt", "auto"),
-      manual: [slot("slot_1", 5000, "outdated"), slot("slot_2", 1000, "ok"), null],
+      manual: [
+        slot("slot_1", 5000, "outdated"),
+        slot("slot_2", 1000, "ok"),
+        null,
+      ],
     });
     // Le plus récent (8000) et le suivant (5000) sont illisibles → 1000 gagne.
     expect(result?.slotId).toBe("slot_2");
@@ -234,7 +362,15 @@ describe("rotation auto A/B", () => {
       [AUTO_SLOT_B]: null,
     };
     let pointer: AutoSlotId | null = null;
-    return { slots, get pointer() { return pointer; }, set: (p: AutoSlotId) => { pointer = p; } };
+    return {
+      slots,
+      get pointer() {
+        return pointer;
+      },
+      set: (p: AutoSlotId) => {
+        pointer = p;
+      },
+    };
   };
 
   it("bascule le pointeur sur un write valide", async () => {

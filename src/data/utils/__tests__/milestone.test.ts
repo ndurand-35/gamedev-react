@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  crossedMilestone,
   getMilestoneProgress,
   getReachedMilestone,
 } from "@/data/utils/milestone";
@@ -69,5 +70,26 @@ describe("formatSurvival", () => {
   it("affiche mois et jours au-delà", () => {
     // ~3 mois et quelques jours depuis l'epoch.
     expect(formatSurvival(24 * 100)).toMatch(/mois/);
+  });
+});
+
+describe("crossedMilestone", () => {
+  it("signale le palier franchi pour la première fois", () => {
+    expect(crossedMilestone(24, 25)?.name).toBe("Studio indé");
+    expect(crossedMilestone(49, 52)?.name).toBe("Studio reconnu");
+  });
+
+  it("ne dit rien tant qu'aucun seuil n'est passé", () => {
+    expect(crossedMilestone(10, 24)).toBeNull();
+    expect(crossedMilestone(30, 30)).toBeNull();
+  });
+
+  it("ignore un seuil repassé après une chute de réputation", () => {
+    // Pic à 40, retombé puis remonté à 26 : le palier 25 est déjà acquis.
+    expect(crossedMilestone(40, 26)).toBeNull();
+  });
+
+  it("retient le plus haut palier si plusieurs sont franchis d'un coup", () => {
+    expect(crossedMilestone(20, 60)?.name).toBe("Studio reconnu");
   });
 });

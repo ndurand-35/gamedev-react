@@ -34,6 +34,9 @@ export interface Person {
   raiseCooldownUntil?: number;
   // Volet C : true tant qu'une demande d'augmentation est en attente de décision.
   pendingRaise?: boolean;
+  // Temps de jeu (heures) avant lequel une nouvelle prime ne peut pas être
+  // versée (cf. `utils/morale`).
+  bonusCooldownUntil?: number;
   // Candidat uniquement : temps de jeu (heures) au-delà duquel le profil quitte
   // le vivier — un candidat ramené par une recherche ne patiente pas
   // indéfiniment. Absent sur un employé embauché.

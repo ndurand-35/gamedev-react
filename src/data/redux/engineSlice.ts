@@ -22,6 +22,9 @@ export interface EngineState {
   time: number;
   gameSpeed: number;
   currentTopMenu: TopMenuItem[];
+  // Bâtiment affiché par la vue studio (Accueil), choisi depuis le sélecteur
+  // du menu du bas. `undefined` = le premier bâtiment possédé.
+  currentBuildingId?: number;
   moneyHistory: number[];
   lastSnapshotTime: number;
   // Pression économique : faillite déclenchée par la facturation mensuelle.
@@ -63,6 +66,7 @@ export const engineSlice = createSlice({
         `Studio ${director.firstName} ${director.lastName}`.trim();
       state.gameSpeed = DEFAULT_ENGINE_STATE.gameSpeed;
       state.currentTopMenu = DEFAULT_ENGINE_STATE.currentTopMenu;
+      state.currentBuildingId = undefined;
       state.time = DEFAULT_ENGINE_STATE.time;
       state.moneyHistory = [];
       state.lastSnapshotTime = -1;
@@ -148,6 +152,9 @@ export const engineSlice = createSlice({
     setCurrentTopMenu(state, action: PayloadAction<TopMenuItem[]>) {
       state.currentTopMenu = action.payload;
     },
+    setCurrentBuilding(state, action: PayloadAction<number | undefined>) {
+      state.currentBuildingId = action.payload;
+    },
   },
 });
 
@@ -157,6 +164,7 @@ export const {
   setTime,
   setGameSpeed,
   setCurrentTopMenu,
+  setCurrentBuilding,
   initializeEngineState,
   recordMoneySnapshot,
   setBankruptcyState,

@@ -17,6 +17,7 @@ import { setMoney } from "@/data/redux/companySlice";
 import { pushNotification } from "@/data/redux/notificationSlice";
 import { selectRemainingSlots } from "@/data/redux/selectors";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
+import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 import { formatPrice } from "@/data/utils";
 import {
   INTERVIEW_EXPRESS_FEE,
@@ -47,6 +48,10 @@ const fuzzy = (v: number): string => {
   return `${lo}–${hi}`;
 };
 
+// Offre de départ quand on ne sait rien du candidat : le curseur ne doit pas
+// se poser sur son salaire attendu, ce serait le révéler.
+const BLIND_OFFER = 2000;
+
 type Outcome =
   | { kind: "idle" }
   | { kind: "counter"; amount: number; roundsLeft: number }
@@ -62,17 +67,29 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
   const open = candidate !== null;
   const revealed = candidate?.revealedStats ?? false;
   const expected = candidate?.expectedSalary ?? candidate?.salary ?? 0;
+  // Salaire attendu et tempérament se lisent après l'entretien — ou sur
+  // dossier, si le fondateur a appris à lire un CV. Les stats exactes, elles,
+  // demandent toujours l'entretien.
+  const hasCvReading = useFounderSkill("cv_reading");
+  const knowsProfile = revealed || hasCvReading;
 
-  const [offer, setOffer] = useState<number>(expected);
+  const [offer, setOffer] = useState<number>(
+    knowsProfile ? expected : BLIND_OFFER,
+  );
   const [round, setRound] = useState(0);
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   // Réinitialise l'état de négociation à chaque ouverture / changement de candidat.
   useEffect(() => {
-    setOffer(expected);
     setRound(0);
     setOutcome({ kind: "idle" });
-  }, [candidate?.id, expected]);
+  }, [candidate?.id]);
+
+  // L'offre se cale sur l'attendu dès qu'il est connu (y compris quand
+  // l'entretien le révèle en cours de route), sans rouvrir les tours joués.
+  useEffect(() => {
+    setOffer(knowsProfile ? expected : BLIND_OFFER);
+  }, [candidate?.id, expected, knowsProfile]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -259,7 +276,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
           ))}
         </div>
 
-        {revealed ? (
+        {knowsProfile && (
           <div className="text-sm mb-3 space-y-0.5">
             <div className="flex justify-between">
               <span>Tempérament</span>
@@ -272,11 +289,13 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
               </span>
             </div>
           </div>
-        ) : (
+        )}
+        {!revealed && (
           <div className="alert alert-warning text-xs mb-3 py-2">
             <WarningTriangle width={16} height={16} />
-            Profil non vérifié : stats estimées, salaire attendu et tempérament
-            inconnus. Négocier à l'aveugle est risqué.
+            {hasCvReading
+              ? "Profil non vérifié : les stats restent estimées tant que l'entretien n'a pas eu lieu."
+              : "Profil non vérifié : stats estimées, salaire attendu et tempérament inconnus. Négocier à l'aveugle est risqué."}
           </div>
         )}
 
@@ -316,7 +335,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
           <input
             type="range"
             min={1000}
-            max={3600}
+            max={Math.max(3600, Math.ceil((expected * 1.5) / 100) * 100)}
             step={10}
             value={offer}
             onChange={(e) => setOffer(Number(e.target.value))}
@@ -326,7 +345,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
             {formatPrice(offer)}
           </span>
         </div>
-        {revealed && (
+        {knowsProfile && (
           <p className="text-xs opacity-60 mb-2">
             Repère : attendu ≈ {formatPrice(expected)} ({Math.round((offer / expected) * 100)}
             % de l'attendu)

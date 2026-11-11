@@ -244,6 +244,8 @@ export const computeExpectedSalary = (
   p: Person,
   reputation: number,
   noise: number = 0,
+  /** Indice des salaires du marché (technologies, cf. `techSalaryIndex`). */
+  salaryIndex: number = 1,
 ): number => {
   const role = salaryRole(p);
   const [floor, cap] = SALARY_ENVELOPE[role];
@@ -254,7 +256,7 @@ export const computeExpectedSalary = (
     1 + MARKET_INDEX_PER_REPUTATION * Math.max(0, reputation),
   );
   const noiseMult = 1 + clamp(noise, -1, 1) * SALARY_NOISE;
-  return round10(base * market * noiseMult);
+  return round10(base * market * noiseMult * Math.max(0, salaryIndex));
 };
 
 // ── Volet B — négociation à l'embauche ──────────────────────────────────────
