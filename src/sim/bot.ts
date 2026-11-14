@@ -17,6 +17,8 @@ import {
   QUALITY_STAT_STEP,
   STAT_KEY_BY_TYPE,
   StartedContract,
+  AMENITIES,
+  buildingSeats,
   buildingSynergyMultiplier,
   getBuildingMonthlyCharges,
   isProductReady,
@@ -53,6 +55,8 @@ import {
   setTraining,
 } from "@/data/redux/employeSlice";
 import { TRAINING_COST_PER_LEVEL } from "@/data/utils/training";
+import { LEAVE_OPTIONS, sendOnLeave } from "@/data/utils/leave";
+import { buyAmenity } from "@/data/utils/amenities";
 import {
   hireCandidate,
   searchCandidates,
@@ -178,6 +182,11 @@ export interface BotCounters {
   /** Jours passés en crunch / en détente (rythme des studios). */
   crunchDays: number;
   restDays: number;
+  /** Départs en congés. */
+  leaves: number;
+  /** Aménagements achetés, et leur prix. */
+  amenities: number;
+  amenitySpend: number;
 }
 
 export const emptyCounters = (): BotCounters => ({
@@ -206,6 +215,9 @@ export const emptyCounters = (): BotCounters => ({
   poachLost: 0,
   crunchDays: 0,
   restDays: 0,
+  leaves: 0,
+  amenities: 0,
+  amenitySpend: 0,
 });
 
 type TypeCounts = Record<ComponentType, number>;
@@ -307,6 +319,8 @@ export class Bot {
   constructor(
     private readonly store: SimStore,
     private readonly schedulePolicy: SchedulePolicy = "NORMAL",
+    /** Le bot achète-t-il des aménagements ? */
+    private readonly furnishes = true,
   ) {}
 
   private get state(): RootState {
@@ -358,6 +372,7 @@ export class Bot {
         isProduction(e) &&
         e.buildingId != null &&
         !e.trainingType &&
+        e.leaveUntil == null &&
         !(researching && e.id === FOUNDER_ID),
     );
   }
@@ -944,14 +959,14 @@ export class Bot {
     for (const e of state.employe.employeList) {
       if (e.buildingId != null) continue;
       const building = state.company.buildingList.find(
-        (b) => (occupancy.get(b.id) ?? 0) < b.place,
+        (b) => (occupancy.get(b.id) ?? 0) < buildingSeats(b),
       );
       if (!building) break;
       this.dispatch(
         assignBuilding({
           employeId: e.id,
           buildingId: building.id,
-          buildingPlace: building.place,
+          buildingPlace: buildingSeats(building),
         }),
       );
       occupancy.set(building.id, (occupancy.get(building.id) ?? 0) + 1);
@@ -970,6 +985,7 @@ export class Bot {
     this.retireLosers();
     this.promote();
     this.careForMorale();
+    this.furnish();
     this.train();
     this.grow();
   }
@@ -1239,7 +1255,11 @@ export class Bot {
    */
   private careForMorale() {
     for (const e of this.state.employe.employeList) {
-      if (e.id === FOUNDER_ID) continue;
+      if (e.id === FOUNDER_ID) {
+        // Le fondateur n'a que les congés pour se reposer.
+        if (e.morale < 50) this.takeLeave(e.id);
+        continue;
+      }
       const expected = e.expectedSalary ?? e.salary;
       if (e.salary < 0.95 * expected) {
         const ok = this.dispatch(
@@ -1263,9 +1283,45 @@ export class Bot {
         if (ok) {
           this.counters.bonuses++;
           this.counters.bonusSpend += before - this.state.company.money;
+        } else {
+          // Prime impossible (délai, fonds) : une semaine de congés.
+          this.takeLeave(e.id);
         }
       }
     }
+  }
+
+  /**
+   * Aménagements sans place (café, plantes, fauteuils, bibliothèque) dans les
+   * bâtiments occupés, tant que la trésorerie reste confortable.
+   */
+  private furnish() {
+    if (!this.furnishes) return;
+    for (const b of this.state.company.buildingList) {
+      const occupants = this.state.employe.employeList.filter(
+        (e) => e.buildingId === b.id,
+      ).length;
+      if (occupants === 0) continue;
+      for (const a of AMENITIES) {
+        if (a.places > 0) continue;
+        const state = this.state;
+        if (state.company.money < 6 * monthlyBurn(state) + a.price) return;
+        const ok = this.dispatch(
+          buyAmenity(b.id, a.id) as never,
+        ) as unknown as boolean;
+        if (ok) {
+          this.counters.amenities++;
+          this.counters.amenitySpend += a.price;
+        }
+      }
+    }
+  }
+
+  private takeLeave(employeId: number) {
+    const ok = this.dispatch(
+      sendOnLeave(employeId, LEAVE_OPTIONS[0]) as never,
+    ) as unknown as boolean;
+    if (ok) this.counters.leaves++;
   }
 
   // ── Croissance : recruter, puis s'agrandir ─────────────────────────────────
@@ -1318,7 +1374,10 @@ export class Bot {
       Math.max(1, this.incomeHistory.length);
     const salary = 1900 * techSalaryIndex(state.engine.time);
     const money = state.company.money;
-    const cap = state.company.buildingList.reduce((acc, b) => acc + b.place, 0);
+    const cap = state.company.buildingList.reduce(
+      (acc, b) => acc + buildingSeats(b),
+      0,
+    );
     const slots = cap - state.employe.employeList.length;
 
     const comfortable =

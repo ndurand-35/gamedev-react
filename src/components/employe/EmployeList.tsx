@@ -14,6 +14,7 @@ import {
   ProductionPerson,
   QA,
   jobLabel,
+  buildingSeats,
 } from "@/data/interface";
 import { formatPrice } from "@/data/utils";
 import {
@@ -232,8 +233,12 @@ export const EmployeList: React.FC = (): ReactElement => {
                 const buildingPlace =
                   buildingId === undefined
                     ? undefined
-                    : buildingList.find((b: Building) => b.id === buildingId)
-                        ?.place;
+                    : (() => {
+                        const target = buildingList.find(
+                          (b: Building) => b.id === buildingId,
+                        );
+                        return target ? buildingSeats(target) : undefined;
+                      })();
                 dispatch(
                   assignBuilding({
                     employeId: e.id,
@@ -248,10 +253,10 @@ export const EmployeList: React.FC = (): ReactElement => {
               {buildingList.map((b: Building) => {
                 const occupants = occupancyByBuilding[b.id] ?? 0;
                 const isCurrent = b.id === e.buildingId;
-                const isFull = !isCurrent && occupants >= b.place;
+                const isFull = !isCurrent && occupants >= buildingSeats(b);
                 return (
                   <option key={b.id} value={b.id} disabled={isFull}>
-                    {b.name} ({occupants}/{b.place}){isFull ? " — complet" : ""}
+                    {b.name} ({occupants}/{buildingSeats(b)}){isFull ? " — complet" : ""}
                   </option>
                 );
               })}

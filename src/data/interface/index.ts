@@ -1,5 +1,7 @@
 export * from "@/data/interface/employe";
+export * from "@/data/interface/avatar";
 export * from "@/data/interface/building";
+export * from "@/data/interface/amenity";
 export * from "@/data/interface/task";
 export * from "@/data/interface/client";
 export * from "@/data/interface/competitor";

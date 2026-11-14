@@ -177,6 +177,17 @@ export const startFounderResearch =
     const def = getFounderSkill(skillId);
     const state = getState();
     const money = state.company.money;
+    // En congés, le fondateur ne se forme pas : il se repose.
+    const founder = state.employe.employeList.find((e) => e.id === FOUNDER_ID);
+    if (founder?.leaveUntil != null) {
+      dispatch(
+        pushNotification({
+          message: `Le fondateur est en congés : « ${def.name} » attendra son retour.`,
+          type: "warning",
+        }),
+      );
+      return false;
+    }
     const check = checkResearchStart(
       def,
       state.research.acquired,

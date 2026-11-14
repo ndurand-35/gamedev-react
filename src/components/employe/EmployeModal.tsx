@@ -1,4 +1,5 @@
 import { FC, ReactNode, useEffect, useId, useState } from "react";
+import { EditPencil } from "iconoir-react";
 
 import { formatPrice } from "@/data/utils";
 import {
@@ -40,12 +41,14 @@ import { qaLossReductionRatio } from "@/data/utils/economy";
 import { RoleBadge } from "@/components/employe/RoleBadge";
 import { TraitBadges } from "@/components/employe/TraitBadges";
 import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
+import { AvatarEditModal } from "@/components/employe/AvatarEditModal";
 import { MoraleHearts } from "@/components/employe/MoraleIcon";
 import {
   TaskProgressBar,
   employeActivity,
 } from "@/components/employe/ActivityBadge";
 import { CodexLink } from "@/components/codex/CodexLink";
+import { LeaveButton } from "@/components/employe/LeaveButton";
 import { Modal } from "@/components/global/Modal";
 import { TabItem, TabPanel, Tabs } from "@/components/global/Tabs";
 import {
@@ -246,6 +249,7 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
 
   const tabsId = useId();
   const [tab, setTab] = useState<FicheTab>("activite");
+  const [editingAvatar, setEditingAvatar] = useState(false);
   // Chaque fiche s'ouvre sur l'activité, quel que soit l'onglet de la
   // précédente.
   useEffect(() => {
@@ -343,9 +347,11 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
               moral +{PROACTIVE_RAISE_MORALE}
             </span>
           </button>
-          <CodexLink id="moral" />
         </>
       )}
+      {/* Les congés valent aussi pour le fondateur : son seul levier de moral. */}
+      <LeaveButton employe={employe} />
+      <CodexLink id="moral" />
       <button
         type="button"
         onClick={onClose}
@@ -373,7 +379,23 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
           <>
             {/* En-tête : identité à gauche, moral et salaire à droite. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b-[3px] border-ink bg-white px-4 py-4 sm:px-6 sm:py-5">
-              <EmployeAvatar employe={employe} size={68} />
+              {isFounder ? (
+                // Le fondateur se retouche : son avatar ouvre l'éditeur.
+                <button
+                  type="button"
+                  onClick={() => setEditingAvatar(true)}
+                  aria-label="Modifier l'apparence"
+                  title="Modifier l'apparence"
+                  className="group/avatar relative shrink-0 rounded-full"
+                >
+                  <EmployeAvatar employe={employe} size={68} />
+                  <span className="absolute -right-1 -bottom-1 flex size-7 items-center justify-center rounded-full border-[2.5px] border-ink bg-sun transition-transform group-hover/avatar:scale-110">
+                    <EditPencil width={13} height={13} strokeWidth={2.6} />
+                  </span>
+                </button>
+              ) : (
+                <EmployeAvatar employe={employe} size={68} />
+              )}
               <div className="min-w-0 flex-1 basis-48 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="font-display text-2xl font-bold leading-none">
@@ -636,6 +658,13 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
         }}
         onClose={() => setPendingTraining(null)}
       />
+      {employe && isFounder && (
+        <AvatarEditModal
+          employe={employe}
+          open={editingAvatar}
+          onClose={() => setEditingAvatar(false)}
+        />
+      )}
     </>
   );
 };

@@ -1,4 +1,5 @@
 import { FC } from "react";
+import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
 import { Check, Clock } from "iconoir-react";
 
 import { Candidate } from "@/data/interface";
@@ -56,14 +57,7 @@ export const CandidateCvCard: FC<Props> = ({
             onChange={onToggleSelect}
             aria-label={`Sélectionner ${name}`}
           />
-          <div className="avatar avatar-placeholder">
-            <div className="bg-neutral text-neutral-content w-9 rounded-full">
-              <span className="text-xs uppercase">
-                {candidate.firstName[0]}
-                {candidate.lastName[0]}
-              </span>
-            </div>
-          </div>
+          <EmployeAvatar employe={candidate} size={40} />
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-bold">{name}</h3>
             {candidate.seniority && (

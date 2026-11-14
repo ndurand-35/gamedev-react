@@ -6,6 +6,7 @@ import {
   type Marketing,
   type Person,
   type QA,
+  buildingSeats,
 } from "@/data/interface";
 import {
   aggregateQaDetection,
@@ -171,7 +172,7 @@ export const selectStudioStatus = createSelector(
 export const selectRecruitmentCap = createSelector(
   [selectBuildingList],
   (buildingList) =>
-    buildingList.reduce((sum: number, b: Building) => sum + b.place, 0),
+    buildingList.reduce((sum: number, b: Building) => sum + buildingSeats(b), 0),
 );
 
 /** Places de recrutement restantes = plafond − effectif courant (≥ 0 affichable). */

@@ -1,4 +1,11 @@
-import { Building, PAID_MORALE_BONUS, Person } from "@/data/interface";
+import {
+  Building,
+  PAID_MORALE_BONUS,
+  Person,
+  amenityMorale,
+  buildingSeats,
+  hasAmenity,
+} from "@/data/interface";
 import { setMoney } from "@/data/redux/companySlice";
 import {
   adjustMorale,
@@ -116,34 +123,46 @@ export const computeMonthlyMoraleDrift = (
   }
   const full = new Set(
     buildings
-      .filter((b) => (occupancy.get(b.id) ?? 0) >= b.place)
+      .filter((b) => (occupancy.get(b.id) ?? 0) >= buildingSeats(b))
       .map((b) => b.id),
   );
 
   return employes.map((e) => {
-    // Rythme du studio : la fatigue (ou le repos) touche tout le monde.
-    const pace = scheduleMorale(employeSchedule(e, buildings));
+    // En congés : seul le salaire compte, le studio ne le touche pas.
+    const away = e.leaveUntil != null;
+    const building = away
+      ? undefined
+      : buildings.find((b) => b.id === e.buildingId);
+    // Rythme du studio : la fatigue (ou le repos) touche tout le monde ; une
+    // salle de sieste en divise la fatigue par deux.
+    const rawPace = away ? 0 : scheduleMorale(employeSchedule(e, buildings));
+    const pace =
+      rawPace < 0 && hasAmenity(building, "sieste")
+        ? Math.trunc(rawPace / 2)
+        : rawPace;
     const paceCauses: MoraleCause[] = pace < 0 ? ["overworked"] : [];
+    // Aménagements du bâtiment : un confort mensuel, plafonné.
+    const comfort = amenityMorale(building);
     if (e.id === FOUNDER_ID) {
       return {
         employeId: e.id,
-        delta: PAID_MORALE_BONUS + pace,
+        delta: PAID_MORALE_BONUS + pace + comfort,
         causes: paceCauses,
       };
     }
     const causes: MoraleCause[] = [...paceCauses];
-    let delta = PAID_MORALE_BONUS + pace;
+    let delta = PAID_MORALE_BONUS + pace + comfort;
 
     const underpay = underpayPenalty(e);
     if (underpay > 0) {
       delta -= underpay;
       causes.push("underpaid");
     }
-    if (e.buildingId != null && full.has(e.buildingId)) {
+    if (!away && e.buildingId != null && full.has(e.buildingId)) {
       delta -= MORALE_CROWDED_PENALTY;
       causes.push("crowded");
     }
-    if (isIdle(e)) {
+    if (!away && isIdle(e)) {
       delta -= MORALE_IDLE_PENALTY;
       causes.push("idle");
     }

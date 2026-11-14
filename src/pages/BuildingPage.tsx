@@ -13,6 +13,7 @@ import {
   Building,
   buildingSynergyMultiplier,
   getBuildingMonthlyCharges,
+  buildingSeats,
 } from "@/data/interface";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
@@ -162,7 +163,7 @@ export const BuildingPage: React.FC = (): ReactElement => {
     }
 
     for (const b of buildingList) {
-      totalPlaces += b.place;
+      totalPlaces += buildingSeats(b);
       occupiedPlaces += occupiedById[b.id] ?? 0;
       totalRent += b.rent;
       totalElectricity += b.electricity;
@@ -353,7 +354,7 @@ export const BuildingPage: React.FC = (): ReactElement => {
                           <span
                             className="block h-full bg-ink"
                             style={{
-                              width: `${b.place > 0 ? Math.round((occupied / b.place) * 100) : 0}%`,
+                              width: `${buildingSeats(b) > 0 ? Math.round((occupied / buildingSeats(b)) * 100) : 0}%`,
                             }}
                           />
                         </span>
@@ -363,7 +364,7 @@ export const BuildingPage: React.FC = (): ReactElement => {
                             (isEmpty ? "text-warning" : "")
                           }
                         >
-                          {occupied} / {b.place} places
+                          {occupied} / {buildingSeats(b)} places
                         </span>
                       </span>
                       <span className="hidden justify-self-end sm:block">

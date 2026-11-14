@@ -25,7 +25,7 @@ export const INTERVIEW_TICK_MS = 1800;
 export const isFounderInterviewing = (state: RootState): boolean =>
   state.employe.interview != null;
 
-export type InterviewRefusal = "busy" | "researching" | "unknown";
+export type InterviewRefusal = "busy" | "researching" | "onLeave" | "unknown";
 
 /** Pourquoi le fondateur ne peut pas mener cet entretien, ou null. */
 export const interviewBlocker = (
@@ -34,6 +34,8 @@ export const interviewBlocker = (
 ): InterviewRefusal | null => {
   if (isFounderInterviewing(state)) return "busy";
   if (isFounderResearching(state)) return "researching";
+  const founder = state.employe.employeList.find((e) => e.id === 1);
+  if (founder?.leaveUntil != null) return "onLeave";
   const candidate = state.employe.candidateList.find(
     (c) => c.id === candidateId,
   );

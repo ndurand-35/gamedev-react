@@ -225,11 +225,12 @@ export const TEAM_ENTRIES: CodexEntry[] = [
           "**Licenciement** d'un collègue : −5 dans le même bâtiment, −2 ailleurs.",
           "**Deadline manquée** sur un contrat : baisse pour toute l'équipe.",
           "**Prime**, **augmentation** ou réponse à une demande : effet indiqué avant validation.",
+          "**Congés** payés, depuis la fiche : une semaine (+10) ou deux (+18), regagnés au retour. Absent, l'employé ne produit pas ; il ne repart pas avant trois mois.",
         ],
       },
       {
         type: "p",
-        text: "Le **fondateur** échappe aux réclamations et à la démission.",
+        text: "Le **fondateur** échappe aux réclamations et à la démission. Ni prime ni augmentation ne le concernent : seuls les **congés** lui rendent du moral.",
       },
     ],
     related: [
@@ -240,7 +241,32 @@ export const TEAM_ENTRIES: CodexEntry[] = [
       "batiments",
       "affectation",
       "rythme",
+      "amenagements",
     ],
+  },
+  {
+    id: "amenagements",
+    category: "equipe",
+    title: "Aménagements des bureaux",
+    summary:
+      "Machine à café, canapé, baby-foot… : du moral chaque mois pour tout un bâtiment, contre un achat et un entretien.",
+    body: [
+      {
+        type: "p",
+        text: "Le bouton **Aménager**, dans l'en-tête du studio, ouvre le catalogue du bâtiment affiché. Chaque aménagement remonte chaque mois le **moral** de tous ceux qui y travaillent, contre un prix d'achat et un **entretien** mensuel ajouté aux charges du bâtiment, qui se paie **par place** : l'effet profite à chaque occupant, le coût suit la taille des locaux.",
+      },
+      {
+        type: "list",
+        items: [
+          "Le gain d'un bâtiment est **plafonné à +3 par mois** : au-delà, un aménagement de plus n'apporte rien.",
+          "Les plus volumineux (canapé, baby-foot, borne d'arcade, salle de sieste) **prennent la place d'un bureau** : un employé de moins dans le bâtiment.",
+          "Certains n'existent qu'à partir d'une **année** : pas de borne d'arcade avant 1981.",
+          "La **salle de sieste** divise aussi par deux la fatigue des horaires lourds ; la **bibliothèque** accélère les formations du bâtiment.",
+          "Un aménagement se **revend** à moitié prix ; il part avec le bâtiment s'il est libéré, compté dans sa revente.",
+        ],
+      },
+    ],
+    related: ["moral", "batiments", "rythme"],
   },
   {
     id: "rythme",

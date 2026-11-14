@@ -102,6 +102,7 @@ export const processTrainingTick = (
   for (const e of state.employe.employeList) {
     if (!isProductionPerson(e)) continue;
     if (!e.trainingType) continue;
+    if (e.leaveUntil != null) continue;
 
     const statKey = STAT_KEY_BY_TYPE[e.trainingType];
     const maxKey = MAX_STAT_KEY_BY_TYPE[e.trainingType];
@@ -125,7 +126,11 @@ export const processTrainingTick = (
     // Autodidacte, ou mentor dans le bâtiment : l'heure payée avance plus.
     const step =
       TRAINING_PROGRESS_PER_TICK *
-      trainingSpeedMultiplier(e, state.employe.employeList);
+      trainingSpeedMultiplier(
+        e,
+        state.employe.employeList,
+        state.company.buildingList,
+      );
     const next = (e.trainingProgress ?? 0) + step;
 
     if (next < TRAINING_THRESHOLD) {

@@ -30,8 +30,11 @@ import { DEFAULT_COMPANY_STATE } from "@/data/utils/constant";
 import { COMPONENT_ICON, COMPONENT_TEXT_CLASS } from "@/components/component";
 import { useForm } from "@tanstack/react-form";
 import { ArrowLeft } from "iconoir-react";
+import { AvatarEditor } from "@/components/employe/AvatarEditor";
+import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
+import { randomAvatar } from "@/data/utils/avatar";
 
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -201,6 +204,8 @@ const StatRow: React.FC<{
 const NewGamePage: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  // Tiré une fois : le joueur part d'une tête au hasard et la retouche.
+  const [initialAvatar] = useState(randomAvatar);
 
   const form = useForm<ProductionPerson & { gameName: string }>({
     onSubmit: ({ value }) => {
@@ -247,6 +252,7 @@ const NewGamePage: React.FC = () => {
       salary: 0,
       personType: PersonType.PROD,
       morale: DEFAULT_MORALE + 20,
+      avatar: initialAvatar,
       specialty: FULLSTACK_PROFILE.specialty,
       ...FULLSTACK_PROFILE.preset,
       codeMaxStat: MAX_STAT_POSSIBLE,
@@ -387,6 +393,41 @@ const NewGamePage: React.FC = () => {
                 )}
               />
             </div>
+
+            <form.Field
+              name="avatar"
+              children={(field) => (
+                <section className="flex flex-col gap-4 border-t-2 border-dashed border-base-content/15 pt-5 sm:flex-row sm:items-start sm:gap-8">
+                  <div className="flex flex-col items-center gap-2 sm:sticky sm:top-6">
+                    <h2 className="self-start font-display text-lg font-semibold">
+                      Apparence
+                    </h2>
+                    <form.Subscribe
+                      selector={(state) => ({
+                        firstName: state.values.firstName,
+                        lastName: state.values.lastName,
+                      })}
+                      children={(names) => (
+                        <EmployeAvatar
+                          employe={{
+                            ...names,
+                            personType: PersonType.PROD,
+                            avatar: field.state.value,
+                          }}
+                          size={136}
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <AvatarEditor
+                      value={field.state.value!}
+                      onChange={field.handleChange}
+                    />
+                  </div>
+                </section>
+              )}
+            />
 
             <footer className="flex flex-col gap-4 border-t border-base-300 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">

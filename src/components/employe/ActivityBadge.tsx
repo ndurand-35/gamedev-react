@@ -1,5 +1,5 @@
 import { FC, ReactElement } from "react";
-import { CoffeeCup, GraduationCap } from "iconoir-react";
+import { BeachBag, CoffeeCup, GraduationCap } from "iconoir-react";
 
 import { COMPONENT_ICON, COMPONENT_TEXT_CLASS } from "@/components/component";
 import {
@@ -49,8 +49,11 @@ const COMPONENT_PROGRESS_CLASS: Record<ComponentType, string> = {
 };
 
 export interface EmployeActivity {
-  /** `work` : produit un composant. `training` : se forme. `idle` : rien. */
-  kind: "work" | "training" | "idle" | "role";
+  /**
+   * `work` : produit un composant. `training` : se forme. `leave` : en congés.
+   * `idle` : rien.
+   */
+  kind: "work" | "training" | "leave" | "idle" | "role";
   label: string;
   Icon: IconComponent;
   /** Couleur du texte / de l'icône. */
@@ -76,12 +79,26 @@ const IDLE_ACTIVITY: EmployeActivity = {
   fillClass: "bg-base-content/40",
 };
 
+const LEAVE_ACTIVITY: EmployeActivity = {
+  kind: "leave",
+  label: "En congés",
+  Icon: BeachBag,
+  textClass: "text-info",
+  softClass: "bg-info/10 border-info/40",
+  accentBorderClass: "border-l-info",
+  progressClass: "",
+  fillClass: "bg-info/60",
+};
+
 /**
- * Activité courante d'un employé : affectation de production en priorité, puis
+ * Activité courante d'un employé : les congés d'abord (absent, il ne fait rien
+ * d'autre), puis l'affectation de production, puis
  * formation, puis rôle (QA / Marketing, qui n'ont pas d'affectation), sinon
  * inactif. Un seul point de vérité pour les trois vues de l'Accueil.
  */
 export const employeActivity = (emp: Employe): EmployeActivity => {
+  if (emp.leaveUntil != null) return LEAVE_ACTIVITY;
+
   const prod =
     emp.personType === PersonType.PROD ? (emp as ProductionPerson) : null;
 

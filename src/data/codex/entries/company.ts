@@ -333,7 +333,7 @@ export const COMPANY_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "Le studio démarre dans un **Garage** de 3 places. D'autres bâtiments s'achètent dans **SeLoger**, dont les annonces sont renouvelées chaque semaine ; leur nombre augmente avec la réputation. Chaque annonce indique ville, pays, **places**, **charges par mois** (loyer, électricité, internet) et **prix**.",
+        text: "Le studio démarre dans un **Garage** de 3 places. D'autres bâtiments s'achètent dans **SeLoger**, dont les annonces sont renouvelées chaque semaine ; leur nombre augmente avec la réputation. Elles sont posées sur le **plan de la ville** : chaque local (garage, loft, atelier, péniche…) a son quartier, son adresse, sa façade et quelques atouts, et indique **places**, **charges par mois** (loyer, électricité, internet) et **prix**.",
       },
       {
         type: "list",
@@ -342,6 +342,10 @@ export const COMPANY_ENTRIES: CodexEntry[] = [
           "Les **charges fixes** sont dues chaque mois, que le bâtiment soit occupé ou non.",
           "Des **charges variables** s'ajoutent pour chaque employé installé.",
         ],
+      },
+      {
+        type: "p",
+        text: "Le studio commence dans une seule ville. D'autres villes s'ouvrent aux paliers de réputation **25**, **50** et **75** ; chacune a son plan et ses propres annonces.",
       },
       {
         type: "p",

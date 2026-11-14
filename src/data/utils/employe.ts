@@ -25,6 +25,7 @@ import {
 } from "@/data/utils/recruitment";
 import { rollTraits } from "@/data/utils/traits";
 import { rollStatRangeOffsets } from "@/data/utils/candidateStats";
+import { randomAvatar } from "@/data/utils/avatar";
 
 // Plafond défini avec l'échelle des stats (interface) ; réexporté pour les
 // imports existants.
@@ -117,6 +118,7 @@ const baseCandidate = (seniority: Seniority): Person => {
     personType: PersonType.PROD,
     morale: DEFAULT_MORALE + randomIntFromInterval(-10, 10),
     seniority,
+    avatar: randomAvatar(),
   };
 };
 

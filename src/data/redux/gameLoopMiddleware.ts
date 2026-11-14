@@ -23,6 +23,7 @@ import {
   processMoraleTick,
 } from "@/data/utils/billing";
 import { processTrainingTick } from "@/data/utils/training";
+import { processLeaveTick } from "@/data/utils/leave";
 import { processRaiseTick } from "@/data/utils/events";
 import { processPoachingTick } from "@/data/utils/poaching";
 import { processResearchTick } from "@/data/utils/research";
@@ -114,6 +115,7 @@ export const runGameTick = (
   produceComponents(dispatch, state);
   decayComponents(dispatch, state);
   processTrainingTick(dispatch, state);
+  processLeaveTick(dispatch, state);
   processMonthlyBilling(dispatch, state);
   processCampaignTick(dispatch, state);
   processMoraleTick(dispatch, state);
@@ -163,6 +165,7 @@ export const runGameTick = (
     generateCompanyList({
       time: state.engine.time,
       reputation: state.company.reputation,
+      peakReputation: state.engine.peakReputation ?? 0,
     }),
   );
   // Palier de réputation franchi pour la première fois : on le dit,

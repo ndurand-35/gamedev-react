@@ -107,6 +107,7 @@ export const TrainingConfirmModal: FC<TrainingConfirmModalProps> = ({
   const reputation = useAppSelector((s) => s.company.reputation);
   const time = useAppSelector((s) => s.engine.time);
   const employeList = useAppSelector((s) => s.employe.employeList);
+  const buildingList = useAppSelector((s) => s.company.buildingList);
 
   const confirm = () => {
     onConfirm();
@@ -128,7 +129,7 @@ export const TrainingConfirmModal: FC<TrainingConfirmModalProps> = ({
         pending.employe,
         pending.trainingType,
         pending.employe.trainingProgress ?? 0,
-        trainingSpeedMultiplier(pending.employe, employeList),
+        trainingSpeedMultiplier(pending.employe, employeList, buildingList),
       )
     : null;
   // Mieux formé, il se sait plus cher : ce qu'il attendra au prochain palier.

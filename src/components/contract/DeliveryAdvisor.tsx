@@ -64,7 +64,10 @@ const formatGained = (gained: ConsumedComponent[]): string | null => {
 };
 
 /** Ce qu'une attente change, en clair : ce qu'elle apporte et ce qu'elle coûte. */
-const waitEffects = (now: DeliveryScenario, wait: DeliveryScenario): string[] => {
+const waitEffects = (
+  now: DeliveryScenario,
+  wait: DeliveryScenario,
+): string[] => {
   const effects: string[] = [];
   const gained = formatGained(wait.gained);
   if (gained) effects.push(gained);
@@ -99,9 +102,7 @@ const ScenarioRow: FC<ScenarioRowProps> = ({
   <div
     className={
       "grid grid-cols-[8rem_1fr_auto] items-center gap-2 border-l-2 pl-2 " +
-      (highlighted
-        ? "border-success"
-        : "border-transparent opacity-60")
+      (highlighted ? "border-success" : "border-transparent opacity-60")
     }
   >
     <span className={"text-sm " + (highlighted ? "font-semibold" : "")}>
@@ -144,8 +145,8 @@ export const DeliveryAdvisor: FC<DeliveryAdvisorProps> = ({
         <p className="text-xs opacity-80 mt-0.5">
           Il manquera {formatMissing(now.missing)} à l'effectif actuel. Sans
           renfort sur ces composants, le contrat expire et coûte{" "}
-          {formatMoney(priceMalus)} et{" "}
-          {Math.abs(DEADLINE_REPUTATION_MALUS)} points de réputation.
+          {formatMoney(priceMalus)} et {Math.abs(DEADLINE_REPUTATION_MALUS)}{" "}
+          points de réputation.
         </p>
       </div>
     );

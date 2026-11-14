@@ -7,10 +7,12 @@ import {
 } from "react";
 
 import {
+  BeachBag,
   CoffeeCup,
   Desk,
   List,
   NavArrowRight,
+  Sofa,
   Sparks,
   Table,
   ViewGrid,
@@ -27,6 +29,7 @@ import {
   ProductionPerson,
   QUALITY_LABELS,
   jobLabel,
+  buildingSeats,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 import {
@@ -50,6 +53,7 @@ import {
 } from "@/components/employe/ActivityBadge";
 import { SeatAssignModal } from "@/components/building/SeatAssignModal";
 import { WorkScheduleSelect } from "@/components/building/WorkScheduleSelect";
+import { AmenitiesModal } from "@/components/building/AmenitiesModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Effectif d'un bâtiment, en trois présentations au choix du joueur.
@@ -202,8 +206,9 @@ export const BuildingEmployeView = ({
   const filtersActive = role !== "all" || assignment !== "all" || lowMoraleOnly;
   const freeSeats = filtersActive
     ? 0
-    : Math.max(0, building.place - employes.length);
+    : Math.max(0, buildingSeats(building) - employes.length);
   const [seatTarget, setSeatTarget] = useState<Building | null>(null);
+  const [amenityTarget, setAmenityTarget] = useState<Building | null>(null);
   const openSeat = () => setSeatTarget(building);
 
   return (
@@ -215,12 +220,20 @@ export const BuildingEmployeView = ({
         <span className="badge h-7 bg-base-300 px-3">
           {isFiltered
             ? `${filtered.length} / ${employes.length} affichés`
-            : `${employes.length} / ${building.place} place${building.place > 1 ? "s" : ""}`}
+            : `${employes.length} / ${buildingSeats(building)} place${buildingSeats(building) > 1 ? "s" : ""}`}
         </span>
         <span className="text-sm font-bold text-base-content/70">
           {formatPrice(payroll)} / mois
         </span>
         <WorkScheduleSelect building={building} />
+        <button
+          type="button"
+          className="btn btn-sm gap-1.5"
+          onClick={() => setAmenityTarget(building)}
+        >
+          <Sofa width={16} height={16} />
+          Aménager
+        </button>
         {onMode && (
           <div className="ml-auto">
             <EmployeViewSwitch mode={mode} onMode={onMode} />
@@ -279,6 +292,10 @@ export const BuildingEmployeView = ({
         building={seatTarget}
         onClose={() => setSeatTarget(null)}
       />
+      <AmenitiesModal
+        building={amenityTarget}
+        onClose={() => setAmenityTarget(null)}
+      />
     </div>
   );
 };
@@ -295,20 +312,26 @@ const ActivitySummary = ({
 }: {
   employes: Employe[];
 }): ReactElement | null => {
-  const { byType, idle } = useMemo(() => {
+  const { byType, idle, away } = useMemo(() => {
     const byType = new Map<ComponentType, number>();
     let idle = 0;
+    let away = 0;
     for (const emp of employes) {
+      // En congés : absent, ni au travail ni inactif.
+      if (emp.leaveUntil != null) {
+        away += 1;
+        continue;
+      }
       const prod = asProd(emp);
       if (!prod) continue;
       const assigned = prod.assignedComponentType ?? null;
       if (assigned) byType.set(assigned, (byType.get(assigned) ?? 0) + 1);
       else idle += 1;
     }
-    return { byType, idle };
+    return { byType, idle, away };
   }, [employes]);
 
-  if (byType.size === 0 && idle === 0) return null;
+  if (byType.size === 0 && idle === 0 && away === 0) return null;
 
   return (
     <ul className="flex flex-wrap items-center gap-1.5">
@@ -332,6 +355,13 @@ const ActivitySummary = ({
           <CoffeeCup width={13} height={13} />
           <span className="tabular-nums">{idle}</span>
           <span>inactif{idle > 1 ? "s" : ""}</span>
+        </li>
+      )}
+      {away > 0 && (
+        <li className="inline-flex items-center gap-1 rounded-full border border-info/40 bg-info/10 px-2 py-0.5 text-xs font-medium text-info">
+          <BeachBag width={13} height={13} />
+          <span className="tabular-nums">{away}</span>
+          <span>en congés</span>
         </li>
       )}
     </ul>

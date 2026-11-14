@@ -1,6 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import {
+  AvatarConfig,
   ComponentType,
   MAX_MORALE,
   MAX_STAT_KEY_BY_TYPE,
@@ -169,6 +170,31 @@ export const employeSlice = createSlice({
         e.expectedSalary = Math.round((base * ratio) / 10) * 10;
       }
     },
+    // Départ en congés : absent jusqu'à `until` (cf. `utils/leave`).
+    startLeave(
+      state,
+      action: PayloadAction<{ employeId: number; until: number; morale: number }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (!employe) return;
+      employe.leaveUntil = action.payload.until;
+      employe.leaveMorale = action.payload.morale;
+    },
+    // Retour de congés : présent à nouveau, délai avant de repartir armé.
+    endLeave(
+      state,
+      action: PayloadAction<{ employeId: number; cooldownUntil: number }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (!employe) return;
+      delete employe.leaveUntil;
+      delete employe.leaveMorale;
+      employe.leaveCooldownUntil = action.payload.cooldownUntil;
+    },
     // Prime versée : arme le délai avant la prochaine (cf. `utils/morale`).
     setBonusCooldown(
       state,
@@ -178,6 +204,16 @@ export const employeSlice = createSlice({
         (e: Person) => e.id === action.payload.employeId,
       );
       if (employe) employe.bonusCooldownUntil = action.payload.until;
+    },
+    /** Nouvelle apparence (le fondateur se retouche depuis sa fiche). */
+    setAvatar(
+      state,
+      action: PayloadAction<{ employeId: number; avatar: AvatarConfig }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      );
+      if (employe) employe.avatar = action.payload.avatar;
     },
     setPendingRaise(
       state,
@@ -343,8 +379,11 @@ export const {
   setSalary,
   setRaiseCooldown,
   setBonusCooldown,
+  startLeave,
+  endLeave,
   raiseExpectedSalaries,
   setPendingRaise,
+  setAvatar,
   assignBuilding,
   assignComponentType,
   adjustMorale,

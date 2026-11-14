@@ -19,6 +19,7 @@ import {
   PersonType,
   ProductionPerson,
   RESIGNATION_MORALE_THRESHOLD,
+  buildingSeats,
 } from "@/data/interface";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
@@ -572,12 +573,12 @@ export const EmployePage: React.FC = (): ReactElement => {
                           <span
                             className="block h-full bg-ink"
                             style={{
-                              width: `${building.place > 0 ? Math.round((count / building.place) * 100) : 0}%`,
+                              width: `${buildingSeats(building) > 0 ? Math.round((count / buildingSeats(building)) * 100) : 0}%`,
                             }}
                           />
                         </span>
                         <span className="text-xs font-extrabold whitespace-nowrap tabular-nums">
-                          {count} / {building.place}
+                          {count} / {buildingSeats(building)}
                         </span>
                       </span>
                       <span

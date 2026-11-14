@@ -200,6 +200,8 @@ export const renderReport = (results: SimulationResult[]): string => {
         "Débauchés",
         "Jours crunch",
         "Jours détente",
+        "Congés",
+        "Aménag.",
       ],
       results.map((r) => {
         const last = r.years[r.years.length - 1];
@@ -225,6 +227,8 @@ export const renderReport = (results: SimulationResult[]): string => {
           String(r.counters.poachLost ?? 0),
           String(r.counters.crunchDays ?? 0),
           String(r.counters.restDays ?? 0),
+          String(r.counters.leaves ?? 0),
+          String(r.counters.amenities ?? 0),
         ];
       }),
     ),

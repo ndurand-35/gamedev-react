@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { TopMenuItem } from "@/data/interface";
@@ -26,7 +26,7 @@ import {
   Suitcase,
 } from "iconoir-react";
 
-const NAV_ITEMS: {
+type NavItem = {
   to: string;
   end?: boolean;
   ariaLabel: string;
@@ -41,7 +41,9 @@ const NAV_ITEMS: {
   activePrefixes?: string[];
   /** Pastille d'état portée par l'icône (dépend du store, rendue au rendu). */
   badge?: "loans";
-}[] = [
+};
+
+const NAV_ITEMS: NavItem[] = [
   {
     to: "/game",
     end: true,
@@ -92,11 +94,21 @@ const NAV_ITEMS: {
   },
 ];
 
+const NO_SUBMENU: TopMenuItem[] = [];
+
+/** Marge entre la capsule des sous-menus et le bord de l'écran. */
+const CAPSULE_MARGIN = 8;
+/**
+ * Délai avant de passer à la section voisine : en remontant en biais vers
+ * une capsule plus large que la touche, on frôle souvent la touche d'à côté.
+ */
+const SWITCH_DELAY_MS = 120;
+
 /**
  * Dock du bas : une grosse touche par section (icône + libellé), la section
  * courante enfoncée en jaune. Au survol, les sous-menus de la section montent
- * dans une capsule au-dessus du dock. Le temps et les vitesses vivent dans le
- * HUD du haut.
+ * dans une capsule posée au-dessus de la touche survolée. Le temps et les
+ * vitesses vivent dans le HUD du haut.
  */
 export const BottomNavigation = () => {
   const currentTopMenu = useAppSelector((state) => state.engine.currentTopMenu);
@@ -110,21 +122,87 @@ export const BottomNavigation = () => {
   };
 
   const { pathname } = useLocation();
+  const isActive = (item: NavItem) =>
+    pathname === item.to ||
+    (!item.end && pathname.startsWith(item.to + "/")) ||
+    !!item.activePrefixes?.some((p) => pathname.startsWith(p));
 
-  const [hoveredSubMenu, setHoveredSubMenu] = useState<TopMenuItem[] | null>(
-    null,
-  );
+  // Touche survolée (son `to`) ; sans survol, la capsule se pose sur la
+  // section courante.
+  const [hoveredTo, setHoveredTo] = useState<string | null>(null);
+  const hoveredItem = NAV_ITEMS.find((item) => item.to === hoveredTo);
+  const anchorTo = hoveredItem?.to ?? NAV_ITEMS.find(isActive)?.to ?? null;
+  const displayedSubMenu: TopMenuItem[] =
+    hoveredItem?.subMenu ?? currentTopMenu ?? NO_SUBMENU;
+  // Raccourci de la section, affiché au bout de sa capsule : une infobulle
+  // sur la touche viendrait se coller sous la capsule.
+  const anchorItem = NAV_ITEMS.find((item) => item.to === anchorTo);
+  const anchorKey = anchorItem?.shortcut
+    ? bindings[anchorItem.shortcut][0]
+    : null;
 
-  const displayedSubMenu = hoveredSubMenu ?? currentTopMenu;
+  const switchTimer = useRef<number | undefined>(undefined);
+  const cancelSwitch = () => window.clearTimeout(switchTimer.current);
+  useEffect(() => cancelSwitch, []);
+  const hoverItem = (to: string) => {
+    cancelSwitch();
+    if (hoveredTo === null) setHoveredTo(to);
+    else
+      switchTimer.current = window.setTimeout(
+        () => setHoveredTo(to),
+        SWITCH_DELAY_MS,
+      );
+  };
+
+  // Capsule centrée sur sa touche, sans sortir de l'écran.
+  const dockRef = useRef<HTMLDivElement>(null);
+  const capsuleRef = useRef<HTMLUListElement>(null);
+  const itemRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const [capsuleLeft, setCapsuleLeft] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const place = () => {
+      const dock = dockRef.current;
+      const capsule = capsuleRef.current;
+      if (!dock || !capsule) return;
+      const dockBox = dock.getBoundingClientRect();
+      const anchor = anchorTo ? itemRefs.current[anchorTo] : null;
+      const anchorBox = anchor?.getBoundingClientRect();
+      const center = anchorBox
+        ? anchorBox.left + anchorBox.width / 2 - dockBox.left
+        : dockBox.width / 2;
+      const width = capsule.offsetWidth;
+      setCapsuleLeft(
+        Math.max(
+          CAPSULE_MARGIN,
+          Math.min(center - width / 2, dockBox.width - width - CAPSULE_MARGIN),
+        ),
+      );
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [anchorTo, displayedSubMenu]);
 
   return (
     <div
+      ref={dockRef}
       className="group fixed bottom-0 left-0 z-40 flex h-20 w-full items-center gap-1.5 px-2 sm:gap-0 sm:px-4"
-      onMouseLeave={() => setHoveredSubMenu(null)}
+      onMouseLeave={() => {
+        cancelSwitch();
+        setHoveredTo(null);
+      }}
     >
-      {displayedSubMenu && displayedSubMenu.length > 0 && (
-        <div className="pointer-events-none absolute bottom-full left-0 flex w-full justify-center pb-1 opacity-0 max-sm:hidden transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
-          <ul className="toy-pill menu menu-horizontal flex-nowrap gap-1 p-1.5">
+      {displayedSubMenu.length > 0 && (
+        <div
+          className="pointer-events-none absolute bottom-full pb-1 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 max-sm:hidden"
+          style={{ left: capsuleLeft ?? undefined }}
+          // Arrivé sur la capsule, on garde la section qu'elle montre.
+          onMouseEnter={cancelSwitch}
+        >
+          <ul
+            ref={capsuleRef}
+            className="toy-pill menu menu-horizontal flex-nowrap gap-1 p-1.5"
+          >
             {displayedSubMenu.map((menu) => (
               <li key={`topmenu_item_${menu.name}`}>
                 <NavLink
@@ -139,6 +217,16 @@ export const BottomNavigation = () => {
                 </NavLink>
               </li>
             ))}
+            {anchorKey && (
+              <li
+                aria-hidden="true"
+                className="pointer-events-none justify-center pr-1.5 pl-0.5"
+              >
+                <kbd className="kbd kbd-sm text-ink">
+                  {keyLabel(anchorKey, layout)}
+                </kbd>
+              </li>
+            )}
           </ul>
         </div>
       )}
@@ -151,14 +239,19 @@ export const BottomNavigation = () => {
           gardent leur taille au centre du dock. */}
       <div className="flex min-w-0 flex-1 items-center justify-between gap-1 sm:flex-none sm:justify-center sm:gap-3">
         {NAV_ITEMS.map((item) => {
-          const active =
-            pathname === item.to ||
-            (!item.end && pathname.startsWith(item.to + "/")) ||
-            item.activePrefixes?.some((p) => pathname.startsWith(p));
+          const active = isActive(item);
           return (
             <div
-              className="tooltip max-w-14 min-w-0 flex-1 sm:max-w-none sm:flex-none"
-              data-tip={tip(item.ariaLabel, item.shortcut)}
+              className={
+                "max-w-14 min-w-0 flex-1 sm:max-w-none sm:flex-none " +
+                // Avec une capsule, le raccourci y est déjà.
+                (item.subMenu.length > 0 ? "" : "tooltip")
+              }
+              data-tip={
+                item.subMenu.length > 0
+                  ? undefined
+                  : tip(item.ariaLabel, item.shortcut)
+              }
               key={`nav_${item.to}`}
             >
               <NavLink
@@ -167,7 +260,10 @@ export const BottomNavigation = () => {
                 aria-label={item.ariaLabel}
                 aria-current={active ? "page" : undefined}
                 data-tuto={`nav:${item.to}`}
-                onMouseEnter={() => setHoveredSubMenu(item.subMenu)}
+                ref={(el) => {
+                  itemRefs.current[item.to] = el;
+                }}
+                onMouseEnter={() => hoverItem(item.to)}
                 className={
                   "btn relative h-12 w-full flex-col gap-0 px-0 sm:h-14 sm:w-14 lg:w-24 " +
                   (active ? "btn-primary btn-active" : "")

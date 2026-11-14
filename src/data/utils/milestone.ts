@@ -8,7 +8,8 @@ export interface ReputationMilestone {
   /**
    * Ce que le palier ouvre, en clair. Reflète les barèmes de
    * `generateNewContract` (contrats), `generateNewBuilding` (annonces) et
-   * `LOAN_OFFERS` (prêts) : à tenir à jour avec eux.
+   * `LOAN_OFFERS` (prêts) et `CITY_UNLOCK_REPUTATION` (villes) : à tenir à jour
+   * avec eux.
    */
   unlocks: string;
 }
@@ -25,19 +26,19 @@ export const REPUTATION_MILESTONES: ReputationMilestone[] = [
     name: "Studio indé",
     threshold: 25,
     unlocks:
-      "Recrutement de profils confirmés, prêt PME (50 000 €), 9 contrats et 5 annonces par semaine.",
+      "Recrutement de profils confirmés, prêt PME (50 000 €), 9 contrats et 5 annonces par semaine, une deuxième ville.",
   },
   {
     name: "Studio reconnu",
     threshold: 50,
     unlocks:
-      "Recrutement de seniors, prêt expansion (150 000 €), 10 contrats et 7 annonces par semaine.",
+      "Recrutement de seniors, prêt expansion (150 000 €), 10 contrats et 7 annonces par semaine, une troisième ville.",
   },
   {
     name: "Studio AAA",
     threshold: 75,
     unlocks:
-      "Prêt institutionnel (500 000 €), 12 contrats et 9 annonces par semaine.",
+      "Prêt institutionnel (500 000 €), 12 contrats et 9 annonces par semaine, une quatrième ville.",
   },
   {
     name: "Studio légendaire",

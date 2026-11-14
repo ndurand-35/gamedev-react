@@ -21,6 +21,8 @@ const SEEDS = (process.env.SIM_SEEDS ?? "1,2,3")
   .map((s) => Number(s.trim()))
   .filter((n) => Number.isFinite(n));
 const SCHEDULE = (process.env.SIM_SCHEDULE ?? "NORMAL") as SchedulePolicy;
+// SIM_AMENITIES=0 : le bot n'achète aucun aménagement (comparaison).
+const AMENITIES = process.env.SIM_AMENITIES !== "0";
 // Suffixe des fichiers de sortie : plusieurs simulations en parallèle.
 const TAG = process.env.SIM_TAG ? `-${process.env.SIM_TAG}` : "";
 
@@ -37,6 +39,7 @@ it(`simule ${SEEDS.length} partie(s) sur ${YEARS} ans`, () => {
       seed,
       years: YEARS,
       schedule: SCHEDULE,
+      amenities: AMENITIES,
       onYear: (y) =>
         appendFileSync(
           progress,

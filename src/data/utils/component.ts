@@ -171,6 +171,8 @@ export const produceComponents = (dispatch: AppDispatch, state: RootState) => {
     }
     if (employe.buildingId == null) continue;
     if (founderBusy && employe.id === FOUNDER_ID) continue;
+    // En congés : rien ne sort, l'avancement attend le retour.
+    if (employe.leaveUntil != null) continue;
 
     const stat = getRelevantStat(employe, type);
     const synergy = buildingSynergyMultiplier(

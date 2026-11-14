@@ -121,6 +121,10 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
   const capReached = useAppSelector(selectRemainingSlots) <= 0;
   // En formation, le fondateur n'est pas disponible pour un entretien.
   const founderResearching = useAppSelector(isFounderResearching);
+  // En congés non plus.
+  const founderAway = useAppSelector(
+    (s) => s.employe.employeList.find((e) => e.id === 1)?.leaveUntil != null,
+  );
 
   const revealed = candidate?.revealedStats ?? false;
   const expected = candidate?.expectedSalary ?? candidate?.salary ?? 0;
@@ -429,11 +433,13 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
                       type="button"
                       className="btn btn-sm justify-between"
                       onClick={runInterview}
-                      disabled={founderResearching}
+                      disabled={founderResearching || founderAway}
                       title={
                         founderResearching
                           ? "Le fondateur est en formation : il ne peut pas mener d'entretien."
-                          : undefined
+                          : founderAway
+                            ? "Le fondateur est en congés : il ne peut pas mener d'entretien."
+                            : undefined
                       }
                     >
                       <span className="flex items-center gap-1.5">

@@ -1,4 +1,5 @@
 import { FC, ReactElement, useState } from "react";
+import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
 
 import {
   Employe,
@@ -6,6 +7,7 @@ import {
   ProductionPerson,
   getBuildingMonthlyCharges,
   jobLabel,
+  buildingSeats,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 import { formatPrice } from "@/data/utils";
@@ -52,7 +54,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
         </p>
         <div className="flex flex-wrap gap-4 text-sm mt-2">
           <span>
-            {employes.length}/{building.place} places
+            {employes.length}/{buildingSeats(building)} places
           </span>
         </div>
         <div className="mt-3 pt-3 border-t border-base-content/10">
@@ -103,14 +105,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
                   key={`detail_employe_${emp.id}`}
                   className="flex items-center gap-2 p-2 rounded border border-base-content/10"
                 >
-                  <div className="avatar avatar-placeholder">
-                    <div className="bg-neutral text-neutral-content rounded-full w-10">
-                      <span className="uppercase">
-                        {emp.firstName[0]}
-                        {emp.lastName[0]}
-                      </span>
-                    </div>
-                  </div>
+                  <EmployeAvatar employe={emp} size={40} />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
                       {emp.firstName} {emp.lastName}

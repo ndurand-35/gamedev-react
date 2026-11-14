@@ -5,8 +5,8 @@ import { EmployeState } from "@/data/redux/employeSlice";
 import { ComponentState } from "@/data/redux/componentSlice";
 import { ComponentType } from "@/data/interface";
 import { starterStock } from "@/data/utils/firstContract";
-
-import { faker } from "@faker-js/faker";
+import { newCitySeed } from "@/data/utils/city";
+import { buildStarterGarage } from "@/data/utils/studioListing";
 
 /**
  * Vitesses de jeu, en millisecondes entre deux ticks (0 = pause). Source
@@ -45,38 +45,26 @@ export const DEFAULT_ENGINE_STATE: EngineState = {
   bestMonthlyBalance: null,
 };
 
-export const buildDefaultCompanyState = (): CompanyState => ({
-  money: 10000,
-  reputation: 0,
-  reputationByType: {
-    [ComponentType.CODE]: 0,
-    [ComponentType.VISUEL]: 0,
-    [ComponentType.UX]: 0,
-  },
-  buildingList: [
-    {
-      id: 1,
-      name: "Garage",
-      price: 0,
-      place: 3,
-      rent: 60,
-      electricity: 25,
-      internet: 15,
-      image:
-        "https://www.menuiserie-legoffic.com/wp-content/uploads/2023/11/transformer-un-garage-en-bureau.jpg",
-      address: {
-        adr1: faker.location.street(),
-        adr2: faker.location.secondaryAddress(),
-        city: faker.location.city(),
-        country: faker.location.country(),
-      },
+export const buildDefaultCompanyState = (): CompanyState => {
+  // Graine des villes de SeLoger : tirée à la création de la partie, elle
+  // fixe le plan de chaque ville et l'îlot du Garage (cf. `utils/city`).
+  const citySeed = newCitySeed();
+  return {
+    money: 10000,
+    reputation: 0,
+    reputationByType: {
+      [ComponentType.CODE]: 0,
+      [ComponentType.VISUEL]: 0,
+      [ComponentType.UX]: 0,
     },
-  ],
-  availableBuildingList: [],
-  lastBuildingGeneration: -168,
-  nextBuildingId: 2,
-  activeCampaign: undefined,
-});
+    buildingList: [buildStarterGarage(citySeed)],
+    availableBuildingList: [],
+    lastBuildingGeneration: -168,
+    nextBuildingId: 2,
+    activeCampaign: undefined,
+    citySeed,
+  };
+};
 
 export const DEFAULT_COMPANY_STATE: CompanyState = buildDefaultCompanyState();
 

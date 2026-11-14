@@ -4,49 +4,25 @@ import {
   getBuildingMonthlyCharges,
   getBuildingResaleValue,
 } from "@/data/interface";
-import { faker } from "@faker-js/faker";
-import { randomIntFromInterval, formatPrice } from "@/data/utils";
+import { formatPrice } from "@/data/utils";
+import {
+  ListingContext,
+  generateStudioListings,
+} from "@/data/utils/studioListing";
 import { releaseBuilding } from "@/data/redux/companySlice";
 import { pushNotification } from "@/data/redux/notificationSlice";
 import { AppDispatch, RootState } from "@/data/redux/store";
 import { SortState, nextSort, sortBy } from "@/data/utils/sort";
 
-export const generateNewBuilding = (reputation: number): Building[] => {
-  let nbGenerated = 3;
-  if (reputation >= 25) nbGenerated = 5;
-  if (reputation >= 50) nbGenerated = 7;
-  if (reputation >= 75) nbGenerated = 9;
-  if (reputation === 100) nbGenerated = 15;
+/**
+ * Annonces SeLoger de la semaine : des studios générés sur les îlots libres
+ * des villes ouvertes (cf. `utils/studioListing`, `utils/city`).
+ */
+export const generateNewBuilding = (
+  reputation: number,
+  ctx: ListingContext,
+): Building[] => generateStudioListings(reputation, ctx);
 
-  let generated: Building[] = [];
-  for (let i = 0; i < nbGenerated; i++) {
-    let time = randomIntFromInterval(1, 8);
-    let nbPlace = randomIntFromInterval(time + 2, time * 4);
-    let price = randomIntFromInterval(nbPlace * 8000, nbPlace * 10250);
-    let rent = randomIntFromInterval(nbPlace * 80, nbPlace * 160);
-    let electricity = randomIntFromInterval(nbPlace * 25, nbPlace * 60);
-    let internet = randomIntFromInterval(30, 80);
-
-    let address = {
-      adr1: faker.location.street(),
-      adr2: faker.location.secondaryAddress(),
-      city: faker.location.city(),
-      country: faker.location.country(),
-    };
-    generated.push({
-      id: 0, // assigné par le slice via nextBuildingId
-      name: faker.location.street(),
-      rent,
-      electricity,
-      internet,
-      address,
-      place: nbPlace,
-      price,
-      image: faker.image.urlLoremFlickr({ category: "building" }),
-    });
-  }
-  return generated;
-};
 export const getBuildingEmploye = (
   employeList: Employe[],
   building: Building,

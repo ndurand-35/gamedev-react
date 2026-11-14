@@ -166,11 +166,14 @@ export const simulate = ({
   years,
   onYear,
   schedule = "NORMAL",
+  amenities = true,
 }: {
   seed: number;
   years: number;
   /** Rythme de travail joué par le bot (cf. `SchedulePolicy`). */
   schedule?: SchedulePolicy;
+  /** Le bot achète-t-il des aménagements ? */
+  amenities?: boolean;
   /** Appelé à chaque année close : suivi de progression. */
   onYear?: (record: YearRecord) => void;
 }): SimulationResult => {
@@ -184,7 +187,7 @@ export const simulate = ({
     });
     const dispatch = store.dispatch as (a: unknown) => unknown;
     newGame(dispatch);
-    const bot = new Bot(store, schedule);
+    const bot = new Bot(store, schedule, amenities);
 
     const records: YearRecord[] = [];
     let bankruptAt: number | null = null;
@@ -240,7 +243,8 @@ export const simulate = ({
           diff("recruitSpend") +
             diff("buildingSpend") +
             diff("promotionSpend") +
-            diff("bonusSpend"),
+            diff("bonusSpend") +
+            diff("amenitySpend"),
         ),
         training: Math.round(acc.training),
         onSale: state.product.products.filter(

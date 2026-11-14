@@ -4,10 +4,15 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import {
   Building,
   ComponentType,
+  AMENITY_BY_ID,
+  AMENITY_RESALE_RATIO,
+  AmenityId,
   WorkSchedule,
   getBuildingResaleValue,
 } from "@/data/interface";
 import { generateNewBuilding } from "@/data/utils/building";
+import { newCitySeed } from "@/data/utils/city";
+import { resolveOwnedLocations } from "@/data/utils/studioListing";
 import {
   DEFAULT_COMPANY_STATE,
   buildDefaultCompanyState,
@@ -38,6 +43,11 @@ export interface CompanyState {
    * n'a encore été gagné.
    */
   contractReputation?: { month: string; gained: number };
+  /**
+   * Graine des villes de SeLoger (cf. `utils/city`). Absente d'une partie
+   * antérieure aux villes : tirée à la prochaine génération d'annonces.
+   */
+  citySeed?: number;
 }
 
 const initialState: CompanyState = DEFAULT_COMPANY_STATE;
@@ -57,6 +67,7 @@ export const companySlice = createSlice({
       state.nextBuildingId = fresh.nextBuildingId;
       state.activeCampaign = fresh.activeCampaign;
       state.contractReputation = undefined;
+      state.citySeed = fresh.citySeed;
     },
     addReputation(state, action: PayloadAction<number>) {
       state.reputation = Math.max(
@@ -99,6 +110,34 @@ export const companySlice = createSlice({
       );
       if (building) building.name = action.payload.name;
     },
+    // Aménagement acheté : payé, installé (cf. `utils/amenities`, garde-fous).
+    installAmenity(
+      state,
+      action: PayloadAction<{ buildingId: number; amenityId: AmenityId }>,
+    ) {
+      const building = state.buildingList.find(
+        (b) => b.id === action.payload.buildingId,
+      );
+      const def = AMENITY_BY_ID[action.payload.amenityId];
+      if (!building || !def) return;
+      if (building.amenities?.includes(def.id)) return;
+      if (state.money < def.price) return;
+      state.money -= def.price;
+      building.amenities = [...(building.amenities ?? []), def.id];
+    },
+    // Aménagement revendu : retiré, une part du prix récupérée.
+    removeAmenity(
+      state,
+      action: PayloadAction<{ buildingId: number; amenityId: AmenityId }>,
+    ) {
+      const building = state.buildingList.find(
+        (b) => b.id === action.payload.buildingId,
+      );
+      const def = AMENITY_BY_ID[action.payload.amenityId];
+      if (!building || !def || !building.amenities?.includes(def.id)) return;
+      building.amenities = building.amenities.filter((id) => id !== def.id);
+      state.money += Math.round(def.price * AMENITY_RESALE_RATIO);
+    },
     // Rythme de travail d'un studio (cf. `utils/workSchedule`).
     setBuildingSchedule(
       state,
@@ -114,11 +153,32 @@ export const companySlice = createSlice({
     },
     generateCompanyList(
       state,
-      action: PayloadAction<{ reputation: number; time: number }>,
+      action: PayloadAction<{
+        reputation: number;
+        time: number;
+        /** Pic de réputation : il ouvre les villes. Défaut : la réputation. */
+        peakReputation?: number;
+      }>,
     ) {
-      if (action.payload.time - state.lastBuildingGeneration > 168) {
+      if (state.citySeed == null) state.citySeed = newCitySeed();
+      // Annonces d'avant les villes (sans îlot) : on les remplace aussitôt.
+      const stale = state.availableBuildingList.some((b) => !b.location);
+      if (
+        stale ||
+        action.payload.time - state.lastBuildingGeneration > 168
+      ) {
         state.lastBuildingGeneration = action.payload.time;
-        const buildings = generateNewBuilding(action.payload.reputation);
+        const buildings = generateNewBuilding(action.payload.reputation, {
+          citySeed: state.citySeed,
+          peakReputation:
+            action.payload.peakReputation ?? action.payload.reputation,
+          occupied: [
+            ...resolveOwnedLocations(
+              state.buildingList,
+              state.citySeed,
+            ).values(),
+          ],
+        });
         state.availableBuildingList = buildings.map((b) => ({
           ...b,
           id: state.nextBuildingId++,
@@ -190,6 +250,8 @@ export const {
   paySeverance,
   renameBuilding,
   setBuildingSchedule,
+  installAmenity,
+  removeAmenity,
   releaseBuilding,
   launchCampaign,
   clearCampaign,

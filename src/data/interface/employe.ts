@@ -1,4 +1,5 @@
 import { ComponentType } from "@/data/interface/component";
+import { AvatarConfig } from "@/data/interface/avatar";
 
 export enum PersonType {
   PROD = "Production",
@@ -37,6 +38,9 @@ export interface Person {
   buildingId?: number;
   personType: PersonType;
   morale: number;
+  /** Apparence. Absente sur les profils d'avant les avatars : `avatarOf`
+   * en dérive alors une du nom. */
+  avatar?: AvatarConfig;
 
   // ── Recrutement enrichi (MYL-13) ──────────────────────────────────────────
   // Salaire attendu (base de négociation, §3). Borné dans l'enveloppe du rôle.
@@ -62,6 +66,11 @@ export interface Person {
   // Temps de jeu (heures) avant lequel une nouvelle prime ne peut pas être
   // versée (cf. `utils/morale`).
   bonusCooldownUntil?: number;
+  // Congés (cf. `utils/leave`) : heure de jeu du retour tant que l'employé est
+  // absent, moral qu'il regagnera en rentrant, et délai avant de repartir.
+  leaveUntil?: number;
+  leaveMorale?: number;
+  leaveCooldownUntil?: number;
   // Candidat uniquement : temps de jeu (heures) au-delà duquel le profil quitte
   // le vivier — un candidat ramené par une recherche ne patiente pas
   // indéfiniment. Absent sur un employé embauché.

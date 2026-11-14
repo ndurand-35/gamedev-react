@@ -2,7 +2,7 @@ import { FC, ReactElement } from "react";
 import { Link } from "react-router-dom";
 import { Check, Plus } from "iconoir-react";
 
-import { Building } from "@/data/interface";
+import { Building, buildingSeats } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 
 interface BuildingPickerProps {
@@ -42,7 +42,7 @@ export const BuildingPicker: FC<BuildingPickerProps> = ({
                 <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
                   <span className="font-medium truncate w-full">{b.name}</span>
                   <span className="text-xs opacity-70">
-                    {b.address.city} · {occupied}/{b.place} places
+                    {b.address.city} · {occupied}/{buildingSeats(b)} places
                   </span>
                 </div>
                 {isActive && <Check width={16} height={16} />}

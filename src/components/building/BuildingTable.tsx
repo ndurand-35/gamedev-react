@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { LogOut, Text } from "iconoir-react";
 import { createColumnHelper } from "@tanstack/react-table";
 
-import { Building, getBuildingMonthlyCharges } from "@/data/interface";
+import { Building, getBuildingMonthlyCharges, buildingSeats } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 import { getBuildingEmploye } from "@/data/utils";
 import { formatPrice } from "@/data/utils";
@@ -60,7 +60,7 @@ export const BuildingTable = () => {
                 <span
                   className="block h-full bg-ink"
                   style={{
-                    width: `${b.place > 0 ? Math.round((occupants / b.place) * 100) : 0}%`,
+                    width: `${buildingSeats(b) > 0 ? Math.round((occupants / buildingSeats(b)) * 100) : 0}%`,
                   }}
                 />
               </span>

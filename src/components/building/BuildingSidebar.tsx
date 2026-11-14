@@ -1,7 +1,7 @@
 import { FC, ReactElement, useMemo } from "react";
 import { Link } from "react-router-dom";
 
-import { Building } from "@/data/interface";
+import { Building, buildingSeats } from "@/data/interface";
 import { setCurrentBuilding } from "@/data/redux/engineSlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { selectCurrentBuilding } from "@/data/redux/selectors";
@@ -51,7 +51,7 @@ export const BuildingSidebar: FC = (): ReactElement => {
       <ul className="flex flex-col gap-3 pt-1">
         {stats.map(({ building, count, alerts }) => {
           const selected = building.id === current?.id;
-          const ratio = building.place > 0 ? count / building.place : 0;
+          const ratio = buildingSeats(building) > 0 ? count / buildingSeats(building) : 0;
           return (
             <li key={building.id}>
               <button
@@ -70,7 +70,7 @@ export const BuildingSidebar: FC = (): ReactElement => {
                     {building.name}
                   </span>
                   <span className="shrink-0 text-xs font-extrabold tabular-nums">
-                    {count} / {building.place}
+                    {count} / {buildingSeats(building)}
                   </span>
                 </span>
                 <span className="block h-2 overflow-hidden rounded-full border-2 border-ink bg-base-300">

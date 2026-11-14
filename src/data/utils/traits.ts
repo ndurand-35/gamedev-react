@@ -5,7 +5,14 @@
 // le profil n'est pas vérifié (entretien ou process RH express).
 // Logique pure : les tirages sont injectés.
 
-import { Person, PersonType, TraitId } from "@/data/interface";
+import {
+  Building,
+  LIBRARY_TRAINING_SPEED,
+  Person,
+  PersonType,
+  TraitId,
+  hasAmenity,
+} from "@/data/interface";
 
 export type { TraitId };
 
@@ -117,7 +124,13 @@ export const qualityBonus = (p: Person): number =>
 export const trainingSpeedMultiplier = (
   p: Person,
   colleagues: Person[],
+  /** Bâtiments, pour leur bibliothèque (cf. `interface/amenity`). */
+  buildings: Building[] = [],
 ): number => {
+  const library = hasAmenity(
+    buildings.find((b) => b.id === p.buildingId),
+    "biblio",
+  );
   const mentored =
     p.buildingId != null &&
     colleagues.some(
@@ -128,7 +141,8 @@ export const trainingSpeedMultiplier = (
     );
   return (
     (hasTrait(p, "autodidacte") ? SELF_TAUGHT_TRAINING_SPEED : 1) *
-    (mentored ? 1 + MENTOR_TRAINING_BOOST : 1)
+    (mentored ? 1 + MENTOR_TRAINING_BOOST : 1) *
+    (library ? LIBRARY_TRAINING_SPEED : 1)
   );
 };
 

@@ -69,8 +69,9 @@ export interface ForecastedComponent {
 /**
  * Composants que l'effectif actuel sortira entre `from` et `until`, à staffing
  * constant : même débit horaire que `produceComponents` (stat × moral ×
- * synergie du bâtiment × rythme du studio), même seuil de points. Un employé non productif, non
- * assigné ou sans bâtiment ne produit rien.
+ * synergie du bâtiment × rythme du studio), même seuil de points. Un employé
+ * non productif, non assigné ou sans bâtiment ne produit rien ; un employé en
+ * congés ne reprend qu'à son retour.
  */
 export const forecastProduction = (
   employes: Person[],
@@ -91,7 +92,6 @@ export const forecastProduction = (
     }
   }
 
-  const horizon = until - from;
   const forecast: ForecastedComponent[] = [];
 
   for (const employe of employes) {
@@ -109,20 +109,22 @@ export const forecastProduction = (
     if (output <= 0) continue;
 
     const progress = productionProgress[employe.id] ?? 0;
+    const start = Math.max(from, employe.leaveUntil ?? from);
+    if (start >= until) continue;
     const quality = expectedComponentQuality(
       stat,
       qualityBonus(employe) +
         scheduleQuality(schedules.get(employe.buildingId) ?? "NORMAL"),
     );
     const count = Math.floor(
-      (progress + output * horizon) / PRODUCTION_THRESHOLD,
+      (progress + output * (until - start)) / PRODUCTION_THRESHOLD,
     );
     // Le k-ième composant sort au premier tick horaire où le cumul de points
     // franchit k paliers : c'est exactement la boucle `while` de la production.
     for (let k = 1; k <= count; k++) {
       const ticks = Math.ceil((k * PRODUCTION_THRESHOLD - progress) / output);
       forecast.push({
-        at: from + ticks,
+        at: start + ticks,
         type,
         quality,
         producedBy: employe.id,

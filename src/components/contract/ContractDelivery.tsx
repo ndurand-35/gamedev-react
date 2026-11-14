@@ -1,19 +1,16 @@
 import { FC, ReactElement, useMemo } from "react";
 import { Hourglass } from "iconoir-react";
 
-import { ComponentType, StartedContract } from "@/data/interface";
+import { StartedContract } from "@/data/interface";
 import { ClientBadge } from "@/components/contract/ClientBadge";
 import { DeliveryAdvisor } from "@/components/contract/DeliveryAdvisor";
 import { RequirementList } from "@/components/contract/RequirementList";
-import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
+import { useAppSelector } from "@/data/redux/hooks";
 import {
-  EARLY_DELIVERY_RATIO,
-  FOUNDER_ID,
-  adviseDelivery,
-  deliverContract,
-  hasFounderSkill,
-  selectBestComponents,
-} from "@/data/utils";
+  deadlineLabel,
+  useContractDelivery,
+} from "@/components/contract/useContractDelivery";
+import { FOUNDER_ID, adviseDelivery, hasFounderSkill } from "@/data/utils";
 
 interface ContractDeliveryProps {
   contract: StartedContract;
@@ -30,7 +27,8 @@ interface ContractDeliveryProps {
 export const ContractDelivery: FC<ContractDeliveryProps> = ({
   contract,
 }): ReactElement => {
-  const dispatch = useAppDispatch();
+  const { deliverable, heldByType, hoursLeft, daysLeft, early, deliver } =
+    useContractDelivery(contract);
   const time = useAppSelector((state) => state.engine.time);
   const stock = useAppSelector((state) => state.component.stock);
   const employes = useAppSelector((state) => state.employe.employeList);
@@ -43,29 +41,6 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
     (state) => state.research.current !== null,
   );
   const hasAdvisor = hasFounderSkill(acquiredSkills, "delivery_advisor");
-
-  // Sélection sur le stock RÉEL : c'est elle qui doit décider si le bouton est
-  // actif, puisque c'est exactement ce que `deliverContract` consommera.
-  const selection = useMemo(
-    () => selectBestComponents(stock, contract.requirements),
-    [stock, contract.requirements],
-  );
-  const deliverable = selection.missing.length === 0;
-
-  // Ce que le stock couvre déjà, par type : la sélection ne remonte que le
-  // manque, le reste est donc réputé disponible.
-  const heldByType = useMemo(() => {
-    const held: Record<ComponentType, number> = {
-      [ComponentType.CODE]: 0,
-      [ComponentType.VISUEL]: 0,
-      [ComponentType.UX]: 0,
-    };
-    for (const req of contract.requirements) {
-      const missing = selection.missing.find((m) => m.type === req.type);
-      held[req.type] = req.quantity - (missing?.quantity ?? 0);
-    }
-    return held;
-  }, [contract.requirements, selection.missing]);
 
   // Le fondateur en formation ne produit pas : la projection doit l'ignorer,
   // comme `produceComponents`.
@@ -100,12 +75,6 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
     ],
   );
 
-  const hoursLeft = contract.startDate + contract.time - time;
-  const daysLeft = Math.max(0, Math.round(hoursLeft / 24));
-  // La fenêtre de prime est un fait du contrat, pas un conseil : affichée
-  // même sans compétence.
-  const early =
-    time - contract.startDate < contract.time * EARLY_DELIVERY_RATIO;
   const deadlineChip =
     hoursLeft <= 0
       ? "bg-error text-white"
@@ -133,9 +102,7 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold ${deadlineChip}`}
           >
             <Hourglass width={12} height={12} strokeWidth={2.4} />
-            {hoursLeft <= 0
-              ? "Délai dépassé"
-              : `${daysLeft} jour${daysLeft > 1 ? "s" : ""}`}
+            {deadlineLabel(hoursLeft, daysLeft)}
           </span>
           {early && hoursLeft > 0 && (
             <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-extrabold text-success">
@@ -152,7 +119,7 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
         />
         <button
           type="button"
-          onClick={() => dispatch(deliverContract(contract.id))}
+          onClick={deliver}
           disabled={!deliverable}
           data-tuto="contract-deliver"
           className="btn btn-primary"

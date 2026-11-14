@@ -10,13 +10,15 @@ import {
 } from "@/data/redux/selectors";
 import { EmployeModal } from "@/components/employe";
 import { BuildingSidebar } from "@/components/building/BuildingSidebar";
+import { CurrentContractsPanel } from "@/components/contract/CurrentContractsPanel";
 
 const pageTopMenuItems: TopMenuItem[] = [];
 
 /**
- * Vue studio : l'effectif du bâtiment courant. Le bâtiment se choisit depuis
- * le sélecteur du menu du bas (`BuildingSwitcher`) et, à partir de deux
- * bâtiments, depuis la colonne de gauche qui signale les alertes de chacun.
+ * Vue studio : l'effectif du bâtiment courant, et à droite les contrats en
+ * cours. Le bâtiment se choisit depuis le sélecteur du menu du bas
+ * (`BuildingSwitcher`) et, à partir de deux bâtiments, depuis la colonne de
+ * gauche qui signale les alertes de chacun.
  */
 export const HomePage: React.FC = (): ReactElement => {
   useTopMenu(pageTopMenuItems);
@@ -32,17 +34,20 @@ export const HomePage: React.FC = (): ReactElement => {
   );
 
   const openEmploye = (id: number) => setSelectedEmployeId(id);
+  const multi = buildingCount >= 2;
 
   return (
     <div
       className={
         "fixed inset-x-0 top-14 bottom-20 grid grid-cols-1 gap-4 overflow-hidden px-2 pt-3 pb-2 sm:px-4 " +
-        (buildingCount >= 2 ? "md:grid-cols-[15rem_minmax(0,1fr)]" : "")
+        (multi
+          ? "md:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_21rem]"
+          : "lg:grid-cols-[minmax(0,1fr)_21rem]")
       }
     >
       {/* Sur téléphone, le sélecteur du dock suffit : la colonne écraserait
           l'effectif. */}
-      {buildingCount >= 2 && (
+      {multi && (
         <div className="hidden min-h-0 md:contents">
           <BuildingSidebar />
         </div>
@@ -66,6 +71,14 @@ export const HomePage: React.FC = (): ReactElement => {
             onSelect={openEmploye}
           />
         )}
+      </div>
+
+      {/* Contrats signés à droite, dès que la largeur le permet ; sinon ils
+          restent sur la page Contrats. */}
+      <div
+        className={"hidden min-h-0 " + (multi ? "xl:contents" : "lg:contents")}
+      >
+        <CurrentContractsPanel />
       </div>
 
       <EmployeModal

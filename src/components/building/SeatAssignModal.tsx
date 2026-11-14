@@ -2,7 +2,7 @@ import { FC, ReactElement, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Desk } from "iconoir-react";
 
-import { Building, Employe, jobLabel } from "@/data/interface";
+import { Building, Employe, jobLabel, buildingSeats } from "@/data/interface";
 import { assignBuilding } from "@/data/redux/employeSlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { EmployeTag } from "@/components/employe/MoraleIcon";
@@ -49,7 +49,7 @@ export const SeatAssignModal: FC<SeatAssignModalProps> = ({
       assignBuilding({
         employeId: emp.id,
         buildingId: building.id,
-        buildingPlace: building.place,
+        buildingPlace: buildingSeats(building),
       }),
     );
     onClose();
