@@ -10,6 +10,7 @@ import {
   nextTechnology,
   techAdoption,
 } from "@/data/utils/technology";
+import { CodexLink } from "@/components/codex/CodexLink";
 
 /** « Outil +80 %, Jeu +20 % » : ce que la technologie fait à la demande. */
 const demandEffects = (tech: TechnologyDef): string =>
@@ -45,6 +46,7 @@ export const TechnologyPanel: FC<{ time: number }> = ({ time }) => {
       <div className="flex flex-row flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider opacity-60">
           <Cpu width={14} height={14} aria-hidden /> Technologies · {year}
+          <CodexLink id="technologies" />
         </span>
         <span className="text-xs opacity-70">
           {next ? (
@@ -57,8 +59,7 @@ export const TechnologyPanel: FC<{ time: number }> = ({ time }) => {
             ) : (
               <span className="inline-flex items-center gap-1">
                 <Lock width={12} height={12} aria-hidden />
-                Prochaine technologie inconnue — la « Veille technologique »
-                du fondateur permet de l'anticiper.
+                Prochaine technologie inconnue
               </span>
             )
           ) : (

@@ -17,7 +17,9 @@ export type EventEffect =
   | { kind: "contractMalus"; amount: number } // coût ponctuel (money -= amount)
   // Recrutement enrichi (MYL-13) — augmentations (volet C)
   | { kind: "salary"; employeId: number; salary: number } // nouveau salaire mensuel
-  | { kind: "raiseCooldown"; employeId: number; until: number }; // réarme l'anti-spam
+  | { kind: "raiseCooldown"; employeId: number; until: number } // réarme l'anti-spam
+  // Débauchage : l'employé quitte le studio (cf. utils/poaching).
+  | { kind: "leave"; employeId: number };
 
 export interface DecisionOption {
   id: string;

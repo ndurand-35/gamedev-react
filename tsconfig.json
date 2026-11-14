@@ -25,5 +25,8 @@
 		}
   },
   "include": ["src"],
+  // Points d'entrée de la simulation (`npm run sim`) : ils tournent sous Node
+  // (fichiers, variables d'environnement), que le jeu n'embarque pas.
+  "exclude": ["src/**/*.sim.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

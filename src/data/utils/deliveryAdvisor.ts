@@ -1,4 +1,5 @@
 import {
+  Building,
   COMPONENT_DECAY_PERIOD_HOURS,
   Component,
   ComponentQuality,
@@ -7,6 +8,7 @@ import {
   ConsumedComponent,
   Contract,
   Person,
+  QUALITY_STAT_STEP,
   STAT_KEY_BY_TYPE,
   StartedContract,
   buildingSynergyMultiplier,
@@ -14,6 +16,7 @@ import {
   hoursBeforeNextDecay,
   moraleProductivityMultiplier,
 } from "@/data/interface";
+import { productionSpeedMultiplier, qualityBonus } from "@/data/utils/traits";
 import { PRODUCTION_THRESHOLD } from "@/data/redux/componentSlice";
 import {
   computeAverageQuality,
@@ -21,6 +24,11 @@ import {
   selectBestComponents,
 } from "@/data/utils/component";
 import { EARLY_DELIVERY_RATIO, computeContractPayout } from "@/data/utils/task";
+import {
+  employeScheduleOutput,
+  scheduleByBuilding,
+  scheduleQuality,
+} from "@/data/utils/workSchedule";
 
 // --- Conseiller de livraison -----------------------------------------------
 // Le joueur choisit quand livrer, et ce choix arbitre trois forces qui tirent
@@ -36,14 +44,19 @@ export const MAX_DELIVERY_CANDIDATES = 24;
 
 /**
  * Qualité anticipée d'un composant produit avec `relevantStat` : la valeur
- * modale de `rollComponentQuality`, variance et bonus rare écartés — ils sont
+ * modale de `rollComponent`, variance et bonus rare écartés — ils sont
  * centrés (ou négligeables) et surtout non prévisibles. Une prévision reste
  * donc une espérance, jamais une promesse.
  */
 export const expectedComponentQuality = (
   relevantStat: number,
+  /** Crans de qualité ajoutés par les traits (cf. `qualityBonus`). */
+  bonus: number = 0,
 ): ComponentQuality =>
-  Math.max(0, Math.min(5, Math.round(relevantStat / 5))) as ComponentQuality;
+  Math.max(
+    0,
+    Math.min(5, Math.round(relevantStat / QUALITY_STAT_STEP + bonus)),
+  ) as ComponentQuality;
 
 export interface ForecastedComponent {
   /** Heure de jeu à laquelle le composant tombe en stock. */
@@ -56,7 +69,7 @@ export interface ForecastedComponent {
 /**
  * Composants que l'effectif actuel sortira entre `from` et `until`, à staffing
  * constant : même débit horaire que `produceComponents` (stat × moral ×
- * synergie du bâtiment), même seuil de points. Un employé non productif, non
+ * synergie du bâtiment × rythme du studio), même seuil de points. Un employé non productif, non
  * assigné ou sans bâtiment ne produit rien.
  */
 export const forecastProduction = (
@@ -64,8 +77,11 @@ export const forecastProduction = (
   productionProgress: Record<number, number>,
   from: number,
   until: number,
+  /** Studios, pour leur rythme de travail (Normal partout si absent). */
+  buildings: Building[] = [],
 ): ForecastedComponent[] => {
   if (until <= from) return [];
+  const schedules = scheduleByBuilding(buildings);
 
   const occupantsByBuilding: Record<number, number> = {};
   for (const e of employes) {
@@ -86,12 +102,18 @@ export const forecastProduction = (
     const stat = employe[STAT_KEY_BY_TYPE[type]];
     const output =
       stat *
+      productionSpeedMultiplier(employe) *
       moraleProductivityMultiplier(employe.morale) *
-      buildingSynergyMultiplier(occupantsByBuilding[employe.buildingId] ?? 1);
+      buildingSynergyMultiplier(occupantsByBuilding[employe.buildingId] ?? 1) *
+      employeScheduleOutput(employe, schedules);
     if (output <= 0) continue;
 
     const progress = productionProgress[employe.id] ?? 0;
-    const quality = expectedComponentQuality(stat);
+    const quality = expectedComponentQuality(
+      stat,
+      qualityBonus(employe) +
+        scheduleQuality(schedules.get(employe.buildingId) ?? "NORMAL"),
+    );
     const count = Math.floor(
       (progress + output * horizon) / PRODUCTION_THRESHOLD,
     );
@@ -151,6 +173,40 @@ export const projectStock = (
   }
 
   return projected;
+};
+
+/**
+ * Premier instant où le stock projeté compte ASSEZ de composants de chaque
+ * type, qualité ignorée : `-Infinity` si le stock actuel suffit, `null` si la
+ * production prévue n'y arrive jamais. Ce décompte ne fait que croître (la
+ * production ajoute, l'obsolescence dégrade sans retirer) : aucun instant
+ * antérieur ne peut être livrable. Sert à sauter, sans rien valoriser, toute
+ * la période où l'on attend simplement la production.
+ */
+export const countFeasibleFrom = (
+  stock: Component[],
+  forecast: ForecastedComponent[],
+  requirements: ComponentRequirement[],
+): number | null => {
+  const missing = new Map<ComponentType, number>();
+  for (const r of requirements) {
+    missing.set(r.type, (missing.get(r.type) ?? 0) + r.quantity);
+  }
+  for (const c of stock) {
+    const m = missing.get(c.type);
+    if (m !== undefined) missing.set(c.type, m - 1);
+  }
+  let short = [...missing.values()].filter((m) => m > 0).length;
+  if (short === 0) return -Infinity;
+  const sorted = [...forecast].sort((a, b) => a.at - b.at);
+  for (const f of sorted) {
+    const m = missing.get(f.type);
+    if (m === undefined) continue;
+    missing.set(f.type, m - 1);
+    if (m === 1) short--;
+    if (short === 0) return f.at;
+  }
+  return null;
 };
 
 export interface DeliveryScenario {
@@ -257,6 +313,8 @@ export interface DeliveryAdviceInput {
   employes: Person[];
   productionProgress: Record<number, number>;
   time: number;
+  /** Studios, pour leur rythme de travail. */
+  buildings?: Building[];
 }
 
 /**
@@ -277,6 +335,7 @@ export const adviseDelivery = ({
   employes,
   productionProgress,
   time,
+  buildings,
 }: DeliveryAdviceInput): DeliveryAdvice => {
   const deadline = contract.startDate + contract.time;
   const lastEarlyTime =
@@ -290,6 +349,7 @@ export const adviseDelivery = ({
     productionProgress,
     time,
     deadline,
+    buildings,
   ).filter((f) => requiredTypes.has(f.type));
 
   const now = evaluateScenario(contract, stock, forecast, time, time, null);
@@ -323,8 +383,10 @@ export const adviseDelivery = ({
   // réponse factuelle (« livrable dans N jours »), elle ne doit pas dépendre de
   // l'échantillonnage qui, lui, ne sert qu'à borner le coût de valorisation.
   let deliverableAt: number | null = now.deliverable ? time : null;
-  if (deliverableAt === null) {
+  const countable = countFeasibleFrom(stock, forecast, contract.requirements);
+  if (deliverableAt === null && countable !== null) {
     for (const at of sorted) {
+      if (at < countable) continue;
       const projected = projectStock(stock, forecast, at);
       if (
         selectBestComponents(projected, contract.requirements).missing
@@ -358,6 +420,35 @@ export const adviseDelivery = ({
     if (!wait || scenario.reward > wait.reward) wait = scenario;
   }
 
+  // L'échantillonnage peut enjamber le bon moment : on remonte, entre le
+  // candidat précédent et le meilleur, au premier instant qui rapporte autant
+  // (dichotomie : quelques valorisations de plus, pas une par événement).
+  if (wait) {
+    const best = wait;
+    const before = candidates.filter((t) => t < best.time);
+    const floor = before.length > 0 ? before[before.length - 1] : time;
+    const between = sorted.filter((t) => t > floor && t < best.time);
+    let lo = 0;
+    let hi = between.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const scenario = evaluateScenario(
+        contract,
+        stock,
+        forecast,
+        time,
+        between[mid],
+        baseline,
+      );
+      if (scenario.deliverable && scenario.reward >= best.reward) {
+        wait = scenario;
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+  }
+
   const recommendation: DeliveryRecommendation = !now.deliverable
     ? deliverableAt === null
       ? "blocked"
@@ -377,6 +468,8 @@ export interface ContractLeadTimeInput {
   employes: Person[];
   productionProgress: Record<number, number>;
   time: number;
+  /** Studios, pour leur rythme de travail. */
+  buildings?: Building[];
 }
 
 /**
@@ -392,6 +485,7 @@ export const estimateContractLeadTime = ({
   employes,
   productionProgress,
   time,
+  buildings,
 }: ContractLeadTimeInput): number | null => {
   const deadline = time + contract.time;
   const requiredTypes = new Set(contract.requirements.map((r) => r.type));
@@ -406,14 +500,18 @@ export const estimateContractLeadTime = ({
     productionProgress,
     time,
     deadline,
+    buildings,
   ).filter((f) => requiredTypes.has(f.type));
 
   if (deliverableAt(time)) return 0;
+  const countable = countFeasibleFrom(stock, forecast, contract.requirements);
+  if (countable === null) return null;
 
   // Seule une sortie de production peut rendre livrable ce qui ne l'est pas.
   const events = [...new Set(forecast.map((f) => f.at))].sort((a, b) => a - b);
   for (const at of events) {
     if (at > deadline) break;
+    if (at < countable) continue;
     if (deliverableAt(at)) return at - time;
   }
   return null;

@@ -49,98 +49,101 @@ export const SaveSlotCard: FC<SaveSlotCardProps> = ({
   const loadOnly = mode === "load";
 
   return (
-    <div className="card relative bg-base-200 border border-base-content/15 shadow-sm">
+    <div className="toy-tile relative flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
       {busy && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-box bg-base-100/70">
+        <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] bg-base-100/70">
           <span className="loading loading-spinner loading-sm" />
-          <span className="text-sm font-medium">
+          <span className="text-sm font-bold">
             {BUSY_LABEL[busyStatus] ?? "…"}
           </span>
         </div>
       )}
 
-      <div className="card-body gap-3 p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate font-display text-lg font-semibold">
             {meta ? meta.slotName : `Slot ${index + 1}`}
           </h3>
           {meta ? (
-            <span className={`badge ${INTEGRITY_BADGE_CLASS[integrity]}`}>
+            <span
+              className={`badge badge-sm ${INTEGRITY_BADGE_CLASS[integrity]}`}
+            >
               {INTEGRITY_LABEL[integrity]}
             </span>
           ) : (
-            <span className="badge badge-ghost">Vide</span>
+            <span className="badge badge-sm badge-ghost">Vide</span>
           )}
         </div>
 
         {meta ? (
           <>
             <SavePreview meta={meta} />
-            <p className="text-xs opacity-50">
+            <p className="text-xs font-semibold text-base-content/60">
               Sauvegardé le {formatRealTimestamp(meta.realTimestamp)}
             </p>
             {integrity === "corrupt" && (
-              <p className="text-xs text-error">
+              <p className="text-xs font-bold text-error">
                 Données illisibles : ce slot ne peut pas être chargé.
               </p>
             )}
             {integrity === "outdated" && (
-              <p className="text-xs text-warning">
+              <p className="text-xs font-bold text-warning">
                 Sauvegarde plus récente que le jeu : chargement bloqué.
               </p>
             )}
-            <div className="card-actions justify-end pt-1">
-              <button
-                type="button"
-                className="btn btn-sm btn-primary"
-                onClick={onLoad}
-                disabled={busy || !loadable}
-              >
-                <Upload className="w-4 h-4" /> Charger
-              </button>
-              {!loadOnly && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={onOverwrite}
-                  disabled={busy}
-                >
-                  <FloppyDisk className="w-4 h-4" /> Écraser
-                </button>
-              )}
-              <button
-                type="button"
-                className="btn btn-sm btn-ghost text-error"
-                onClick={onDelete}
-                disabled={busy}
-                aria-label="Supprimer la sauvegarde"
-              >
-                <Trash className="w-4 h-4" /> Supprimer
-              </button>
-            </div>
           </>
         ) : (
-          <>
-            <p className="text-sm opacity-60">
-              {loadOnly
-                ? "Emplacement libre."
-                : "Emplacement libre. Sauvegardez votre partie ici."}
-            </p>
-            {!loadOnly && (
-              <div className="card-actions justify-end pt-1">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary"
-                  onClick={onSave}
-                  disabled={busy}
-                >
-                  <Folder className="w-4 h-4" /> Sauvegarder
-                </button>
-              </div>
-            )}
-          </>
+          <p className="text-sm font-semibold text-base-content/60">
+            Emplacement libre.
+          </p>
         )}
       </div>
+
+      {meta ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={onLoad}
+            disabled={busy || !loadable}
+          >
+            <Upload className="h-4 w-4" /> Charger
+          </button>
+          {!loadOnly && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={onOverwrite}
+              disabled={busy}
+            >
+              <FloppyDisk className="h-4 w-4" /> Écraser
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost btn-square text-error"
+            onClick={onDelete}
+            disabled={busy}
+            aria-label="Supprimer la sauvegarde"
+            title="Supprimer"
+          >
+            <Trash className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        !loadOnly && (
+          <div className="flex shrink-0 items-center sm:justify-end">
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={onSave}
+              disabled={busy}
+            >
+              <Folder className="h-4 w-4" /> Sauvegarder
+            </button>
+          </div>
+        )
+      )}
     </div>
   );
 };

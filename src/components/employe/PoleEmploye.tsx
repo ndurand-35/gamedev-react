@@ -1,235 +1,79 @@
-import { ReactElement, useMemo, useState } from "react";
+import { ReactElement, useState } from "react";
 
-import { Search, UserPlus, WarningTriangle } from "iconoir-react";
+import { Search, WarningTriangle } from "iconoir-react";
 
-import {
-  Candidate,
-  ComponentType,
-  PersonType,
-  ProductionPerson,
-  Specialty,
-} from "@/data/interface";
-import { hireCandidate } from "@/data/redux/recruitmentThunks";
 import { CandidateSearchModal } from "@/components/employe/CandidateSearchModal";
+import { DossierCard } from "@/components/employe/DossierCard";
+import { groupByDossier } from "@/components/employe/searchDossier";
 import {
   selectRecruitmentCap,
   selectRemainingSlots,
 } from "@/data/redux/selectors";
-import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
-import { useFounderSkill } from "@/data/hooks/useFounderSkill";
-import { createColumnHelper } from "@tanstack/react-table";
-import { MyTable } from "@/components/Table";
-import { ComponentTypeBadge } from "@/components/component";
-import { RoleBadge } from "@/components/employe/RoleBadge";
-import { HireNegotiationModal } from "@/components/employe/HireNegotiationModal";
-import { CandidateCard } from "@/components/studio";
-import { formatPrice } from "@/data/utils";
+import { useAppSelector } from "@/data/redux/hooks";
 
-const SpecialtyBadge = ({ specialty }: { specialty: Specialty }) => {
-  if (specialty === "FULLSTACK") {
-    return <span className="badge badge-ghost badge-sm">Fullstack</span>;
-  }
-  return <ComponentTypeBadge type={specialty as ComponentType} variant="badge" />;
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Pôle Emploi : les dossiers de recherche en cours. Chaque recherche commandée
+// ramène ses profils dans un dossier ; un clic ouvre la page du dossier, où se
+// mènent entretiens, négociations et embauches.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Production : badge de spécialité (Code/Visuel/UX/Fullstack). QA / Marketing :
-// badge de rôle coloré. Affichés au même endroit (cf. spec UX §2).
-const CandidateRoleBadge = ({ candidate }: { candidate: Candidate }) => {
-  if (candidate.personType === PersonType.PROD) {
-    return (
-      <SpecialtyBadge
-        specialty={(candidate as ProductionPerson).specialty ?? "FULLSTACK"}
-      />
-    );
-  }
-  return <RoleBadge personType={candidate.personType} />;
-};
-
-// Temps restant avant qu'un candidat ne quitte le vivier (heures de jeu).
-const remainingLabel = (hours: number): string => {
-  if (hours <= 0) return "Expiré";
-  if (hours < 24) return `${Math.ceil(hours)} h`;
-  return `${Math.ceil(hours / 24)} j`;
-};
+/** Au-delà, les places se lisent en chiffres plutôt qu'en bureaux dessinés. */
+const MAX_SEAT_ICONS = 12;
 
 export const PoleEmploye: React.FC = (): ReactElement => {
-  const dispatch = useAppDispatch();
   const candidateList = useAppSelector((state) => state.employe.candidateList);
   const time = useAppSelector((state) => state.engine.time);
   // Plafond de recrutement (cross-slice : cap = somme des places des bâtiments).
   const recruitmentCap = useAppSelector(selectRecruitmentCap);
   const remainingSlots = useAppSelector(selectRemainingSlots);
   const capReached = remainingSlots <= 0;
-  // Sans entretien, le salaire attendu d'un candidat est inconnu — sauf si le
-  // fondateur sait lire un CV (compétence « Lecture de CV »).
-  const hasCvReading = useFounderSkill("cv_reading");
+  const free = Math.max(0, remainingSlots);
 
   // Commande de recherche : formulaire déporté dans une modale.
   const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = () => setSearchOpen(true);
 
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
-  // Id du candidat en cours d'entretien / négociation (null = modale fermée).
-  // On garde l'id et on relit l'objet live pour refléter `revealedStats`.
-  const [negotiatingId, setNegotiatingId] = useState<number | null>(null);
-  const negotiating =
-    candidateList.find((c) => c.id === negotiatingId) ?? null;
-
-  const hireSelected = () => {
-    const ids = Object.keys(rowSelection)
-      .map((index) => candidateList[parseInt(index)]?.id)
-      .filter((id): id is number => id != null);
-    // Garde-fou plafond : on s'arrête net dès qu'une embauche est refusée
-    // faute de place (le thunk relit le plafond à chaque appel + pousse le toast).
-    for (const id of ids) {
-      const result = dispatch(hireCandidate(id));
-      if (!result.ok) break;
-    }
-    setRowSelection({});
-  };
-
-  const columns = useMemo(() => {
-    const columnHelper = createColumnHelper<Candidate>();
-    return [
-      {
-        header: "Nom",
-        accessorFn: (row: Candidate) => row.lastName + " " + row.firstName,
-        enableColumnFilter: false,
-        cell: (props: any) => (
-          <div className="group relative flex items-center space-x-3">
-            <div className="avatar avatar-placeholder">
-              <div className="bg-neutral text-neutral-content rounded-full w-8">
-                <span className="text-xs uppercase">
-                  {props.row.original.firstName[0]}
-                  {props.row.original.lastName[0]}
-                </span>
-              </div>
-            </div>
-            <div className="font-bold">
-              {props.row.original.firstName} {props.row.original.lastName}
-            </div>
-            {/* Aperçu carte candidat au survol (panneau table inchangé) */}
-            <div className="pointer-events-none absolute left-0 top-full z-50 mt-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-              <CandidateCard
-                candidate={props.row.original as Candidate}
-                style={{
-                  filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.3))",
-                }}
-              />
-            </div>
-          </div>
-        ),
-      },
-      {
-        header: "Rôle",
-        accessorFn: (row: Candidate) =>
-          row.personType === PersonType.PROD
-            ? (row as ProductionPerson).specialty ?? "FULLSTACK"
-            : row.personType,
-        cell: (info: any) => (
-          <CandidateRoleBadge candidate={info.row.original as Candidate} />
-        ),
-      },
-      {
-        header: "Salaire attendu",
-        // Un salaire inconnu se trie comme 0 : l'ordre de la colonne ne doit
-        // pas trahir ce que l'affichage cache.
-        accessorFn: (row: Candidate) =>
-          row.revealedStats || hasCvReading
-            ? (row.expectedSalary ?? row.salary)
-            : 0,
-        cell: (info: any) => {
-          const c = info.row.original as Candidate;
-          const value = c.expectedSalary ?? c.salary;
-          return (
-            <span className="tabular-nums">
-              {c.revealedStats ? (
-                formatPrice(value) + " / Mois"
-              ) : hasCvReading ? (
-                <span className="opacity-70">≈ {formatPrice(value)} / Mois</span>
-              ) : (
-                <span className="opacity-50">Inconnu</span>
-              )}
-            </span>
-          );
-        },
-      },
-      {
-        header: "Entretien",
-        accessorFn: (row: Candidate) => (row.revealedStats ? "Fait" : "Requis"),
-        cell: (info: any) => {
-          const c = info.row.original as Candidate;
-          return c.revealedStats ? (
-            <span className="badge badge-success badge-sm badge-outline">
-              Profil vérifié
-            </span>
-          ) : (
-            <span className="badge badge-warning badge-sm badge-outline">
-              Entretien requis
-            </span>
-          );
-        },
-      },
-      {
-        header: "Disponible",
-        accessorFn: (row: Candidate) =>
-          row.expiresAt == null ? Infinity : row.expiresAt - time,
-        enableColumnFilter: false,
-        cell: (info: any) => {
-          const expiresAt = (info.row.original as Candidate).expiresAt;
-          if (expiresAt == null) return <span className="opacity-60">—</span>;
-          const left = expiresAt - time;
-          return (
-            <span
-              className={
-                "badge badge-sm badge-outline " +
-                (left <= 24 ? "badge-error" : "badge-ghost")
-              }
-              title="Temps restant avant que le candidat quitte le vivier"
-            >
-              {remainingLabel(left)}
-            </span>
-          );
-        },
-      },
-      columnHelper.display({
-        header: "Action",
-        cell: (props) => (
-          <div className="tooltip" data-tip="Entretien / Négociation">
-            <button
-              aria-label="Entretien et négociation"
-              className="btn btn-xs btn-info btn-square"
-              onClick={(ev) => {
-                ev.stopPropagation();
-                setNegotiatingId(props.row.original.id);
-              }}
-            >
-              <UserPlus />
-            </button>
-          </div>
-        ),
-      }),
-    ];
-  }, [dispatch, time, hasCvReading]);
+  const dossiers = groupByDossier(candidateList);
 
   return (
-    <div className="space-y-4">
-      {/* Feedback plafond recrutement §6.1 : places restantes toujours visibles,
-          et message d'orientation quand l'effectif a atteint le plafond. */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm">
-          Places de recrutement :{" "}
-          <strong className="tabular-nums">{Math.max(0, remainingSlots)}</strong>{" "}
-          <span className="opacity-60">/ {recruitmentCap}</span>
-        </span>
-        {/* Le vivier ne se remplit plus tout seul : c'est le joueur qui commande
-            (et paie) une recherche ciblée. */}
-        <button
-          className="btn btn-sm btn-primary gap-1"
-          onClick={() => setSearchOpen(true)}
-        >
-          <Search width={16} height={16} /> Lancer une recherche
-        </button>
+    <div className="space-y-5">
+      {/* Tête de page : places de recrutement, commande d'une recherche. */}
+      <div className="flex flex-wrap items-center gap-4">
+        <h1 className="font-display text-2xl font-bold">Dossiers</h1>
+        <div className="flex items-center gap-2.5">
+          {recruitmentCap <= MAX_SEAT_ICONS && (
+            <span className="flex gap-1" aria-hidden="true">
+              {Array.from({ length: recruitmentCap }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    "size-5 rounded-md border-2 border-ink " +
+                    (i < recruitmentCap - free ? "bg-ink" : "border-dashed")
+                  }
+                />
+              ))}
+            </span>
+          )}
+          <span className="text-sm font-extrabold">
+            {free} place{free > 1 ? "s" : ""} libre{free > 1 ? "s" : ""}
+            <span className="text-base-content/60"> sur {recruitmentCap}</span>
+          </span>
+        </div>
+        {dossiers.length > 0 && (
+          // Le vivier ne se remplit plus tout seul : c'est le joueur qui
+          // commande (et paie) une recherche ciblée.
+          <button
+            type="button"
+            className="btn btn-primary ml-auto gap-2"
+            onClick={openSearch}
+            data-tuto="recruit-search"
+          >
+            <Search width={17} height={17} strokeWidth={2.4} /> Lancer une
+            recherche
+          </button>
+        )}
       </div>
+
       {capReached && (
         <div className="alert alert-warning py-2 text-sm">
           <WarningTriangle width={18} height={18} />
@@ -240,44 +84,54 @@ export const PoleEmploye: React.FC = (): ReactElement => {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <MyTable
-          columns={columns}
-          defaultData={candidateList}
-          title={
-            candidateList.length +
-            " Candidat" +
-            (candidateList.length > 1 ? "s" : "")
-          }
-          isRowSelectable={true}
-          rowSelection={rowSelection}
-          setRowSelection={setRowSelection}
-          action={
-            Object.keys(rowSelection).length > 0 ? (
-              <button
-                className="btn btn-xs btn-info"
-                onClick={hireSelected}
-                disabled={capReached}
-                aria-disabled={capReached}
-                title={
-                  capReached
-                    ? "Plafond d'effectif atteint — loue un nouveau bâtiment"
-                    : undefined
-                }
-              >
-                <UserPlus />
-                <p>Embaucher (à l'aveugle)</p>
-              </button>
-            ) : (
-              <></>
-            )
-          }
-        />
-      </div>
-      <HireNegotiationModal
-        candidate={negotiating}
-        onClose={() => setNegotiatingId(null)}
-      />
+      {dossiers.length === 0 ? (
+        // Vivier vide : un bureau qui attend quelqu'un, une action.
+        <div className="flex flex-col items-center justify-center gap-3.5 py-14">
+          <svg
+            width="150"
+            height="110"
+            viewBox="0 0 150 110"
+            fill="none"
+            stroke="var(--color-ink)"
+            strokeWidth={3.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M14 58h92" />
+            <path d="M22 58v42M98 58v42" />
+            <rect x="40" y="26" width="40" height="27" rx="4" fill="#fff" />
+            <path d="M60 53v5" />
+            <path d="M116 66h22v14h-22z" fill="var(--color-sun)" />
+            <path d="M120 80v20M134 80v20M116 52v14" />
+            <path d="M50 38h10M50 44h18" strokeWidth={2.5} />
+          </svg>
+          <h2 className="font-display text-xl font-semibold">
+            Le vivier est vide
+          </h2>
+          <button
+            type="button"
+            className="btn btn-primary gap-2"
+            onClick={openSearch}
+            data-tuto="recruit-search"
+          >
+            <Search width={17} height={17} strokeWidth={2.4} /> Lancer une
+            recherche
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(19rem,1fr))] gap-5">
+          {dossiers.map((d, i) => (
+            <DossierCard
+              key={d.key}
+              dossier={d}
+              now={time}
+              tutoAnchor={i === 0}
+            />
+          ))}
+        </div>
+      )}
+
       <CandidateSearchModal
         open={searchOpen}
         onClose={() => setSearchOpen(false)}

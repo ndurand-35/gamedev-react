@@ -1,9 +1,73 @@
 @import "tailwindcss";
+@import "@fontsource-variable/fredoka";
+@import "@fontsource-variable/nunito";
 
 @plugin "@tailwindcss/typography";
 
 @plugin "daisyui" {
-  themes: light --default;
+  themes: false;
+}
+
+/* ── Direction « Bureau douillet » ──────────────────────────────────────────
+   Papier clair, encre brun foncé, gros contours et ombre pleine décalée.
+   Règle de densité : le style « jouet » (contour 3 px + ombre) est réservé aux
+   cadres, aux actions et à la navigation ; les listes denses gardent des
+   contours de 2 px sans ombre. Le jaune (primary) marque l'actif et l'action
+   principale : jamais en couleur de texte, illisible sur le papier. */
+@plugin "daisyui/theme" {
+  name: "codex";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: #fff9ef;
+  --color-base-200: #f3eadb;
+  --color-base-300: #e9dcc6;
+  --color-base-content: #2b2420;
+  --color-primary: #ffc93c;
+  --color-primary-content: #2b2420;
+  --color-secondary: #7c4dba;
+  --color-secondary-content: #ffffff;
+  --color-accent: #177585;
+  --color-accent-content: #ffffff;
+  --color-neutral: #2b2420;
+  --color-neutral-content: #fff9ef;
+  --color-info: #2a7fb8;
+  --color-info-content: #ffffff;
+  --color-success: #2e7d46;
+  --color-success-content: #ffffff;
+  --color-warning: #9a6a00;
+  --color-warning-content: #ffffff;
+  --color-error: #c42b35;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.6rem;
+  --radius-field: 0.8rem;
+  --radius-box: 1.25rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 2px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: "Nunito Variable", ui-rounded, system-ui, sans-serif;
+  --font-display: "Fredoka Variable", "Nunito Variable", ui-rounded, system-ui,
+    sans-serif;
+  /* Encre des contours et du texte, jaune de l'actif. */
+  --color-ink: #2b2420;
+  --color-sun: #ffc93c;
+  --color-heart: #e8475f;
+  /* Types de composants : distincts des couleurs d'interface, lisibles en
+     texte sur le papier comme en fond sous du texte blanc. */
+  --color-code: #2a63cc;
+  --color-visuel: #c2336b;
+  --color-ux: #b25e00;
+  /* Pastilles d'avatar par rôle (fond clair sous l'encre). */
+  --color-role-prod: #9ccbff;
+  --color-role-qa: #b9e4a8;
+  --color-role-marketing: #ffc2d6;
+  --shadow-toy: 0 5px 0 var(--color-ink);
+  --shadow-toy-sm: 0 3px 0 var(--color-ink);
 }
 
 @layer base {
@@ -12,7 +76,498 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
+    border-color: color-mix(in oklab, var(--color-ink) 15%, transparent);
+  }
+  /* Papier à pois sur toute la fenêtre. daisyUI peint la racine via
+     `--root-bg` : la couleur y reste, les pois vont sur le corps. */
+  :root {
+    --root-bg: var(--color-base-200);
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--color-base-200);
+    background-image: radial-gradient(
+      color-mix(in oklab, var(--color-ink) 13%, transparent) 1.3px,
+      transparent 1.3px
+    );
+    background-size: 22px 22px;
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+  }
+}
+
+/* Cadre principal : contour épais, ombre pleine. */
+@utility toy-frame {
+  background-color: var(--color-base-100);
+  border: 3px solid var(--color-ink);
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-toy);
+}
+/* Tuile de liste dense : contour fin, pas d'ombre. */
+@utility toy-tile {
+  background-color: #fff;
+  border: 2px solid var(--color-ink);
+  border-radius: 0.9rem;
+}
+/* Règle de densité : un cadre posé dans un autre cadre (ex. les blocs d'une
+   page de section) redevient une tuile — contour fin, sans ombre. */
+.toy-frame .toy-frame {
+  border-width: 2px;
+  border-radius: 1.1rem;
+  box-shadow: none;
+}
+/* Gabarit d'une page de section : sous le HUD, au-dessus du dock. Marges
+   resserrées sur téléphone, où chaque pixel de largeur compte. */
+@utility page-shell {
+  margin-top: 3.5rem;
+  margin-bottom: 5rem;
+  padding: 0.75rem 0.75rem 1rem;
+  @variant sm {
+    padding-inline: 1.5rem;
+  }
+}
+/* Cadre d'une page de section, posé sous ses onglets. */
+@utility page-frame {
+  padding: 1rem;
+  @variant sm {
+    padding: 1.5rem;
+  }
+}
+/* Pastille du HUD : capsule à contour épais. */
+@utility toy-pill {
+  background-color: var(--color-base-100);
+  border: 3px solid var(--color-ink);
+  border-radius: 999px;
+  box-shadow: 0 4px 0 var(--color-ink);
+}
+/* Hachures d'encre : part « potentielle » d'une jauge. */
+@utility hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklab, var(--color-ink) 28%, transparent) 0 3px,
+    transparent 3px 8px
+  );
+}
+/* Hachures des barres d'avancement. */
+@utility stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(255 255 255 / 0.3) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+/* ── Nuit (cosmétique, cf. `utils/dayCycle`) ──────────────────────────────
+   `--night` (0 → 1) est posé sur la racine par `useDayCycle`. Le papier passe
+   au bleu nuit étoilé ; panneaux et barres prennent un voile bleu, plafonné
+   pour garder le texte lisible ; les cartes restent claires (bureaux
+   éclairés). Les voiles passent sous le contenu grâce à `isolation` (nouveau
+   contexte d'empilement : le z-index -1 se peint au-dessus du fond, sous les
+   enfants). */
+:root {
+  --night-sky-rgb: 24 33 92;
+  --night-stars:
+    radial-gradient(circle, #fff3c4 1.8px, transparent 2.4px),
+    radial-gradient(circle, #fff3c4 1.2px, transparent 1.8px),
+    radial-gradient(circle, rgb(255 243 196 / 0.7) 0.9px, transparent 1.4px);
+  --night-stars-size: 173px 131px, 97px 89px, 53px 61px;
+  --night-stars-pos: 13px 41px, 61px 7px, 29px 23px;
+}
+body {
+  isolation: isolate;
+}
+/* Ciel du papier : bleu nuit et étoiles. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: rgb(var(--night-sky-rgb) / 0.9);
+  background-image: var(--night-stars);
+  background-size: var(--night-stars-size);
+  background-position: var(--night-stars-pos);
+  opacity: var(--night, 0);
+  transition: opacity 1.5s ease;
+}
+/* Fond d'un panneau qui bleuit la nuit (barres, studio). */
+@utility night-wash {
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background-color: rgb(var(--night-sky-rgb) / var(--night-strength, 0.5));
+    background-image: var(--night-deco, none);
+    background-size: var(--night-deco-size, auto);
+    background-position: var(--night-deco-pos, 0 0);
+    background-repeat: var(--night-deco-repeat, repeat);
+    opacity: var(--night, 0);
+    transition: opacity 1.5s ease;
+  }
+}
+/* Panneau-fenêtre : croissant de lune et étoiles éparses derrière le
+   contenu. L'échancrure du croissant est un disque opaque de la couleur du
+   panneau voilé (crème + bleu nuit à `--night-strength`) : le calque entier
+   s'estompe d'un bloc, le raccord reste juste à toute heure. Le halo passe
+   au-dessus, pour éclairer pareil le ciel et l'échancrure. Le voile et
+   l'échancrure dépendent des lampes : `lamps-off` ou `lamps-on`. */
+@utility night-sky {
+  --night-deco:
+    radial-gradient(
+      circle at calc(100% - 74px) calc(100% - 72px),
+      transparent 0 27px,
+      rgb(255 243 196 / 0.3) 28px,
+      transparent 56px
+    ),
+    radial-gradient(
+      circle at calc(100% - 62px) calc(100% - 82px),
+      var(--night-moon-bite) 0 25px,
+      transparent 26px
+    ),
+    radial-gradient(
+      circle at calc(100% - 74px) calc(100% - 72px),
+      #fff6d6 0 27px,
+      transparent 28px
+    ),
+    radial-gradient(circle, #fff3c4 1.6px, transparent 2.2px),
+    radial-gradient(circle, rgb(255 243 196 / 0.75) 1.1px, transparent 1.7px);
+  --night-deco-size: 100% 100%, 100% 100%, 100% 100%, 211px 157px, 139px 191px;
+  --night-deco-pos: 0 0, 0 0, 0 0, 37px 59px, 101px 13px;
+  --night-deco-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
+/* Studio fermé la nuit : voile plein. */
+@utility lamps-off {
+  --night-strength: 0.58;
+  --night-moon-bite: #797c9a;
+}
+/* Studio qui travaille tard (Soutenu, Crunch) : les lampes restent allumées. */
+@utility lamps-on {
+  --night-strength: 0.3;
+  --night-moon-bite: #bab8c3;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 90% 75% at 50% 0%,
+      rgb(255 196 70 / 0.6),
+      rgb(255 196 70 / 0.15) 60%,
+      transparent 85%
+    );
+    opacity: var(--night, 0);
+    transition: opacity 1.5s ease;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .night-wash::before,
+  .lamps-on::after {
+    transition: none;
+  }
+}
+
+/* Habillage des composants daisyUI. Couche imbriquée dans `utilities`,
+   déclarée après celle de daisyUI : elle l'emporte sur daisyUI, mais les
+   classes utilitaires posées sur un élément l'emportent toujours sur elle. */
+@layer utilities {
+  @layer codex {
+    /* Boutons : contour d'encre, ombre pleine, s'enfoncent au clic. */
+    .btn {
+      font-family: var(--font-display);
+      font-weight: 600;
+    }
+    .btn:not(.btn-ghost, .btn-link) {
+      --btn-border: var(--color-ink);
+      --btn-shadow: 0 4px 0 var(--color-ink);
+      border-width: 3px;
+      transition:
+        translate 0.08s ease-out,
+        box-shadow 0.08s ease-out,
+        background-color 0.15s;
+    }
+    .btn:not(.btn-ghost, .btn-link, .btn-outline, .btn-soft, .btn-dash) {
+      --btn-bg: var(--btn-color, var(--color-base-100));
+    }
+    @media (hover: hover) {
+      .btn:not(.btn-ghost, .btn-link, .btn-outline, .btn-soft, .btn-dash):hover {
+        --btn-bg: color-mix(
+          in oklab,
+          var(--btn-color, var(--color-base-100)),
+          #000 6%
+        );
+      }
+    }
+    .btn:is(.btn-sm, .btn-xs):not(.btn-ghost, .btn-link) {
+      --btn-shadow: 0 3px 0 var(--color-ink);
+      border-width: 2px;
+    }
+    .btn:not(.btn-ghost, .btn-link):active:not(:disabled, .btn-disabled),
+    .btn:not(.btn-ghost, .btn-link)[aria-pressed="true"],
+    .btn:not(.btn-ghost, .btn-link).btn-active {
+      --btn-shadow: 0 1px 0 var(--color-ink);
+      translate: 0 3px;
+    }
+    .btn:not(.btn-ghost, .btn-link)[aria-pressed="true"] {
+      --btn-color: var(--color-primary);
+      --btn-fg: var(--color-primary-content);
+    }
+    .btn:not(.btn-ghost, .btn-link):is(:disabled, [disabled], .btn-disabled) {
+      --btn-shadow: none;
+      border-color: color-mix(in oklab, var(--color-ink) 25%, transparent);
+      background-color: var(--color-base-300);
+      color: color-mix(in oklab, var(--color-ink) 45%, transparent);
+      translate: 0 3px;
+    }
+    /* Contour = action secondaire : papier et encre (rouge pour le danger). */
+    .btn-outline {
+      --btn-bg: var(--color-base-100);
+      background-color: var(--color-base-100);
+      color: var(--color-ink);
+    }
+    .btn-outline.btn-error {
+      --btn-border: var(--color-error);
+      --btn-shadow: 0 4px 0 var(--color-error);
+      color: var(--color-error);
+    }
+    .btn-ghost:hover {
+      background-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
+    }
+    /* Couleurs des types de composants. */
+    .btn-code {
+      --btn-color: var(--color-code);
+      --btn-fg: #fff;
+    }
+    .btn-visuel {
+      --btn-color: var(--color-visuel);
+      --btn-fg: #fff;
+    }
+    .btn-ux {
+      --btn-color: var(--color-ux);
+      --btn-fg: #fff;
+    }
+
+    /* Badges : capsule à contour d'encre. */
+    .badge {
+      border-color: var(--color-ink);
+      font-weight: 800;
+    }
+    .badge-ghost {
+      background-color: var(--color-base-300);
+    }
+    .badge-code {
+      --badge-color: var(--color-code);
+      --badge-fg: #fff;
+    }
+    .badge-visuel {
+      --badge-color: var(--color-visuel);
+      --badge-fg: #fff;
+    }
+    .badge-ux {
+      --badge-color: var(--color-ux);
+      --badge-fg: #fff;
+    }
+
+    /* Barres d'avancement : piste papier, remplissage plein. */
+    .progress {
+      background-color: color-mix(in oklab, var(--color-ink) 12%, transparent);
+    }
+    .progress-code {
+      color: var(--color-code);
+    }
+    .progress-visuel {
+      color: var(--color-visuel);
+    }
+    .progress-ux {
+      color: var(--color-ux);
+    }
+
+    /* Champs. */
+    .input,
+    .select,
+    .textarea,
+    .checkbox,
+    .radio,
+    .toggle,
+    .file-input {
+      --input-color: var(--color-ink);
+    }
+    .input,
+    .select,
+    .textarea {
+      background-color: #fff;
+      font-weight: 600;
+    }
+    .range {
+      --range-bg: color-mix(in oklab, var(--color-ink) 15%, transparent);
+    }
+
+    /* Modales : cadre principal. */
+    .modal-box {
+      background-color: var(--color-base-100);
+      border: 3px solid var(--color-ink);
+      border-radius: 1.75rem;
+      box-shadow: 0 8px 0 var(--color-ink);
+    }
+
+    /* Tableaux en « lignes en tuiles » : chaque ligne est une tuile blanche
+       posée sur le cadre, séparée des autres par un jour, sans trait. L'en-tête
+       n'a ni fond ni filet. Une ligne sélectionnée (`data-selected`) se cerne
+       d'encre sur fond jaune pâle. Dans les lignes, les contrôles s'allègent :
+       listes en pastilles sans contour, badges sans contour, boutons à ombre
+       courte, et les actions secondaires (`.row-action`) n'apparaissent qu'au
+       survol de la ligne. */
+    .table {
+      --tile-ring: #eadfcc;
+      --tile-radius: 14px;
+      border-collapse: separate;
+      border-spacing: 0 6px;
+      background-color: transparent;
+      border-radius: 0;
+    }
+    .table-sm {
+      --tile-radius: 10px;
+      border-spacing: 0 4px;
+    }
+    .table :where(tr) {
+      border: 0;
+    }
+    .table :where(thead) :where(th) {
+      background-color: transparent;
+      color: color-mix(in oklab, var(--color-ink) 72%, transparent);
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding-block: 0.25rem;
+    }
+    .table :where(tbody) :where(td, th) {
+      background-color: #fff;
+      box-shadow:
+        inset 0 1px 0 var(--tile-ring),
+        inset 0 -1px 0 var(--tile-ring);
+      transition: background-color 0.12s;
+    }
+    .table :where(tbody) :where(td, th):first-child {
+      border-radius: var(--tile-radius) 0 0 var(--tile-radius);
+      box-shadow:
+        inset 1px 0 0 var(--tile-ring),
+        inset 0 1px 0 var(--tile-ring),
+        inset 0 -1px 0 var(--tile-ring);
+    }
+    .table :where(tbody) :where(td, th):last-child {
+      border-radius: 0 var(--tile-radius) var(--tile-radius) 0;
+      box-shadow:
+        inset -1px 0 0 var(--tile-ring),
+        inset 0 1px 0 var(--tile-ring),
+        inset 0 -1px 0 var(--tile-ring);
+    }
+    .table :where(tbody) :where(td, th):only-child {
+      border-radius: var(--tile-radius);
+      box-shadow: inset 0 0 0 1px var(--tile-ring);
+    }
+    .table :where(tbody tr:hover) :where(td, th) {
+      background-color: #fffcf5;
+    }
+    .table :where(tbody tr[data-selected="true"]) {
+      --tile-ring: var(--color-ink);
+    }
+    .table :where(tbody tr[data-selected="true"]) :where(td, th) {
+      background-color: #fff0c2;
+      box-shadow:
+        inset 0 2px 0 var(--color-ink),
+        inset 0 -2px 0 var(--color-ink);
+    }
+    .table :where(tbody tr[data-selected="true"]) :where(td, th):first-child {
+      box-shadow:
+        inset 2px 0 0 var(--color-ink),
+        inset 0 2px 0 var(--color-ink),
+        inset 0 -2px 0 var(--color-ink);
+    }
+    .table :where(tbody tr[data-selected="true"]) :where(td, th):last-child {
+      box-shadow:
+        inset -2px 0 0 var(--color-ink),
+        inset 0 2px 0 var(--color-ink),
+        inset 0 -2px 0 var(--color-ink);
+    }
+    /* Contrôles dans les lignes : allégés. */
+    .table :where(tbody) :is(.select, .input) {
+      --input-color: transparent;
+      background-color: var(--color-base-200);
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .table .checkbox {
+      --input-color: color-mix(in oklab, var(--color-ink) 45%, transparent);
+    }
+    .table :where(tbody) .badge {
+      border-color: transparent;
+    }
+    .table :where(tbody) .btn:not(.btn-ghost, .btn-link) {
+      --btn-shadow: 0 2px 0 var(--color-ink);
+      border-width: 2px;
+    }
+    /* Sans survol possible (écran tactile), l'action reste visible. */
+    @media (hover: hover) {
+      .table :where(tbody) .row-action {
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+    }
+    .table :where(tbody tr:hover, tbody tr:focus-within) .row-action {
+      opacity: 1;
+    }
+
+    /* Menus et onglets : l'élément actif prend le jaune. */
+    .menu :where(li > a, li > button):is(.active, .menu-active) {
+      background-color: var(--color-primary);
+      color: var(--color-primary-content);
+      box-shadow: inset 0 0 0 2px var(--color-ink);
+      font-weight: 700;
+    }
+    .tab {
+      font-family: var(--font-display);
+      font-weight: 600;
+    }
+
+    /* Divers. */
+    .alert {
+      border: 2px solid var(--color-ink);
+      font-weight: 600;
+    }
+    .stats {
+      background-color: #fff;
+      border: 2px solid var(--color-ink);
+    }
+    .kbd {
+      background-color: #fff;
+      border: 2px solid var(--color-ink);
+      border-bottom-width: 4px;
+      font-family: var(--font-display);
+    }
+    .tooltip > .tooltip-content,
+    .tooltip[data-tip]::before {
+      font-weight: 700;
+    }
+    /* Écran tactile : pas de survol, donc pas d'infobulle. Masquées, elles
+       occupent quand même de la place et élargissent la page sur téléphone. */
+    @media (hover: none) {
+      .tooltip > .tooltip-content,
+      .tooltip[data-tip]::before,
+      .tooltip[data-tip]::after {
+        display: none;
+      }
+    }
   }
 }
 
@@ -25,10 +580,12 @@
 /* §4.2 — pulse une fois quand la jauge réputation atteint 100 % (studio ouvrable). */
 @keyframes studio-frame-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
+    box-shadow: 0 0 0 0
+      color-mix(in oklab, var(--color-accent) 55%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 0.6rem color-mix(in oklab, var(--color-accent) 0%, transparent);
+    box-shadow: 0 0 0 0.6rem
+      color-mix(in oklab, var(--color-accent) 0%, transparent);
   }
   100% {
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 0%, transparent);
@@ -75,10 +632,170 @@
   }
 }
 
-/* Voile des modales assombri (daisyUI applique oklch(0% 0 0 / .4) par défaut). */
+/* ── Sortie d'un composant ───────────────────────────────────────────────────
+   `--burst-color` (couleur du type de composant) est posée en style inline
+   par le composant qui déclenche l'effet. */
+
+/* « +1 » qui s'élève de la carte de l'employé puis s'efface. */
+@keyframes production-float {
+  0% {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-1rem) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-1.75rem) scale(1);
+  }
+}
+.production-float {
+  animation: production-float 1.4s ease-out 1 forwards;
+}
+
+/* Barre d'avancement remplie qui s'éteint : la tâche est allée au bout. */
+@keyframes production-bar-flash {
+  0%,
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.production-bar-flash {
+  animation: production-bar-flash 0.6s ease-out 1 forwards;
+}
+
+/* Halo de la carte, dans la couleur du type de composant produit. */
+@keyframes production-glow {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--burst-color) 50%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0.6rem
+      color-mix(in oklab, var(--burst-color) 0%, transparent);
+  }
+}
+.production-glow {
+  animation: production-glow 0.7s ease-out 1;
+}
+/* Coup de génie : halo plus large, répété, pour qu'on le remarque. */
+.production-glow--genius {
+  animation: production-glow 0.7s ease-out 3;
+}
+
+/* Compteur de stock de l'en-tête qui « encaisse » le composant. */
+@keyframes stock-bump {
+  0% {
+    transform: scale(1);
+    color: var(--burst-color);
+  }
+  35% {
+    transform: scale(1.35);
+    color: var(--burst-color);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.stock-bump {
+  display: inline-block;
+  animation: stock-bump 0.45s ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Aucun déplacement : le « +1 » apparaît sur place, le compteur change de
+     couleur sans grossir, le halo est coupé. */
+  .production-float {
+    animation: reveal-banner-fade-in 0.3s ease-out 1;
+  }
+  .production-glow,
+  .production-glow--genius {
+    animation: none;
+  }
+  @keyframes stock-bump {
+    0%,
+    60% {
+      color: var(--burst-color);
+    }
+  }
+}
+
+/* Voile des modales : l'encre du jeu, assez dense pour isoler la modale. */
 .modal[open],
 .modal-open,
 .modal:target,
 .modal-toggle:checked + .modal {
-  background-color: oklch(0% 0 0 / 0.7);
+  background-color: color-mix(in oklab, var(--color-ink) 60%, transparent);
+}
+
+/* Menu pause : le voile apparaît en fondu, le panneau monte légèrement. */
+@keyframes game-menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.game-menu-backdrop {
+  animation: reveal-banner-fade-in 0.15s ease-out 1;
+}
+.game-menu-panel {
+  animation: game-menu-pop 0.2s ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-menu-panel {
+    animation: reveal-banner-fade-in 0.15s ease-out 1;
+  }
+}
+
+/* Curseur d'offre de la négociation : un rond jaune cerclé d'encre posé sur la
+   jauge de réception (les zones colorées sont dessinées dessous). */
+.offer-range {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.offer-range::-webkit-slider-runnable-track {
+  height: 1.25rem;
+  background: transparent;
+}
+.offer-range::-moz-range-track {
+  height: 1.25rem;
+  background: transparent;
+}
+.offer-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: -0.25rem;
+  border-radius: 999px;
+  background: var(--color-sun);
+  border: 3px solid var(--color-ink);
+  box-shadow: 0 3px 0 var(--color-ink);
+}
+.offer-range::-moz-range-thumb {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--color-sun);
+  border: 3px solid var(--color-ink);
+  box-shadow: 0 3px 0 var(--color-ink);
+}
+.offer-range:focus-visible {
+  outline: none;
+}
+.offer-range:focus-visible::-webkit-slider-thumb {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
 }

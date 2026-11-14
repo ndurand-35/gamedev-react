@@ -93,7 +93,7 @@ const stateWith = (over: {
   employeList?: ProductionPerson[];
 }): RootState =>
   ({
-    company: { money: over.money ?? 10000 },
+    company: { money: over.money ?? 10000, buildingList: [] },
     engine: { time: over.time ?? 0 },
     research: { acquired: over.acquired ?? [], current: over.current ?? null },
     employe: { employeList: over.employeList ?? [] },
@@ -173,12 +173,12 @@ const founder = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
   morale: 100,
   buildingId: 1,
   specialty: "FULLSTACK",
-  codeStat: 20,
-  codeMaxStat: 25,
-  visualStat: 10,
-  visualMaxStat: 25,
-  uxStat: 10,
-  uxMaxStat: 25,
+  codeStat: 200,
+  codeMaxStat: 250,
+  visualStat: 100,
+  visualMaxStat: 250,
+  uxStat: 100,
+  uxMaxStat: 250,
   assignedComponentType: ComponentType.CODE,
   ...over,
 });
@@ -265,7 +265,7 @@ describe("estimateContractLeadTime", () => {
       productionProgress: {},
       time: 0,
     });
-    expect(hours).toBe(Math.ceil((2 * PRODUCTION_THRESHOLD) / 20));
+    expect(hours).toBe(Math.ceil((2 * PRODUCTION_THRESHOLD) / 200));
   });
 
   it("renvoie null quand le délai du contrat ne suffira pas", () => {

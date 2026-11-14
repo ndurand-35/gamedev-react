@@ -15,10 +15,10 @@ export const SelectInput: React.FC<SelectInputProps> = ({
     // comme TextInput pour garder l'alignement des champs du formulaire.
     <div className="w-full flex flex-col">
       <div className="label">
-        <span className="label-text">{label}</span>
+        <span className="text-sm font-bold">{label}</span>
       </div>
       <select
-        className="select select-bordered w-full"
+        className="select w-full"
         value={field.state.value}
         onChange={(e) => field.handleChange(e.target.value)}
       >

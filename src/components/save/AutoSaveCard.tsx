@@ -21,54 +21,56 @@ export const AutoSaveCard: FC<AutoSaveCardProps> = ({
   onLoad,
   onCopy,
 }) => (
-  <div className="card relative bg-base-200 border-2 border-info/40 shadow-sm">
+  <div className="toy-tile relative flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
     {busy && (
-      <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-box bg-base-100/70">
+      <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] bg-base-100/70">
         <span className="loading loading-spinner loading-sm" />
-        <span className="text-sm font-medium">Chargement…</span>
+        <span className="text-sm font-bold">Chargement…</span>
       </div>
     )}
 
-    <div className="card-body gap-3 p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="flex items-center gap-2 font-semibold">
-          <Refresh className="w-4 h-4 text-info" aria-hidden />
+    <div className="min-w-0 flex-1 space-y-1.5">
+      <div className="flex items-center gap-2">
+        <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
+          <Refresh className="h-4 w-4 opacity-60" aria-hidden />
           Sauvegarde automatique
         </h3>
-        <span className="badge badge-info gap-1">AUTO</span>
+        <span className="badge badge-sm badge-ghost">AUTO</span>
       </div>
 
       {meta ? (
         <>
           <SavePreview meta={meta} />
-          <p className="text-xs opacity-50">
+          <p className="text-xs font-semibold text-base-content/60">
             Dernière auto-sauvegarde : {formatRealTimestamp(meta.realTimestamp)}
           </p>
-          <div className="card-actions justify-end pt-1">
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={onLoad}
-              disabled={busy}
-            >
-              <Upload className="w-4 h-4" /> Charger
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={onCopy}
-              disabled={busy}
-            >
-              <Copy className="w-4 h-4" /> Copier vers un slot
-            </button>
-          </div>
         </>
       ) : (
-        <p className="text-sm opacity-60">
-          Aucune sauvegarde automatique pour le moment. Elle se crée seule en
-          cours de partie.
+        <p className="text-sm font-semibold text-base-content/60">
+          Aucune sauvegarde automatique pour le moment.
         </p>
       )}
     </div>
+
+    {meta && (
+      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          onClick={onLoad}
+          disabled={busy}
+        >
+          <Upload className="h-4 w-4" /> Charger
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={onCopy}
+          disabled={busy}
+        >
+          <Copy className="h-4 w-4" /> Copier vers un slot
+        </button>
+      </div>
+    )}
   </div>
 );

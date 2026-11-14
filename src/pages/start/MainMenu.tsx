@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BookStack, Settings } from "iconoir-react";
 
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { listSaves, loadSlot } from "@/data/redux/saveSlice";
 import { pickMostRecentValid } from "@/data/utils/saveStorage";
 import { ConfirmModal } from "@/components/save";
 import { formatSavePreviewLine } from "@/components/save/saveFormat";
+import { CodexPanel, openCodexPanel } from "@/components/codex/CodexPanel";
+import {
+  SettingsPanel,
+  openSettingsPanel,
+} from "@/components/layout/SettingsPanel";
 
 // Écran d'accueil (MYL-26). Au montage, lit `saves_meta` (IndexedDB) pour
 // décider quels boutons afficher (§4) sans flash : on garde un skeleton bref
@@ -38,8 +44,7 @@ const MainMenu: React.FC = () => {
 
   // Vue joueur (auto logique + 3 slots manuels) → sélecteur de conception.
   const mostRecent = pickMostRecentValid({ auto, manual });
-  const hasAnySlot =
-    auto !== null || manual.some((m) => m !== null);
+  const hasAnySlot = auto !== null || manual.some((m) => m !== null);
   // §4 : « Continuer » visible ssi une sauvegarde chargeable existe ; « Charger »
   // visible dès qu'un slot existe (même tous illisibles → seule porte de
   // récupération hors-jeu).
@@ -61,30 +66,31 @@ const MainMenu: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-center flex flex-col justify-center items-center"
-      style={{ backgroundImage: "url(/menu-bg.jpg)" }}
-    >
-      <div className="bg-white/90 p-8 rounded-lg shadow-lg max-w-lg w-full text-center">
-        <h1 className="text-4xl font-bold mb-8 text-gray-800">Codex Inc.</h1>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+      <div className="toy-frame w-full max-w-md p-8 text-center">
+        <h1 className="mb-8 flex justify-center">
+          <span className="-rotate-2 rounded-xl bg-ink px-5 py-1.5 font-display text-4xl font-bold text-base-100">
+            Codex Inc.
+          </span>
+        </h1>
 
         <div className="flex flex-col gap-4">
           {!ready ? (
             // Skeleton bref pour éviter un flash de boutons (§4).
             <>
-              <div className="skeleton h-12 w-full" />
-              <div className="skeleton h-12 w-full" />
+              <div className="skeleton h-12 w-full rounded-field" />
+              <div className="skeleton h-12 w-full rounded-field" />
             </>
           ) : (
             <>
               {showContinue && mostRecent && (
                 <button
                   type="button"
-                  className="btn btn-primary w-full flex-col h-auto py-3 gap-1"
+                  className="btn btn-primary btn-lg h-auto w-full flex-col gap-0.5 py-3"
                   onClick={handleContinue}
                 >
-                  <span className="font-semibold">Continuer</span>
-                  <span className="text-xs font-normal opacity-80">
+                  <span>Continuer</span>
+                  <span className="font-sans text-xs font-bold opacity-75">
                     {formatSavePreviewLine(mostRecent)}
                   </span>
                 </button>
@@ -92,8 +98,8 @@ const MainMenu: React.FC = () => {
 
               <Link
                 to="/new-game"
-                className={`btn w-full ${
-                  showContinue ? "btn-neutral" : "btn-primary"
+                className={`btn btn-lg w-full ${
+                  showContinue ? "" : "btn-primary"
                 }`}
               >
                 Démarrer une nouvelle partie
@@ -102,19 +108,42 @@ const MainMenu: React.FC = () => {
               {showLoad && (
                 <button
                   type="button"
-                  className="btn btn-ghost w-full"
+                  className="btn btn-lg w-full"
                   onClick={() => navigate("/load")}
                 >
                   Charger une partie
                 </button>
               )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  className="btn w-full gap-2"
+                  onClick={openCodexPanel}
+                >
+                  <BookStack width={18} height={18} />
+                  Codex
+                </button>
+                <button
+                  type="button"
+                  className="btn w-full gap-2"
+                  onClick={openSettingsPanel}
+                >
+                  <Settings width={18} height={18} />
+                  Paramètres
+                </button>
+              </div>
             </>
           )}
         </div>
       </div>
+      <SettingsPanel />
+      <CodexPanel />
 
       <footer className="mt-8 text-center">
-        <p className="text-white text-sm">Créé par Nicolas Durand</p>
+        <p className="text-sm font-bold text-base-content/60">
+          Créé par Nicolas Durand
+        </p>
       </footer>
 
       {confirmContinue && (
@@ -127,7 +156,7 @@ const MainMenu: React.FC = () => {
             </>
           }
           confirmLabel="Continuer"
-          confirmClass="btn-warning"
+          confirmClass="btn-primary"
           onConfirm={() => {
             setConfirmContinue(false);
             void doContinue();

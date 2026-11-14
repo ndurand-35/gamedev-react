@@ -1,11 +1,9 @@
 import { ReactElement, useMemo, useState } from "react";
 
 import { SortableHeader } from "@/components/SortableHeader";
-import {
-  Building,
-  TopMenuItem,
-  getBuildingMonthlyCharges,
-} from "@/data/interface";
+import { Modal } from "@/components/global/Modal";
+import { SectionTabs } from "@/components/layout/SectionTabs";
+import { Building, getBuildingMonthlyCharges } from "@/data/interface";
 import { buyBuilding } from "@/data/redux/companySlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
@@ -16,12 +14,7 @@ import {
   nextBuildingSort,
   sortBuildings,
 } from "@/data/utils/building";
-
-const pageTopMenuItems: TopMenuItem[] = [
-  { name: "Accueil", link: "/game/building" },
-  { name: "Mes bâtiments", link: "/game/building/owned" },
-  { name: "SeLoger", link: "/game/building/buy", active: true },
-];
+import { buildingTopMenuItems } from "@/pages/building/menu";
 
 export const SelogerPage: React.FC = (): ReactElement => {
   const dispatch = useAppDispatch();
@@ -30,7 +23,7 @@ export const SelogerPage: React.FC = (): ReactElement => {
     (state) => state.company.availableBuildingList,
   );
   const [pendingBuyId, setPendingBuyId] = useState<number | null>(null);
-  useTopMenu(pageTopMenuItems);
+  useTopMenu(buildingTopMenuItems);
 
   const [sort, setSort] = useState<BuildingSort | null>(null);
   const toggleSort = (key: BuildingSortKey) =>
@@ -52,90 +45,103 @@ export const SelogerPage: React.FC = (): ReactElement => {
   };
 
   return (
-    <div className="p-8 px-16 mt-14 mb-20 space-y-4">
-      <h1>{availableBuildingList.length} Annonces</h1>
-      <table className="table table-zebra bg-base-100 rounded-box shadow">
-        <thead>
-          <tr>
-            <SortableHeader label="Ville" sortKey="city" {...headerProps} />
-            <SortableHeader label="Pays" sortKey="country" {...headerProps} />
-            <SortableHeader
-              label="Places"
-              sortKey="place"
-              align="right"
-              {...headerProps}
-            />
-            <SortableHeader
-              label="Charges / mois"
-              sortKey="charges"
-              align="right"
-              {...headerProps}
-            />
-            <SortableHeader
-              label="Prix"
-              sortKey="price"
-              align="right"
-              {...headerProps}
-            />
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedBuildings.map((b: Building) => (
-            <tr key={`available_building_${b.id}`}>
-              <td className="font-medium">{b.address.city}</td>
-              <td>{b.address.country}</td>
-              <td className="tabular-nums text-right">{b.place}</td>
-              <td className="tabular-nums text-right text-error">
-                <span
-                  className="tooltip"
-                  data-tip={`Loyer ${formatPrice(b.rent)} · Électricité ${formatPrice(b.electricity)} · Internet ${formatPrice(b.internet)}`}
-                >
-                  {formatPrice(getBuildingMonthlyCharges(b))}
-                </span>
-              </td>
-              <td className="tabular-nums text-right">
-                {formatPrice(b.price)}
-              </td>
-              <td>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setPendingBuyId(b.id)}
-                  disabled={b.price > money}
-                >
-                  Acheter
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="page-shell">
+      <SectionTabs items={buildingTopMenuItems} ariaLabel="Section Bâtiments" />
+      <div className="toy-frame page-frame space-y-5">
+        <h1 className="flex items-center gap-2 font-display text-2xl font-bold">
+          Annonces
+          <span className="rounded-full border-2 border-ink bg-base-200 px-2 font-sans text-sm font-extrabold">
+            {availableBuildingList.length}
+          </span>
+        </h1>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <SortableHeader label="Ville" sortKey="city" {...headerProps} />
+                <SortableHeader
+                  label="Pays"
+                  sortKey="country"
+                  {...headerProps}
+                />
+                <SortableHeader
+                  label="Places"
+                  sortKey="place"
+                  align="right"
+                  {...headerProps}
+                />
+                <SortableHeader
+                  label="Charges / mois"
+                  sortKey="charges"
+                  align="right"
+                  {...headerProps}
+                />
+                <SortableHeader
+                  label="Prix"
+                  sortKey="price"
+                  align="right"
+                  {...headerProps}
+                />
+                <th className="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedBuildings.map((b: Building) => (
+                <tr key={`available_building_${b.id}`}>
+                  <td className="font-extrabold">{b.address.city}</td>
+                  <td className="font-semibold text-base-content/70">
+                    {b.address.country}
+                  </td>
+                  <td className="tabular-nums text-right">{b.place}</td>
+                  <td className="text-right font-extrabold text-error tabular-nums">
+                    <span
+                      className="tooltip"
+                      data-tip={`Loyer ${formatPrice(b.rent)} · Électricité ${formatPrice(b.electricity)} · Internet ${formatPrice(b.internet)}`}
+                    >
+                      {formatPrice(getBuildingMonthlyCharges(b))} €
+                    </span>
+                  </td>
+                  <td className="text-right font-extrabold tabular-nums">
+                    {formatPrice(b.price)} €
+                  </td>
+                  <td className="text-right">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setPendingBuyId(b.id)}
+                      disabled={b.price > money}
+                    >
+                      Acheter
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {pendingBuilding && (
-        <dialog open className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Confirmer l'achat</h3>
-            <p className="py-4">
-              Acheter ce bâtiment pour {formatPrice(pendingBuilding.price)} € ?
-            </p>
-            <div className="modal-action">
-              <button className="btn" onClick={() => setPendingBuyId(null)}>
-                Annuler
-              </button>
-              <button className="btn btn-primary" onClick={confirmBuy}>
-                Confirmer
-              </button>
-            </div>
-          </div>
-          <form
-            method="dialog"
-            className="modal-backdrop"
-            onClick={() => setPendingBuyId(null)}
-          >
-            <button>close</button>
-          </form>
-        </dialog>
-      )}
+      <Modal
+        open={pendingBuilding != null}
+        onClose={() => setPendingBuyId(null)}
+        size="lg"
+        title="Confirmer l'achat"
+        actions={
+          <>
+            <button className="btn" onClick={() => setPendingBuyId(null)}>
+              Annuler
+            </button>
+            <button className="btn btn-primary" onClick={confirmBuy}>
+              Confirmer
+            </button>
+          </>
+        }
+      >
+        {pendingBuilding && (
+          <p className="py-4">
+            Acheter ce bâtiment pour {formatPrice(pendingBuilding.price)} € ?
+          </p>
+        )}
+      </Modal>
     </div>
   );
 };

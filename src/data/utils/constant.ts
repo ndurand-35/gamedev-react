@@ -4,6 +4,7 @@ import { TaskState } from "@/data/redux/taskSlice";
 import { EmployeState } from "@/data/redux/employeSlice";
 import { ComponentState } from "@/data/redux/componentSlice";
 import { ComponentType } from "@/data/interface";
+import { starterStock } from "@/data/utils/firstContract";
 
 import { faker } from "@faker-js/faker";
 
@@ -14,10 +15,17 @@ import { faker } from "@faker-js/faker";
  */
 export const GAME_SPEEDS = {
   PAUSE: 0,
-  X1: 600,
+  X1: 800,
   X2: 200,
   X3: 50,
 } as const;
+
+/**
+ * Vitesse lue dans une partie enregistrée : le ×1 d'avant son ralentissement
+ * (600 ms) devient le ×1 actuel.
+ */
+export const normalizeGameSpeed = (speed: number): number =>
+  speed === 600 ? GAME_SPEEDS.X1 : speed;
 
 export const DEFAULT_ENGINE_STATE: EngineState = {
   time: 0,
@@ -84,12 +92,16 @@ export const DEFAULT_EMPLOYE_STATE: EmployeState = {
   candidateList: [],
   nextEmployeId: 2,
   nextCandidateId: 1,
+  interview: null,
 };
 
+// Le garage ouvre avec de quoi livrer le premier contrat (cf. firstContract).
+const STARTER_STOCK = starterStock();
+
 export const DEFAULT_COMPONENT_STATE: ComponentState = {
-  stock: [],
+  stock: STARTER_STOCK,
   productionProgress: {},
-  nextComponentId: 1,
+  nextComponentId: STARTER_STOCK.length + 1,
 };
 
 export const MAX_CONTRACT_DIFFICULTY = 100;

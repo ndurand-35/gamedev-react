@@ -31,6 +31,7 @@ import {
   unhousedPayroll,
 } from "@/data/utils/alertCost";
 import { computeSearchCost } from "@/data/utils/recruitment";
+import { PRODUCTION_THRESHOLD } from "@/data/redux/componentSlice";
 import type { ProjectedMonth } from "@/data/utils/finance";
 
 const makeProd = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
@@ -43,12 +44,12 @@ const makeProd = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
   personType: PersonType.PROD,
   morale: DEFAULT_MORALE,
   specialty: ComponentType.CODE,
-  codeStat: 14,
-  codeMaxStat: 20,
-  visualStat: 5,
-  visualMaxStat: 20,
-  uxStat: 5,
-  uxMaxStat: 20,
+  codeStat: 140,
+  codeMaxStat: 200,
+  visualStat: 50,
+  visualMaxStat: 200,
+  uxStat: 50,
+  uxMaxStat: 200,
   assignedComponentType: ComponentType.CODE,
   ...over,
 });
@@ -62,10 +63,10 @@ const makeQa = (over: Partial<QA> = {}): QA => ({
   buildingId: 1,
   personType: PersonType.QA,
   morale: DEFAULT_MORALE,
-  testStat: 10,
-  testMaxStat: 20,
-  bugDetectionStat: 10,
-  bugDetectionMaxStat: 20,
+  testStat: 100,
+  testMaxStat: 200,
+  bugDetectionStat: 100,
+  bugDetectionMaxStat: 200,
   ...over,
 });
 
@@ -250,13 +251,13 @@ describe("malus contractuel exposé", () => {
   it("ne facture pas un manque que la production comblera avant l'échéance", () => {
     // Une affectation en cours, à un point du seuil : le composant manquant
     // tombe à l'heure suivante, bien avant la deadline.
-    const employe = makeProd({ id: 2, codeStat: 20, morale: MAX_MORALE });
+    const employe = makeProd({ id: 2, codeStat: 200, morale: MAX_MORALE });
     expect(
       contractMalusExposure({
         contracts: [dueSoon],
         stock: [makeComponent({ id: 1 })],
         employes: [employe],
-        productionProgress: { 2: 1599 },
+        productionProgress: { 2: PRODUCTION_THRESHOLD - 1 },
         time: now,
       }),
     ).toBe(0);

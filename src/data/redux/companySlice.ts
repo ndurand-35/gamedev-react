@@ -4,6 +4,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import {
   Building,
   ComponentType,
+  WorkSchedule,
   getBuildingResaleValue,
 } from "@/data/interface";
 import { generateNewBuilding } from "@/data/utils/building";
@@ -30,6 +31,13 @@ export interface CompanyState {
   nextBuildingId: number;
   // Phase 2 — campagne marketing en cours (une seule à la fois).
   activeCampaign?: ActiveCampaign;
+  /**
+   * Réputation déjà gagnée par les contrats ce mois-ci (`month` = « AAAA-MM »
+   * du jeu) : elle se construit dans la durée, pas au volume (cf.
+   * `CONTRACT_REPUTATION_PER_MONTH`). Absent d'une partie antérieure : rien
+   * n'a encore été gagné.
+   */
+  contractReputation?: { month: string; gained: number };
 }
 
 const initialState: CompanyState = DEFAULT_COMPANY_STATE;
@@ -48,12 +56,24 @@ export const companySlice = createSlice({
       state.lastBuildingGeneration = fresh.lastBuildingGeneration;
       state.nextBuildingId = fresh.nextBuildingId;
       state.activeCampaign = fresh.activeCampaign;
+      state.contractReputation = undefined;
     },
     addReputation(state, action: PayloadAction<number>) {
       state.reputation = Math.max(
         0,
         Math.min(100, state.reputation + action.payload),
       );
+    },
+    recordContractReputation(
+      state,
+      action: PayloadAction<{ month: string; gained: number }>,
+    ) {
+      const { month, gained } = action.payload;
+      const before =
+        state.contractReputation?.month === month
+          ? state.contractReputation.gained
+          : 0;
+      state.contractReputation = { month, gained: before + gained };
     },
     addReputationByType(
       state,
@@ -78,6 +98,16 @@ export const companySlice = createSlice({
         (b) => b.id === action.payload.id,
       );
       if (building) building.name = action.payload.name;
+    },
+    // Rythme de travail d'un studio (cf. `utils/workSchedule`).
+    setBuildingSchedule(
+      state,
+      action: PayloadAction<{ id: number; schedule: WorkSchedule }>,
+    ) {
+      const building = state.buildingList.find(
+        (b) => b.id === action.payload.id,
+      );
+      if (building) building.schedule = action.payload.schedule;
     },
     setMoney(state, action: PayloadAction<number>) {
       state.money = action.payload;
@@ -155,9 +185,11 @@ export const {
   initializeCompanyState,
   addReputation,
   addReputationByType,
+  recordContractReputation,
   applyContractMalus,
   paySeverance,
   renameBuilding,
+  setBuildingSchedule,
   releaseBuilding,
   launchCampaign,
   clearCampaign,

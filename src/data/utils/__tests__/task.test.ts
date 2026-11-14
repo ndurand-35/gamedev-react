@@ -10,7 +10,12 @@ import {
   sortContracts,
 } from "@/data/utils/task";
 import { totalRequirementQuantity } from "@/data/utils/component";
-import { ComponentType, Contract, ContractType } from "@/data/interface";
+import {
+  COMPONENT_GRAIN as G,
+  ComponentType,
+  Contract,
+  ContractType,
+} from "@/data/interface";
 
 // Couvre la balance des contrats (MYL-11) : depuis le rééquilibrage, chaque
 // contrat demande au moins deux types de composants et garantit un gain
@@ -88,10 +93,10 @@ describe("balance des contrats — generateNewContract", () => {
   });
 
   it("cale le délai sur la charge réelle du contrat", () => {
-    // ~110 h de travail par composant pour un développeur seul, plus la marge
-    // du client, arrondi au jour plein.
-    expect(contractDeadlineHours(10, 100)).toBe(1104); // 1100 h → 46 j
-    expect(contractDeadlineHours(1, 120)).toBe(144); // 132 h → 6 j pleins
+    // ~110 h de travail par unité d'effort (G composants) pour un développeur
+    // seul, plus la marge du client, arrondi au jour plein.
+    expect(contractDeadlineHours(10 * G, 100)).toBe(1104); // 1100 h → 46 j
+    expect(contractDeadlineHours(1 * G, 120)).toBe(144); // 132 h → 6 j pleins
 
     for (let rep = 0; rep <= 100; rep += 10) {
       for (const c of generateNewContract(rep)) {
@@ -112,11 +117,37 @@ describe("balance des contrats — generateNewContract", () => {
   });
 
   it("laisse ~2 mois sur un contrat de difficulté moyenne", () => {
-    // Difficulté 50 → ~13 composants selon `requirementsForType`, soit
-    // ~1430 h de travail solo et un délai de 1,2 à 1,6 fois cette charge.
-    const deadline = contractDeadlineHours(13, 100);
+    // Difficulté 50 → ~13 unités d'effort (× grain) selon
+    // `requirementsForType`, soit ~1430 h de travail solo et un délai de 1,2 à
+    // 1,6 fois cette charge.
+    const deadline = contractDeadlineHours(13 * G, 100);
     expect(deadline / 24).toBeGreaterThanOrEqual(55);
     expect(deadline / 24).toBeLessThanOrEqual(65);
+  });
+
+  it("paie au composant, sans que la difficulté ne fasse exploser le prix", () => {
+    const perComponent = (reputation: number) => {
+      const lot = Array.from({ length: 40 }, () =>
+        generateNewContract(reputation),
+      ).flat();
+      const paid = lot.reduce(
+        (acc, c) => acc + c.priceDeposit + c.priceAdditional,
+        0,
+      );
+      const qty = lot.reduce(
+        (acc, c) => acc + c.requirements.reduce((s, r) => s + r.quantity, 0),
+        0,
+      );
+      // Prix d'une unité d'effort (G composants), l'échelle d'origine.
+      return (paid / qty) * G;
+    };
+    const novice = perComponent(0);
+    const top = perComponent(100);
+    // Mieux payé en haut de l'échelle, mais dans un rapport raisonnable : la
+    // fortune se fait avec les produits (cf. `npm run sim`).
+    expect(top).toBeGreaterThan(novice);
+    expect(top).toBeLessThan(900);
+    expect(top / novice).toBeLessThan(4);
   });
 
   it("applique les planchers de prix forfaitaires même en early game", () => {

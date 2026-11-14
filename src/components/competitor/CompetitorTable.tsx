@@ -1,6 +1,7 @@
 import { FC, useMemo, useState } from "react";
 
 import { SortableHeader } from "@/components/SortableHeader";
+import { CodexLink } from "@/components/codex/CodexLink";
 import {
   CLIENT_RELATION_MAX,
   CLIENT_TIER_BADGE_CLASS,
@@ -50,12 +51,13 @@ const StandingRow: FC<{
     <tr className={lost ? "opacity-50" : ""}>
       <td>
         <div className="flex items-center gap-3">
-          <div className="avatar avatar-placeholder">
-            <div className="w-8 rounded-full bg-neutral text-neutral-content">
-              <span className="text-xs">{initials(competitor.name)}</span>
-            </div>
-          </div>
-          <span className={"font-medium " + (lost ? "line-through" : "")}>
+          <span
+            aria-hidden="true"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-base-200 text-xs font-extrabold"
+          >
+            {initials(competitor.name)}
+          </span>
+          <span className={"font-extrabold " + (lost ? "line-through" : "")}>
             {competitor.name}
           </span>
         </div>
@@ -66,7 +68,7 @@ const StandingRow: FC<{
             {tier}
           </span>
           {client && !lost && (
-            <span className="text-xs tabular-nums opacity-70">
+            <span className="text-xs font-bold text-base-content/70 tabular-nums">
               {client.relation} / {CLIENT_RELATION_MAX}
             </span>
           )}
@@ -77,30 +79,35 @@ const StandingRow: FC<{
           <>
             {client.delivered}
             {client.early > 0 && (
-              <span className="opacity-70"> · {client.early} en avance</span>
+              <span className="text-base-content/70">
+                {" "}
+                · {client.early} en avance
+              </span>
             )}
           </>
         ) : (
-          <span className="opacity-40">—</span>
+          <span className="text-base-content/40">—</span>
         )}
       </td>
       <td className="text-right tabular-nums">
         {bonus > 0 ? (
-          <span className="text-success">+{Math.round(bonus * 100)} %</span>
+          <span className="font-extrabold text-success">
+            +{Math.round(bonus * 100)} %
+          </span>
         ) : (
-          <span className="opacity-40">—</span>
+          <span className="text-base-content/40">—</span>
         )}
       </td>
       <td className="tabular-nums">
         {client ? (
           getTimeAsDate(client.lastSeen).format("DD/MM/YYYY")
         ) : (
-          <span className="opacity-60">Jamais</span>
+          <span className="text-base-content/60">Jamais</span>
         )}
       </td>
       <td>
         {products.length === 0 ? (
-          <span className="opacity-40">—</span>
+          <span className="text-base-content/40">—</span>
         ) : (
           <ul className="flex flex-wrap gap-1">
             {products.map((p) => (
@@ -110,7 +117,9 @@ const StandingRow: FC<{
                 title={`${p.genre} · lancé le ${getTimeAsDate(p.launchTime).format("DD/MM/YYYY")}`}
               >
                 {p.name}
-                <span className="opacity-60">{p.genre}</span>
+                <span className="font-semibold text-base-content/60">
+                  {p.genre}
+                </span>
               </li>
             ))}
           </ul>
@@ -141,9 +150,8 @@ export const CompetitorTable: FC = () => {
 
   if (standings.length === 0) {
     return (
-      <p className="p-4 text-sm opacity-60">
-        Aucun studio connu pour l'instant. Lancez le jeu : le marché se découvre
-        au premier lot de contrats.
+      <p className="text-sm font-semibold text-base-content/70">
+        Aucun studio connu pour l'instant. <CodexLink id="concurrents" />
       </p>
     );
   }
@@ -153,46 +161,46 @@ export const CompetitorTable: FC = () => {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm opacity-60">
+      <p className="text-sm font-semibold text-base-content/70">
         {plural(standings.length, "studio")} sur le marché
         {worked > 0 && ` · ${worked} avec qui vous avez travaillé`}
-        {lost > 0 && ` · ${plural(lost, "rompu")}`}. Livrer en avance fait
-        revenir un studio avec de meilleurs contrats ; manquer une deadline le
-        fait rompre pour de bon.
+        {lost > 0 && ` · ${plural(lost, "rompu")}`}. <CodexLink id="clients" />
       </p>
-      <table className="table table-zebra bg-base-100 rounded-box shadow">
-        <thead>
-          <tr>
-            <SortableHeader label="Studio" sortKey="name" {...headerProps} />
-            <SortableHeader
-              label="Relation"
-              sortKey="relation"
-              {...headerProps}
-            />
-            <SortableHeader
-              label="Contrats livrés"
-              sortKey="delivered"
-              {...headerProps}
-            />
-            <th className="text-right">Prime sur ses prix</th>
-            <SortableHeader
-              label="Dernier contact"
-              sortKey="lastSeen"
-              {...headerProps}
-            />
-            <th>Produits</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((standing) => (
-            <StandingRow
-              key={`competitor_${standing.competitor.id}`}
-              standing={standing}
-              products={rivalsOf(rivals ?? [], standing.competitor.id)}
-            />
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr>
+              <SortableHeader label="Studio" sortKey="name" {...headerProps} />
+              <SortableHeader
+                label="Relation"
+                sortKey="relation"
+                {...headerProps}
+              />
+              <SortableHeader
+                label="Contrats livrés"
+                sortKey="delivered"
+                {...headerProps}
+              />
+              <th className="text-right">Prime sur ses prix</th>
+              <SortableHeader
+                label="Dernier contact"
+                sortKey="lastSeen"
+                {...headerProps}
+              />
+              <th>Produits</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((standing) => (
+              <StandingRow
+                key={`competitor_${standing.competitor.id}`}
+                standing={standing}
+                products={rivalsOf(rivals ?? [], standing.competitor.id)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

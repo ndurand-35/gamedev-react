@@ -144,7 +144,12 @@ export const searchRoleOf = (p: Person): SearchRole => {
  * sourcer, négocier et signer, on paie déjà le poste sans rien en tirer.
  */
 export const replacementCost = (p: Person, reputation: number): number =>
-  computeSearchCost(searchRoleOf(p), REPLACEMENT_SEARCH_SIZE, reputation) +
+  computeSearchCost(
+    searchRoleOf(p),
+    REPLACEMENT_SEARCH_SIZE,
+    reputation,
+    p.seniority,
+  ) +
   p.salary;
 
 /** Coût de remplacement pondéré par le risque de départ, sur le mois. */
@@ -179,6 +184,8 @@ export interface MalusExposureInput {
   employes: Person[];
   productionProgress: Record<number, number>;
   time: number;
+  /** Studios, pour leur rythme de travail. */
+  buildings?: Building[];
 }
 
 /**
@@ -200,6 +207,7 @@ export const contractMalusExposure = ({
   employes,
   productionProgress,
   time,
+  buildings,
 }: MalusExposureInput): number =>
   contracts.reduce((acc, contract) => {
     const advice = adviseDelivery({
@@ -208,6 +216,7 @@ export const contractMalusExposure = ({
       employes,
       productionProgress,
       time,
+      buildings,
     });
     return advice.deliverableAt === null ? acc + contract.priceMalus : acc;
   }, 0);

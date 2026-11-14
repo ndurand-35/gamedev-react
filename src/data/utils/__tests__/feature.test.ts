@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { COMPONENT_GRAIN as G } from "@/data/interface";
 import {
   ComponentType,
   GENRES,
@@ -100,9 +101,9 @@ describe("catalogue", () => {
 describe("coûts et besoins", () => {
   it("somme les coûts d'un assemblage type par type", () => {
     expect(featuresRequirements(["core_tool", "automation"])).toEqual({
-      [ComponentType.CODE]: 4 + 5,
-      [ComponentType.VISUEL]: 1 + 1,
-      [ComponentType.UX]: 1 + 2,
+      [ComponentType.CODE]: (4 + 5) * G,
+      [ComponentType.VISUEL]: (1 + 1) * G,
+      [ComponentType.UX]: (1 + 2) * G,
     });
     expect(featuresRequirements(["inconnu"])).toEqual({
       [ComponentType.CODE]: 0,
@@ -113,8 +114,8 @@ describe("coûts et besoins", () => {
 
   it("exprime le coût d'une fonctionnalité en besoins, types nuls omis", () => {
     expect(featureRequirements(FEATURE_BY_ID.cloud_sync)).toEqual([
-      { type: ComponentType.CODE, quantity: 5 },
-      { type: ComponentType.UX, quantity: 2 },
+      { type: ComponentType.CODE, quantity: 5 * G },
+      { type: ComponentType.UX, quantity: 2 * G },
     ]);
   });
 });
@@ -134,15 +135,15 @@ describe("affinité et attractivité", () => {
     const core = featureCost(coreFeature(ProductGenre.JEU));
     const story = product(ProductGenre.JEU, ["core_game", "story_mode"]); // 11 × 1,4
     const ui = product(ProductGenre.JEU, ["core_game", "ui_polish"]); // 8 × 1,2
-    expect(productBaseAppeal(story)).toBeCloseTo(core + 11 * 1.4);
-    expect(productBaseAppeal(ui)).toBeCloseTo(core + 8 * 1.2);
+    expect(productBaseAppeal(story)).toBeCloseTo(core + 11 * G * 1.4);
+    expect(productBaseAppeal(ui)).toBeCloseTo(core + 8 * G * 1.2);
     expect(productBaseAppeal(story)).toBeGreaterThan(productBaseAppeal(ui));
   });
 
   it("l'attractivité de marché repose sur les fonctionnalités, pas sur la taille brute", () => {
     const p = product(ProductGenre.JEU, ["core_game", "content_pack"]);
     expect(productAppeal(p, 0)).toBe(productBaseAppeal(p));
-    expect(productAppeal(p, 0)).toBeGreaterThan(12 + 9); // affinité 1,5 du contenu
+    expect(productAppeal(p, 0)).toBeGreaterThan((12 + 9) * G); // affinité 1,5 du contenu
   });
 
   it("un produit sans fonctionnalité garde sa taille brute", () => {

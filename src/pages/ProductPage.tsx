@@ -1,3 +1,4 @@
+import { SectionTabs } from "@/components/layout/SectionTabs";
 import { ReactElement, useMemo, useState } from "react";
 import {
   Archive,
@@ -18,6 +19,7 @@ import {
 
 import {
   COMPONENT_TYPE_ORDER,
+  ComponentType,
   Component,
   Product,
   ProductGenre,
@@ -78,6 +80,7 @@ import {
 } from "@/data/utils/marketConfidence";
 import { featureTechnology } from "@/data/utils/technology";
 import { TechnologyPanel } from "@/components/product/TechnologyPanel";
+import { CodexLink } from "@/components/codex/CodexLink";
 import { FeatureTree } from "@/components/product/FeatureTree";
 import { productTopMenuItems } from "@/pages/product/menu";
 
@@ -108,33 +111,33 @@ const SegmentStrip = ({
 }) => (
   <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-3">
     {reports.map((r) => (
-      <div
-        key={`segment_${r.genre.genre}`}
-        className="card bg-base-100 border border-base-300"
-      >
-        <div className="p-3 space-y-1">
+      <div key={`segment_${r.genre.genre}`} className="toy-tile">
+        <div className="p-3.5 space-y-1.5">
           <div className="flex flex-row items-baseline justify-between">
-            <span className="inline-flex items-center gap-2 font-medium">
+            <span className="inline-flex items-center gap-2 font-display text-lg font-semibold">
               {r.genre.genre}
               {trends
                 .filter((t) => t.kind === "genre" && t.target === r.genre.genre)
                 .map((t) => (
-                  <TrendBadge key={`seg_trend_${t.id}`} direction={t.direction} />
+                  <TrendBadge
+                    key={`seg_trend_${t.id}`}
+                    direction={t.direction}
+                  />
                 ))}
             </span>
-            <span className="text-xs opacity-60 tabular-nums">
+            <span className="text-xs font-extrabold tabular-nums text-base-content/70">
               {formatPrice(r.demand)} € / mois
             </span>
           </div>
           {/* Nous, puis les concurrents, sur la même jauge : ce qui reste
               est la concurrence diffuse. */}
-          <div className="flex h-1.5 w-full rounded bg-base-200 overflow-hidden">
+          <div
+            className="flex h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-base-300"
+            title={`Nous : ${pct(r.share)} · concurrents : ${pct(r.rivalShare)}`}
+          >
+            <div className="h-full bg-sun" style={{ width: pct(r.share) }} />
             <div
-              className="h-full bg-base-content/60"
-              style={{ width: pct(r.share) }}
-            />
-            <div
-              className="h-full bg-base-content/20"
+              className="h-full bg-base-content/35"
               style={{ width: pct(r.rivalShare) }}
             />
           </div>
@@ -154,7 +157,6 @@ const SegmentStrip = ({
               "flex flex-row items-center gap-1 text-xs tabular-nums " +
               (r.confidence < CONFIDENCE_WARNING ? "text-error" : "opacity-70")
             }
-            title="Confiance du public : elle baisse quand le segment est inondé de sorties médiocres, et multiplie la demande."
           >
             {r.confidence < CONFIDENCE_WARNING && (
               <WarningTriangle width={12} height={12} aria-hidden />
@@ -169,7 +171,6 @@ const SegmentStrip = ({
               € / mois
             </p>
           )}
-          <p className="text-xs opacity-50">{r.genre.description}</p>
         </div>
       </div>
     ))}
@@ -232,17 +233,25 @@ const Stat = ({
   value: string;
   tone?: "warning";
 }) => (
-  <div>
-    <dt className="text-[11px] opacity-60">{label}</dt>
+  <div className="rounded-xl bg-base-200 px-3 py-2">
+    <dt className="text-xs font-bold text-base-content/70">{label}</dt>
     <dd
       className={
-        "tabular-nums font-semibold " + (tone === "warning" ? "text-warning" : "")
+        "font-display text-lg font-semibold tabular-nums " +
+        (tone === "warning" ? "text-warning" : "")
       }
     >
       {value}
     </dd>
   </div>
 );
+
+/** Barres du chantier, dans la couleur du type. */
+const CHANTIER_FILL: Record<ComponentType, string> = {
+  [ComponentType.CODE]: "bg-code",
+  [ComponentType.VISUEL]: "bg-visuel",
+  [ComponentType.UX]: "bg-ux",
+};
 
 // ── Portefeuille ─────────────────────────────────────────────────────────────
 
@@ -281,21 +290,24 @@ const PortfolioItem = ({
         onClick={onSelect}
         aria-pressed={selected}
         className={
-          "w-full rounded-lg border px-3 py-2 text-left transition hover:bg-base-200 " +
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-base-content " +
+          "w-full rounded-[0.9rem] border-ink px-3 py-2.5 text-left transition-colors " +
           (selected
-            ? "border-base-content bg-base-200"
-            : "border-base-300 bg-base-100")
+            ? "border-[3px] bg-[#fff0c2]"
+            : "border-2 bg-white hover:bg-base-100")
         }
       >
         <span className="flex flex-row items-center gap-2">
           <span className="opacity-70" title={p.status}>
             {STATUS_ICON[p.status]}
           </span>
-          <span className="font-medium flex-1 truncate">{p.name}</span>
+          <span className="flex-1 truncate font-extrabold">{p.name}</span>
           {p.promotion && (
             <span className="text-warning" title="Promotion en cours">
-              <Megaphone width={14} height={14} aria-label="Promotion en cours" />
+              <Megaphone
+                width={14}
+                height={14}
+                aria-label="Promotion en cours"
+              />
             </span>
           )}
           {available > 0 && (
@@ -308,18 +320,27 @@ const PortfolioItem = ({
             </span>
           )}
         </span>
-        <span className="mt-1 flex flex-row items-center justify-between gap-2 text-xs opacity-70">
+        <span className="mt-1 flex flex-row items-center justify-between gap-2 text-xs font-bold text-base-content/70">
           <span>{p.genre}</span>
           {p.status === ProductStatus.LAUNCHED && (
             <span className="tabular-nums">+{formatPrice(revenue)} €/mois</span>
           )}
         </span>
-        <progress
-          className="progress progress-success mt-1 h-1 w-full"
-          value={tree.acquired}
-          max={Math.max(1, tree.total)}
+        <span
+          role="progressbar"
+          aria-valuenow={tree.acquired}
+          aria-valuemin={0}
+          aria-valuemax={tree.total}
           aria-label={`${tree.acquired} fonctionnalités sur ${tree.total}`}
-        />
+          className="mt-2 block h-2 overflow-hidden rounded-full bg-base-300"
+        >
+          <span
+            className="block h-full rounded-full bg-success"
+            style={{
+              width: `${(tree.acquired / Math.max(1, tree.total)) * 100}%`,
+            }}
+          />
+        </span>
       </button>
     </li>
   );
@@ -356,8 +377,11 @@ const Portfolio = ({
         if (list.length === 0) return null;
         return (
           <div key={status}>
-            <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider opacity-60">
-              {title} ({list.length})
+            <h2 className="mb-2 flex items-center gap-2 font-display text-base font-semibold">
+              {title}
+              <span className="rounded-full border-2 border-ink bg-base-200 px-1.5 font-sans text-xs font-extrabold">
+                {list.length}
+              </span>
             </h2>
             <ul className="space-y-2">{list.map(item)}</ul>
           </div>
@@ -366,7 +390,7 @@ const Portfolio = ({
       {retired.length > 0 && (
         // Les retirés ne s'entassent plus au milieu des produits actifs.
         <details>
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider opacity-60">
+          <summary className="cursor-pointer font-display text-base font-semibold text-base-content/70">
             Retirés ({retired.length})
           </summary>
           <ul className="mt-2 space-y-2">{retired.map(item)}</ul>
@@ -398,8 +422,7 @@ const NodeDetail = ({
   if (!node) {
     return (
       <div className="rounded-lg border border-dashed border-base-300 p-4 text-sm opacity-70">
-        Sélectionnez un nœud de l'arbre pour voir ce qu'il coûte et ce qu'on
-        peut en faire.
+        Sélectionnez un nœud. <CodexLink id="fonctionnalites" />
       </div>
     );
   }
@@ -413,33 +436,30 @@ const NodeDetail = ({
       <div className="rounded-lg border border-dashed border-base-300 bg-base-100 p-4 space-y-2">
         <div className="flex flex-row items-start justify-between gap-2">
           <h3 className="font-semibold italic leading-tight">
-            Fonctionnalité à venir
+            Fonctionnalité à venir <CodexLink id="technologies" />
           </h3>
           <span className="badge badge-sm badge-ghost">À venir</span>
         </div>
         <p className="text-xs opacity-70">
-          Une technologie encore à venir la rendra possible. La compétence «
-          Veille technologique » du fondateur permet de savoir laquelle, et
-          quand.
+          Débloquée par une technologie à venir.
         </p>
       </div>
     );
   }
 
   let explanation: string;
-  const futureTech = state === "future" ? featureTechnology(feature.id) : undefined;
+  const futureTech =
+    state === "future" ? featureTechnology(feature.id) : undefined;
   if (futureTech) {
     explanation = `Arrivera avec « ${futureTech.name} », en ${futureTech.year}.`;
   } else if (isRoot) {
-    explanation =
-      "Socle du genre : obligatoire, il fait la taille minimale du produit.";
+    explanation = "Socle du genre.";
   } else if (state === "owned") {
     explanation = "Embarquée dans le produit.";
   } else if (state === "building") {
-    explanation =
-      "Prévue dans l'assemblage : elle sortira avec le produit, une fois ses composants investis.";
+    explanation = "Prévue dans l'assemblage.";
   } else if (state === "available") {
-    explanation = `L'ajout consomme ${total} composants du stock (les meilleurs), corrige les bugs en cours et rajeunit le produit.`;
+    explanation = `Coûte ${total} composants du stock.`;
   } else if (state === "short") {
     explanation = `Le stock ne couvre pas son coût : il manque ${missingLabel(node)}.`;
   } else {
@@ -452,7 +472,9 @@ const NodeDetail = ({
   return (
     <div className="rounded-lg border border-base-300 bg-base-100 p-4 space-y-2">
       <div className="flex flex-row items-start justify-between gap-2">
-        <h3 className="font-semibold leading-tight">{feature.label}</h3>
+        <h3 className="font-semibold leading-tight">
+          {feature.label} <CodexLink id="fonctionnalites" />
+        </h3>
         <span className="badge badge-sm badge-ghost whitespace-nowrap">
           {isRoot ? "Socle" : NODE_STATE_LABEL[state]}
         </span>
@@ -465,12 +487,7 @@ const NodeDetail = ({
         .filter((t) => t.kind === "feature" && t.target === node.feature.id)
         .map((t) => (
           <p key={`node_trend_${t.id}`} className="text-xs">
-            <TrendBadge direction={t.direction} />{" "}
-            <span className="opacity-70">
-              {t.direction === "up"
-                ? "Les produits qui l'embarquent gagnent en bouche-à-oreille, et leurs promotions portent plus loin."
-                : "Les produits qui l'embarquent perdent en bouche-à-oreille, et leurs promotions portent moins loin."}
-            </span>
+            <TrendBadge direction={t.direction} />
           </p>
         ))}
       {affinity && (
@@ -539,12 +556,12 @@ const ProductPanel = ({
   return (
     <div className="space-y-4">
       {/* En-tête : identité, édition, état. */}
-      <div className="card bg-base-100 border border-base-300 shadow-md">
+      <div className="card toy-frame">
         <div className="p-4 space-y-3">
           <div className="flex flex-row flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold">{p.name}</h2>
-              <p className="flex flex-row items-center gap-1.5 text-xs opacity-70">
+              <h2 className="font-display text-2xl font-bold">{p.name}</h2>
+              <p className="flex flex-row items-center gap-1.5 text-sm font-bold text-base-content/70">
                 {STATUS_ICON[p.status]} {p.status} · {p.genre}
                 {p.launchScore !== undefined &&
                   ` · note ${formatScore(p.launchScore)}/10`}
@@ -563,8 +580,10 @@ const ProductPanel = ({
 
           {developing && (
             <div className="space-y-2">
-              <div className="flex flex-row items-center justify-between text-xs">
-                <span className="font-medium">Chantier</span>
+              <div className="flex flex-row items-center justify-between text-sm font-bold">
+                <span className="font-display text-base font-semibold">
+                  Chantier
+                </span>
                 <span className="tabular-nums">
                   {invested} / {required} composants
                   {p.qualityCount > 0 &&
@@ -576,18 +595,28 @@ const ProductPanel = ({
                   p.requirements[t] === 0 ? (
                     <div key={t} />
                   ) : (
-                    <div key={t}>
-                      <div className="flex flex-row justify-between text-[11px]">
-                        <ComponentTypeBadge type={t} size={11} />
+                    <div key={t} className="space-y-1">
+                      <div className="flex flex-row justify-between text-xs font-extrabold">
+                        <ComponentTypeBadge type={t} size={13} />
                         <span className="tabular-nums">
                           {p.invested[t]}/{p.requirements[t]}
                         </span>
                       </div>
-                      <progress
-                        className="progress h-1.5 w-full"
-                        value={p.invested[t]}
-                        max={p.requirements[t]}
-                      />
+                      <div
+                        role="progressbar"
+                        aria-valuenow={p.invested[t]}
+                        aria-valuemin={0}
+                        aria-valuemax={p.requirements[t]}
+                        aria-label={`${t} : ${p.invested[t]} sur ${p.requirements[t]}`}
+                        className="h-3.5 overflow-hidden rounded-full border-2 border-ink bg-base-300"
+                      >
+                        <div
+                          className={`stripes h-full ${CHANTIER_FILL[t]}`}
+                          style={{
+                            width: `${(p.invested[t] / p.requirements[t]) * 100}%`,
+                          }}
+                        />
+                      </div>
                     </div>
                   ),
                 )}
@@ -655,7 +684,6 @@ const ProductPanel = ({
                 type="button"
                 className="btn btn-sm btn-outline"
                 onClick={() => dispatch(patchProductThunk(p.id))}
-                title={`Purge les bugs contre ${patchCost} composant${patchCost > 1 ? "s" : ""} Code`}
               >
                 <Tools /> Corriger ({patchCost} Code)
               </button>
@@ -704,7 +732,7 @@ const ProductPanel = ({
 
       {/* L'arbre et la fiche du nœud choisi, côte à côte sur grand écran. */}
       <div className="grid gap-4 xl:grid-cols-[1fr_18rem] items-start">
-        <div className="card bg-base-100 border border-base-300 shadow-md">
+        <div className="card toy-frame">
           <div className="p-4">
             <div className="mb-3 flex flex-row flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold">Arbre des fonctionnalités</h3>
@@ -817,89 +845,95 @@ export const ProductPage: React.FC = (): ReactElement => {
   };
 
   return (
-    <div className="p-8 mt-14 mb-20 space-y-6">
-      <div className="flex flex-row flex-wrap items-center justify-between gap-3">
-        <h1>Mes produits</h1>
-        <div className="flex flex-row items-center gap-3">
-          {totalRevenue > 0 && (
-            <span className="text-sm tabular-nums">
-              <span className="font-semibold">
-                +{formatPrice(totalRevenue)}
+    <div className="page-shell">
+      <SectionTabs items={productTopMenuItems} ariaLabel="Section Production" />
+      <div className="toy-frame page-frame space-y-6">
+        <div className="flex flex-row flex-wrap items-center justify-between gap-3">
+          {/* Un seul renvoi au codex pour le marché (segments ci-dessous). */}
+          <h1 className="flex items-center gap-2 font-display text-2xl font-bold">
+            Mes produits <CodexLink id="marche" />
+          </h1>
+          <div className="flex flex-row items-center gap-3">
+            {totalRevenue > 0 && (
+              <span className="text-sm tabular-nums">
+                <span className="font-semibold">
+                  +{formatPrice(totalRevenue)}
+                </span>
+                <span className="opacity-60">
+                  {" "}
+                  − {formatPrice(maintenance)} de maintenance / mois
+                </span>
               </span>
-              <span className="opacity-60">
-                {" "}
-                − {formatPrice(maintenance)} de maintenance / mois
-              </span>
-            </span>
-          )}
-          <button
-            type="button"
-            className="btn btn-sm btn-primary"
-            onClick={() => setCreating(true)}
-          >
-            <Plus />
-            Nouveau produit
-          </button>
-        </div>
-      </div>
-
-      <TrendsBar
-        trends={trends}
-        products={products.filter((p) => p.status !== ProductStatus.RETIRED)}
-      />
-
-      <TechnologyPanel time={time} />
-
-      <SegmentStrip
-        reports={segments}
-        trends={trends}
-        time={time}
-        confidence={confidence}
-        techWatch={techWatch}
-      />
-
-      <NewProductModal
-        open={creating}
-        onClose={() => setCreating(false)}
-        onCreate={handleCreate}
-      />
-
-      {products.length === 0 || !selected ? (
-        <div className="card bg-base-100 border border-base-300 p-8 text-center space-y-3">
-          <p className="opacity-70">
-            Aucun produit pour l'instant. Un produit part d'un socle, puis
-            grandit branche par branche.
-          </p>
-          <div>
+            )}
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-sm btn-primary"
               onClick={() => setCreating(true)}
+              data-tuto="product-new"
             >
-              <Plus /> Assembler un premier produit
+              <Plus />
+              Nouveau produit
             </button>
           </div>
         </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-[16rem_1fr] items-start">
-          <Portfolio
-            products={products}
-            stock={stock}
-            time={time}
-            revenues={revenues}
-            selectedId={selected.id}
-            onSelect={select}
-          />
-          <ProductPanel
-            key={`panel_${selected.id}`}
-            product={selected}
-            stock={stock}
-            revenue={revenues[selected.id] ?? 0}
-            share={shares[selected.id] ?? 0}
-            time={time}
-          />
-        </div>
-      )}
+
+        <TrendsBar
+          trends={trends}
+          products={products.filter((p) => p.status !== ProductStatus.RETIRED)}
+        />
+
+        <TechnologyPanel time={time} />
+
+        <SegmentStrip
+          reports={segments}
+          trends={trends}
+          time={time}
+          confidence={confidence}
+          techWatch={techWatch}
+        />
+
+        <NewProductModal
+          open={creating}
+          onClose={() => setCreating(false)}
+          onCreate={handleCreate}
+        />
+
+        {products.length === 0 || !selected ? (
+          <div className="rounded-[1.1rem] border-[3px] border-dashed border-base-content/25 p-8 text-center space-y-3">
+            <p className="opacity-70">
+              Aucun produit pour l'instant. <CodexLink id="produits" />
+            </p>
+            <div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setCreating(true)}
+              >
+                <Plus /> Assembler un premier produit
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[16rem_1fr] items-start">
+            <Portfolio
+              products={products}
+              stock={stock}
+              time={time}
+              revenues={revenues}
+              selectedId={selected.id}
+              onSelect={select}
+            />
+            <ProductPanel
+              key={`panel_${selected.id}`}
+              product={selected}
+              stock={stock}
+              revenue={revenues[selected.id] ?? 0}
+              share={shares[selected.id] ?? 0}
+              time={time}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

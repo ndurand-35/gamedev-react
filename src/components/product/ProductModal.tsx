@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef } from "react";
+import { FC, ReactNode, useMemo } from "react";
 import { WarningTriangle } from "iconoir-react";
 
 import {
@@ -9,7 +9,11 @@ import {
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 import { formatPrice } from "@/data/utils";
-import { affinityLabel, productBaseAppeal, productFeatures } from "@/data/utils/feature";
+import {
+  affinityLabel,
+  productBaseAppeal,
+  productFeatures,
+} from "@/data/utils/feature";
 import {
   LAUNCH_SPIKE_MONTHS,
   bugPenalty,
@@ -28,6 +32,7 @@ import { ComponentTypeBadge } from "@/components/component";
 import { CostBadges } from "@/components/product/CostBadges";
 import { ProductActions } from "@/components/product/ProductActions";
 import { formatScore, pct } from "@/components/product/productView";
+import { Modal } from "@/components/global/Modal";
 
 export interface ProductModalProps {
   /** Produit affiché, ou null quand la fiche est fermée. */
@@ -35,14 +40,26 @@ export interface ProductModalProps {
   onClose: () => void;
 }
 
+/** Une mesure du produit lancé : libellé discret, valeur en chiffres ronds. */
+const Metric: FC<{ label: string; children: ReactNode }> = ({
+  label,
+  children,
+}) => (
+  <div>
+    <dt className="text-xs font-bold text-base-content/60">{label}</dt>
+    <dd className="font-display text-base font-semibold tabular-nums">
+      {children}
+    </dd>
+  </div>
+);
+
 /**
  * La fiche d'un produit : tout ce que la ligne du tableau ne montre pas —
  * l'assemblage et le poids de chaque fonctionnalité, le segment avec les
- * produits rivaux nommés, le pic de lancement — et les actions. Le <dialog>
- * est toujours monté, ouvert quand `productId` est renseigné.
+ * produits rivaux nommés, le pic de lancement — et les actions. Ouverte quand
+ * `productId` désigne un produit existant (cf. Modal).
  */
 export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const products = useAppSelector((s) => s.product.products);
   const rivals = useAppSelector((s) => s.competitor.products);
   const roster = useAppSelector((s) => s.competitor.roster);
@@ -50,18 +67,12 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
   const campaign = useAppSelector((s) => s.company.activeCampaign);
 
   const p = products.find((x) => x.id === productId);
-  const open = p !== undefined;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
 
   const revenue = useMemo(
     () =>
-      p ? (computeProductRevenues(products, time, campaign, rivals)[p.id] ?? 0) : 0,
+      p
+        ? (computeProductRevenues(products, time, campaign, rivals)[p.id] ?? 0)
+        : 0,
     [p, products, time, campaign, rivals],
   );
   const segment = useMemo(
@@ -91,89 +102,74 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
   void myShare;
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="modal"
-      role="dialog"
-      aria-label="Fiche produit"
+    <Modal
+      open={p !== undefined}
       onClose={onClose}
+      size="2xl"
+      className="p-0"
+      ariaLabel="Fiche produit"
     >
-      <div className="modal-box max-w-2xl space-y-4">
-        {p && genre && (
-          <>
-            <div className="flex flex-row items-start justify-between gap-3">
-              <div>
-                <h3 className="font-bold text-lg">{p.name}</h3>
-                <p className="text-xs opacity-60">
-                  {genre.genre} · {p.status}
-                  {p.launchScore !== undefined &&
-                    ` · note ${formatScore(p.launchScore)}/10`}
-                  {p.launchTime !== undefined &&
-                    ` · lancé le ${getTimeAsDate(p.launchTime).format("DD/MM/YYYY")}`}
-                </p>
-              </div>
-              {launched && (
-                <span className="text-right tabular-nums shrink-0">
-                  <span className="block font-semibold">
-                    +{formatPrice(revenue)} / mois
-                  </span>
-                  <span className="block text-xs opacity-60">
-                    −{formatPrice(productMaintenance(p))} de maintenance
-                  </span>
-                </span>
-              )}
+      {p && genre && (
+        <>
+          {/* En-tête : le produit et ce qu'il rapporte */}
+          <div className="flex flex-row items-start justify-between gap-3 border-b-[3px] border-ink bg-white px-6 py-4">
+            <div className="min-w-0 flex flex-col gap-1">
+              <h3 className="font-display text-2xl leading-tight font-bold">
+                {p.name}
+              </h3>
+              <p className="text-sm font-bold text-base-content/70">
+                {genre.genre} · {p.status}
+                {p.launchScore !== undefined &&
+                  ` · note ${formatScore(p.launchScore)}/10`}
+                {p.launchTime !== undefined &&
+                  ` · lancé le ${getTimeAsDate(p.launchTime).format("DD/MM/YYYY")}`}
+              </p>
             </div>
-
             {launched && (
-              <dl className="grid grid-cols-3 gap-2 text-xs">
-                <div>
-                  <dt className="opacity-60">Fraîcheur</dt>
-                  <dd className="tabular-nums font-medium">
-                    {pct(productFreshness(p, time))}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="opacity-60">Attractivité</dt>
-                  <dd className="tabular-nums font-medium">
-                    {productBaseAppeal(p).toFixed(0)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="opacity-60">Qualité</dt>
-                  <dd className="tabular-nums font-medium">
-                    {productAverageQuality(p).toFixed(1)} / 5
-                  </dd>
-                </div>
-                <div>
-                  <dt className="opacity-60">Taille</dt>
-                  <dd className="tabular-nums font-medium">
-                    {productSize(p)} composants
-                  </dd>
-                </div>
-                <div>
-                  <dt className="opacity-60">Mises à jour</dt>
-                  <dd className="tabular-nums font-medium">{p.updates ?? 0}</dd>
-                </div>
-                <div>
-                  <dt className="opacity-60">Hype au lancement</dt>
-                  <dd className="tabular-nums font-medium">
-                    {pct(p.hype ?? 0)}
-                  </dd>
-                </div>
+              <span className="shrink-0 text-right tabular-nums">
+                <span className="block font-display text-xl font-bold">
+                  +{formatPrice(revenue)} / mois
+                </span>
+                <span className="block text-xs font-bold text-base-content/60">
+                  −{formatPrice(productMaintenance(p))} de maintenance
+                </span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-4 px-6 py-5">
+            {launched && (
+              <dl className="toy-tile grid grid-cols-3 gap-x-2 gap-y-3 px-4 py-3">
+                <Metric label="Fraîcheur">
+                  {pct(productFreshness(p, time))}
+                </Metric>
+                <Metric label="Attractivité">
+                  {productBaseAppeal(p).toFixed(0)}
+                </Metric>
+                <Metric label="Qualité">
+                  {productAverageQuality(p).toFixed(1)} / 5
+                </Metric>
+                <Metric label="Taille">{productSize(p)} composants</Metric>
+                <Metric label="Mises à jour">{p.updates ?? 0}</Metric>
+                <Metric label="Hype au lancement">{pct(p.hype ?? 0)}</Metric>
               </dl>
             )}
 
             {launched && (spike > 1 || bugs > 0) && (
-              <div className="flex flex-row flex-wrap gap-2 text-xs">
+              <div className="flex flex-row flex-wrap gap-2">
                 {spike > 1 && (
-                  <span className="badge badge-sm badge-ghost">
+                  <span className="badge badge-sm bg-white">
                     Pic de lancement +{Math.round((spike - 1) * 100)} % ·{" "}
                     {LAUNCH_SPIKE_MONTHS - monthsSinceLaunch(p, time)} mois
                   </span>
                 )}
                 {bugs > 0 && (
-                  <span className="badge badge-sm badge-warning gap-1">
-                    <WarningTriangle width={12} height={12} />
+                  <span className="badge badge-sm gap-1 bg-white">
+                    <WarningTriangle
+                      width={12}
+                      height={12}
+                      className="text-error"
+                    />
                     {bugs} bug{bugs > 1 ? "s" : ""} · −
                     {Math.round((1 - bugPenalty(bugs)) * 100)} % d'attractivité
                   </span>
@@ -182,21 +178,21 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
             )}
 
             {developing && (
-              <div className="space-y-2">
+              <div className="toy-tile flex flex-col gap-2 px-4 py-3">
                 {COMPONENT_TYPE_ORDER.map((t) => {
                   const have = p.invested[t];
                   const need = p.requirements[t];
                   if (need === 0) return null;
                   return (
                     <div key={`${p.id}_${t}`}>
-                      <div className="flex flex-row items-center justify-between text-xs">
+                      <div className="flex flex-row items-center justify-between text-xs font-bold">
                         <ComponentTypeBadge type={t} size={12} />
                         <span className="tabular-nums">
                           {have}/{need}
                         </span>
                       </div>
                       <progress
-                        className="progress w-full h-1.5"
+                        className="progress h-2 w-full"
                         value={Math.min(1, have / need) * 100}
                         max={100}
                       />
@@ -206,29 +202,37 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
               </div>
             )}
 
-            <section className="space-y-1">
-              <h4 className="text-sm font-semibold">Fonctionnalités</h4>
+            <section className="flex flex-col gap-1.5">
+              <h4 className="font-display text-base font-semibold">
+                Fonctionnalités
+              </h4>
               {features.length === 0 ? (
-                <p className="text-xs opacity-60">
+                <p className="text-xs font-semibold text-base-content/60">
                   Produit d'avant le catalogue : sa taille brute tient lieu
                   d'attractivité.
                 </p>
               ) : (
-                <ul className="divide-y divide-base-200 text-sm">
+                <ul className="toy-tile divide-y-[1.5px] divide-base-300 px-4 py-1 text-sm">
                   {features.map((f) => {
                     const label = affinityLabel(f, genre.genre);
                     return (
                       <li
                         key={`${p.id}_${f.id}`}
-                        className="flex flex-row items-center gap-2 py-1"
+                        className="flex flex-row items-center gap-2 py-1.5"
                       >
-                        <span className="flex-1" title={f.description}>
+                        <span
+                          className="flex-1 font-semibold"
+                          title={f.description}
+                        >
                           {f.label}
                           {f.coreOf && (
-                            <span className="opacity-60 text-xs"> · socle</span>
+                            <span className="text-xs text-base-content/60">
+                              {" "}
+                              · socle
+                            </span>
                           )}
                           {label && (
-                            <span className="opacity-60 text-xs tabular-nums">
+                            <span className="text-xs text-base-content/60 tabular-nums">
                               {" "}
                               {label}
                             </span>
@@ -243,67 +247,71 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
             </section>
 
             {segment && (
-              <section className="space-y-1">
-                <h4 className="text-sm font-semibold">
+              <section className="flex flex-col gap-1.5">
+                <h4 className="font-display text-base font-semibold">
                   Son segment — {segment.genre.genre},{" "}
                   {formatPrice(segment.demand)} € / mois
                 </h4>
-                <div className="flex h-1.5 w-full rounded bg-base-200 overflow-hidden">
-                  <div
-                    className="h-full bg-base-content/60"
-                    style={{ width: pct(segment.share) }}
-                  />
-                  <div
-                    className="h-full bg-base-content/20"
-                    style={{ width: pct(segment.rivalShare) }}
-                  />
-                </div>
-                <p className="text-xs tabular-nums opacity-70">
-                  Nous {pct(segment.share)} ({segment.products.length} produit
-                  {segment.products.length > 1 ? "s" : ""}) · concurrents{" "}
-                  {pct(segment.rivalShare)} · concurrence diffuse{" "}
-                  {pct(Math.max(0, 1 - segment.share - segment.rivalShare))}
-                </p>
-                {segment.rivals.length > 0 && (
-                  <ul className="text-xs space-y-0.5">
-                    {segment.rivals.map((r) => (
-                      <li
-                        key={`rival_${r.id}`}
-                        className="flex flex-row items-baseline justify-between gap-2 tabular-nums"
-                      >
-                        <span className="truncate">
-                          <span className="opacity-60">
-                            {studioName.get(r.competitorId) ?? "Studio"} —{" "}
+                <div className="toy-tile flex flex-col gap-2 px-4 py-3">
+                  <div className="flex h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-base-300">
+                    <div
+                      className="h-full bg-ink"
+                      style={{ width: pct(segment.share) }}
+                    />
+                    <div
+                      className="h-full bg-ink/30"
+                      style={{ width: pct(segment.rivalShare) }}
+                    />
+                  </div>
+                  <p className="text-xs font-semibold text-base-content/70 tabular-nums">
+                    Nous {pct(segment.share)} ({segment.products.length} produit
+                    {segment.products.length > 1 ? "s" : ""}) · concurrents{" "}
+                    {pct(segment.rivalShare)} · concurrence diffuse{" "}
+                    {pct(Math.max(0, 1 - segment.share - segment.rivalShare))}
+                  </p>
+                  {segment.rivals.length > 0 && (
+                    <ul className="flex flex-col gap-0.5 border-t-[1.5px] border-base-300 pt-2 text-xs">
+                      {segment.rivals.map((r) => (
+                        <li
+                          key={`rival_${r.id}`}
+                          className="flex flex-row items-baseline justify-between gap-2 tabular-nums"
+                        >
+                          <span className="truncate font-semibold">
+                            <span className="text-base-content/60">
+                              {studioName.get(r.competitorId) ?? "Studio"}{" "}
+                              —{" "}
+                            </span>
+                            {r.name}
                           </span>
-                          {r.name}
-                        </span>
-                        <span className="opacity-60 whitespace-nowrap">
-                          attractivité {rivalAppeal(r, time).toFixed(0)} · depuis
-                          le {getTimeAsDate(r.launchTime).format("MM/YYYY")}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                          <span className="whitespace-nowrap text-base-content/60">
+                            attractivité {rivalAppeal(r, time).toFixed(0)} ·
+                            depuis le{" "}
+                            {getTimeAsDate(r.launchTime).format("MM/YYYY")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </section>
             )}
+          </div>
 
-            <div className="modal-action items-center justify-between">
+          {/* Pied : fermer à gauche, les actions sur le produit à droite */}
+          <div className="flex flex-wrap items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+            <button
+              type="button"
+              className="btn btn-ghost underline underline-offset-4"
+              onClick={onClose}
+            >
+              Fermer
+            </button>
+            <div className="ml-auto">
               <ProductActions product={p} />
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => dialogRef.current?.close()}
-              >
-                Fermer
-              </button>
             </div>
-          </>
-        )}
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button type="submit">close</button>
-      </form>
-    </dialog>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 };

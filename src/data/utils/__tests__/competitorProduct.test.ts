@@ -41,17 +41,20 @@ const mix = (code: number): Record<ComponentType, number> => ({
   [ComponentType.UX]: 0,
 });
 
-/** Notre outil de 15 composants à qualité 2,5 : attractivité 15 = baseline. */
+/** Concurrence diffuse du segment Outil. */
+const BASE = GENRES[ProductGenre.OUTIL].baseline;
+
+/** Notre outil de BASE composants à qualité 2,5 : attractivité = baseline. */
 const ours = (over: Partial<Product> = {}): Product => ({
   id: 1,
   name: "Nôtre",
   status: ProductStatus.LAUNCHED,
   genre: ProductGenre.OUTIL,
   features: [],
-  requirements: mix(15),
-  invested: mix(15),
-  qualitySum: 37.5,
-  qualityCount: 15,
+  requirements: mix(BASE),
+  invested: mix(BASE),
+  qualitySum: 2.5 * BASE,
+  qualityCount: BASE,
   launchTime: 0,
   freshAt: 0,
   bugs: 0,
@@ -65,7 +68,7 @@ const rival = (over: Partial<CompetitorProduct> = {}): CompetitorProduct => ({
   competitorId: "acme",
   name: "Rival",
   genre: ProductGenre.OUTIL,
-  size: 15,
+  size: BASE,
   quality: 2.5,
   launchTime: 0,
   retireAt: addMonthsToTime(0, 18),
@@ -88,11 +91,11 @@ const AFTER_SPIKE = addMonthsToTime(0, LAUNCH_SPIKE_MONTHS);
 
 describe("rivalAppeal", () => {
   it("vaut taille × qualité × fraîcheur, comme les nôtres", () => {
-    expect(rivalAppeal(rival(), 0)).toBe(15);
+    expect(rivalAppeal(rival(), 0)).toBe(BASE);
     expect(rivalAppeal(rival({ quality: 5 }), 0)).toBe(
-      15 * productQualityMultiplier(5),
+      BASE * productQualityMultiplier(5),
     );
-    expect(rivalAppeal(rival(), addMonthsToTime(0, 12))).toBeLessThan(15);
+    expect(rivalAppeal(rival(), addMonthsToTime(0, 12))).toBeLessThan(BASE);
   });
 });
 
@@ -120,7 +123,7 @@ describe("dilution par les concurrents", () => {
     const reports = segmentReports([ours()], AFTER_SPIKE, [rival()]);
     const outil = reports.find((r) => r.genre.genre === ProductGenre.OUTIL)!;
     expect(outil.rivals).toHaveLength(1);
-    expect(outil.rivalAppeal).toBe(15);
+    expect(outil.rivalAppeal).toBe(BASE);
     expect(outil.rivalShare).toBeCloseTo(1 / 3);
     expect(outil.share).toBeCloseTo(1 / 3);
   });

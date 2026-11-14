@@ -19,7 +19,7 @@ export const RangeInput: React.FC<RangeInputProps> = ({
   return (
     <div>
       <div className="flex flex-row justify-between">
-        <span className="label-text">{label}</span>
+        <span className="text-sm font-bold">{label}</span>
         <span className="font-mono text-sm">
           {field.state.value} / {max}
         </span>

@@ -105,10 +105,21 @@ describe("buildRaiseProposal — montant, plafond cumulé, négo partielle", () 
     expect(p.asked).toBe(2300);
   });
   it("écrête au plafond cumulé min(expected×1.25, signed×1.40)", () => {
-    // ultimatum 15 % + bonus, signed bas → plafond signed×1.40 = 2100
-    const p = buildRaiseProposal("ultimatum", 2000, 4000, 1500);
-    const ceil = Math.min(4000 * 1.25, 1500 * 1.4); // min(5000, 2100) = 2100
+    // ultimatum 15 % : 2300 demandés, signed bas → plafond signed×1.40 = 2100
+    const p = buildRaiseProposal("ultimatum", 2000, 2000, 1500);
+    const ceil = Math.min(2000 * 1.25, 1500 * 1.4); // min(2500, 2100) = 2100
     expect(p.granted).toBe(ceil);
+  });
+  it("laisse toujours rejoindre l'attendu, même au-delà de signed×1.40 (employé formé)", () => {
+    // Attendu 4000 pour un salaire signé à 1500 : le plafond cumulé (2100)
+    // l'empêcherait d'être jamais rattrapé ; on accorde la demande entière.
+    const p = buildRaiseProposal("ultimatum", 2000, 4000, 1500);
+    expect(p.granted).toBe(p.asked);
+    expect(p.granted).toBeGreaterThan(1500 * 1.4);
+    // Et la dernière marche s'arrête à l'attendu.
+    expect(buildRaiseProposal("ultimatum", 3900, 4000, 1500).granted).toBe(
+      4000,
+    );
   });
   it("déjà au plafond → capped = true (plus de demande)", () => {
     // salary déjà à signed×1.40
@@ -199,20 +210,20 @@ describe("computeExpectedSalary — borné dans l'enveloppe (anti-régression fa
     ({
       ...emp({ id: 1 }),
       specialty: "FULLSTACK",
-      codeStat: 10,
-      codeMaxStat: 20,
-      visualStat: 10,
-      visualMaxStat: 20,
-      uxStat: 10,
-      uxMaxStat: 20,
+      codeStat: 100,
+      codeMaxStat: 200,
+      visualStat: 100,
+      visualMaxStat: 200,
+      uxStat: 100,
+      uxMaxStat: 200,
       ...over,
     }) as ProductionPerson;
 
   it("reste dans [floor, cap × marketCap × (1+noise)] quel que soit le niveau", () => {
     const [floor, cap] = SALARY_ENVELOPE.FULLSTACK;
-    const lo = computeExpectedSalary(fullstack({ codeStat: 7, visualStat: 7, uxStat: 7 }), 0, 0);
+    const lo = computeExpectedSalary(fullstack({ codeStat: 70, visualStat: 70, uxStat: 70 }), 0, 0);
     const hi = computeExpectedSalary(
-      fullstack({ codeStat: 13, visualStat: 13, uxStat: 13 }),
+      fullstack({ codeStat: 130, visualStat: 130, uxStat: 130 }),
       100,
       1,
     );
@@ -223,7 +234,7 @@ describe("computeExpectedSalary — borné dans l'enveloppe (anti-régression fa
   });
 
   it("indexation marché plafonnée à MARKET_INDEX_CAP", () => {
-    const c = fullstack({ codeStat: 13, visualStat: 13, uxStat: 13 });
+    const c = fullstack({ codeStat: 130, visualStat: 130, uxStat: 130 });
     const r0 = computeExpectedSalary(c, 0, 0);
     const rHuge = computeExpectedSalary(c, 100000, 0); // réputation absurde
     expect(rHuge).toBeLessThanOrEqual(Math.round(r0 * MARKET_INDEX_CAP) + 10);

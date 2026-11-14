@@ -7,7 +7,7 @@ import { TRAINING_THRESHOLD } from "@/data/utils/training";
 // sous chaque vignette.
 //
 // Les compteurs bruts vivent à deux endroits et n'ont pas la même échelle :
-// points de production dans `component.productionProgress` (0..1600), formation
+// points de production dans `component.productionProgress` (0..PRODUCTION_THRESHOLD), formation
 // sur l'employé lui-même (0..100). On les ramène ici à un même ratio 0..1.
 // ─────────────────────────────────────────────────────────────────────────────
 

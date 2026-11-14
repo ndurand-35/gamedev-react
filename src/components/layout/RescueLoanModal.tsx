@@ -56,67 +56,79 @@ export const RescueLoanModal = () => {
       role="dialog"
       aria-modal="true"
       aria-label="Prêt de sauvetage"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-base-900/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
     >
-      <div className="card w-full max-w-md bg-base-100 border-4 border-warning shadow-xl">
-        <div className="card-body space-y-4">
-          <h2 className="card-title gap-2">
-            <WarningTriangle /> Trésorerie insuffisante
+      {/* Pas de <dialog> natif : Échap ne doit pas pouvoir écarter le choix. */}
+      <div className="toy-frame w-full max-w-md overflow-hidden rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
+        <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-6 py-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-[2.5px] border-ink bg-[#f2b37a]">
+            <WarningTriangle width={17} height={17} strokeWidth={2.4} />
+          </span>
+          <h2 className="font-display text-xl leading-tight font-bold">
+            Trésorerie insuffisante
           </h2>
-          <p className="text-sm opacity-80">
+        </div>
+
+        <div className="flex flex-col gap-4 px-6 py-5">
+          <p className="text-sm leading-snug text-base-content/80">
             La clôture de {pending.monthLabel} laisse un découvert de{" "}
-            <span className="font-bold text-error">
+            <span className="font-extrabold whitespace-nowrap text-error tabular-nums">
               {formatPrice(pending.shortfall)} €
             </span>{" "}
             (charges, échéances de prêt et salaires). La banque propose un
             financement de sauvetage pour honorer le mois.
           </p>
 
-          <div className="rounded-box bg-base-200 p-3 space-y-1 text-sm">
-            <div className="flex items-center gap-2 font-medium">
-              <Bank className="h-4 w-4" /> {offer.label}
+          <div className="toy-tile flex flex-col gap-1.5 px-4 py-3 text-sm">
+            <div className="flex items-center gap-2 font-display text-base font-semibold">
+              <Bank width={16} height={16} /> {offer.label}
             </div>
-            <div className="flex justify-between">
-              <span className="opacity-70">Capital versé</span>
-              <span className="font-medium text-success">
+            <div className="flex justify-between font-bold">
+              <span className="text-base-content/70">Capital versé</span>
+              <span className="tabular-nums">
                 +{formatPrice(offer.principal)} €
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="opacity-70">Mensualité</span>
-              <span className="font-medium">
+            <div className="flex justify-between font-bold">
+              <span className="text-base-content/70">Mensualité</span>
+              <span className="tabular-nums">
                 {formatPrice(monthly)} € × {offer.termMonths} mois
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="opacity-70">Taux annuel</span>
-              <span className="font-medium">
+            <div className="flex justify-between font-bold">
+              <span className="text-base-content/70">Taux annuel</span>
+              <span className="tabular-nums">
                 {(offer.annualRate * 100).toFixed(1)} %
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="opacity-70">Coût total du crédit</span>
-              <span className="font-medium text-warning">
+            <div className="flex items-baseline justify-between border-t-[1.5px] border-base-300 pt-2 font-bold">
+              <span className="text-base-content/70">Coût total du crédit</span>
+              <span className="font-display text-lg tabular-nums">
                 {formatPrice(loanTotalCost(offer))} €
               </span>
             </div>
           </div>
 
-          <p className="text-xs opacity-70">
+          <p className="text-xs font-semibold text-base-content/70">
             Refuser, c'est renoncer à payer les salaires : la partie s'arrête.
           </p>
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <button className="btn btn-primary btn-block" onClick={onAccept}>
-              Accepter le prêt
-            </button>
-            <button
-              className="btn btn-error btn-outline btn-block"
-              onClick={onRefuse}
-            >
-              Refuser — déposer le bilan
-            </button>
-          </div>
+        <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+          <button
+            type="button"
+            className="btn btn-ghost text-error underline underline-offset-4"
+            onClick={onRefuse}
+          >
+            Refuser — déposer le bilan
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary ml-auto"
+            onClick={onAccept}
+          >
+            Accepter le prêt
+          </button>
         </div>
       </div>
     </div>

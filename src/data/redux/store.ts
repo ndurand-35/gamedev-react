@@ -11,52 +11,23 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 
-import engineReducer from "@/data/redux/engineSlice";
-import companyReducer from "@/data/redux/companySlice";
-import employeReducer from "@/data/redux/employeSlice";
-import taskReducer from "@/data/redux/taskSlice";
-import componentReducer from "@/data/redux/componentSlice";
-import notificationReducer, {
-  notificationStampMiddleware,
-} from "@/data/redux/notificationSlice";
-import productReducer from "@/data/redux/productSlice";
-import eventsReducer from "@/data/redux/eventsSlice";
-import loanReducer from "@/data/redux/loanSlice";
-import financeReducer from "@/data/redux/financeSlice";
-import studioReducer from "@/data/redux/studioSlice";
-import researchReducer from "@/data/redux/researchSlice";
-import competitorReducer from "@/data/redux/competitorSlice";
-import saveReducer, { hydrateFromSave } from "@/data/redux/saveSlice";
+import { notificationStampMiddleware } from "@/data/redux/notificationSlice";
+import { hydrateFromSave } from "@/data/redux/saveSlice";
+import { gameReducers } from "@/data/redux/reducers";
 import { gameLoopMiddleware } from "@/data/redux/gameLoopMiddleware";
+import { rescaleStateStats } from "@/data/utils/statScale";
+import { rescaleStateGrain } from "@/data/utils/componentGrain";
 
-const reducers = combineReducers({
-  engine: engineReducer,
-  company: companyReducer,
-  employe: employeReducer,
-  task: taskReducer,
-  component: componentReducer,
-  notification: notificationReducer,
-  product: productReducer,
-  events: eventsReducer,
-  loan: loanReducer,
-  finance: financeReducer,
-  studio: studioReducer,
-  // Compétences du fondateur (recherche / formation). Slice absent des saves
-  // antérieures : redux-persist le remonte sur son état initial, pas de purge.
-  research: researchReducer,
-  // Studios concurrents (le marché). Slice absent des saves antérieures : il
-  // remonte vide et la boucle de jeu le peuple au premier tick (`buildRoster`).
-  competitor: competitorReducer,
-  // Vue de l'écran de sauvegarde (non persistée — reconstruite via `listSaves`).
-  save: saveReducer,
-});
+const reducers = combineReducers(gameReducers);
 
 const persistConfig = {
   key: "gamedev-react",
   // MYL-18 : bump pour purger les saves antérieures à l'ajout du `studio` slice
   // (acté produit). La version 9 visée par le ticket était déjà consommée par le
   // lot prêts (MYL-12) → on incrémente à 10 pour obtenir bien la purge.
-  version: 10,
+  // 11 : stats de métier sur 0..200 — une partie en v10 est migrée, pas purgée.
+  // 12 : composants au grain fin — une partie en v10 ou v11 est migrée.
+  version: 12,
   storage,
   // `events` n'est pas persisté : une décision en attente ne doit pas survivre à
   // un rechargement (sinon modal figé à speed 0 sans moyen de reprendre).
@@ -69,6 +40,12 @@ const persistConfig = {
   // saves antérieures au lieu de les recharger telles quelles.
   migrate: (_state: any, currentVersion: number) => {
     const storedVersion = _state?._persist?.version;
+    if (storedVersion === 10 && currentVersion === 12) {
+      return Promise.resolve(rescaleStateGrain(rescaleStateStats(_state)));
+    }
+    if (storedVersion === 11 && currentVersion === 12) {
+      return Promise.resolve(rescaleStateGrain(_state));
+    }
     if (storedVersion !== currentVersion) {
       return Promise.resolve(undefined);
     }

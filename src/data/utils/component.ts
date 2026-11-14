@@ -7,10 +7,14 @@ import {
   ConsumedComponent,
   Person,
   ProductionPerson,
+  QUALITY_LABELS,
+  QUALITY_STAT_STEP,
   STAT_KEY_BY_TYPE,
   buildingSynergyMultiplier,
   moraleProductivityMultiplier,
 } from "@/data/interface";
+import { productionSpeedMultiplier, qualityBonus } from "@/data/utils/traits";
+import { pushNotification } from "@/data/redux/notificationSlice";
 import {
   PRODUCTION_THRESHOLD,
   PendingComponent,
@@ -23,6 +27,11 @@ import {
 import { computeComponentDecay } from "@/data/interface";
 import { FOUNDER_ID, isFounderResearching } from "@/data/utils/research";
 import { techProductivity } from "@/data/utils/technology";
+import {
+  scheduleByBuilding,
+  scheduleOutput,
+  scheduleQuality,
+} from "@/data/utils/workSchedule";
 
 export const isProductionPerson = (p: Person): p is ProductionPerson =>
   typeof (p as ProductionPerson).codeStat === "number";
@@ -34,14 +43,32 @@ export const getRelevantStat = (
 
 const RARE_BONUS_CHANCE = 0.03;
 
-export const rollComponentQuality = (
+export interface ComponentRoll {
+  quality: ComponentQuality;
+  /**
+   * Coup de génie : le bonus rare a hissé la qualité d'un cran au-dessus de ce
+   * que le tirage aurait donné. Les stats plafonnant à 200 (base 4), c'est le
+   * seul chemin vers « Excellent ».
+   */
+  lucky: boolean;
+}
+
+const clampQuality = (raw: number): ComponentQuality =>
+  Math.max(0, Math.min(5, Math.round(raw))) as ComponentQuality;
+
+export const rollComponent = (
   relevantStat: number,
-): ComponentQuality => {
-  const base = relevantStat / 5;
+  /** Crans de qualité ajoutés par les traits (cf. `qualityBonus`). */
+  bonus: number = 0,
+): ComponentRoll => {
+  const base = relevantStat / QUALITY_STAT_STEP + bonus;
   const variance = (Math.random() - 0.5) * 1.0;
-  const rareBonus = Math.random() < RARE_BONUS_CHANCE ? 1 : 0;
-  const raw = Math.round(base + variance + rareBonus);
-  return Math.max(0, Math.min(5, raw)) as ComponentQuality;
+  const rareBonus = Math.random() < RARE_BONUS_CHANCE;
+  const quality = clampQuality(base + variance + (rareBonus ? 1 : 0));
+  return {
+    quality,
+    lucky: rareBonus && quality > clampQuality(base + variance),
+  };
 };
 
 export interface ComponentSelection {
@@ -113,6 +140,7 @@ export const produceComponents = (dispatch: AppDispatch, state: RootState) => {
     ...state.component.productionProgress,
   };
   const produced: PendingComponent[] = [];
+  const strokesOfGenius: string[] = [];
 
   const occupantsByBuilding: Record<number, number> = {};
   for (const e of state.employe.employeList) {
@@ -123,10 +151,14 @@ export const produceComponents = (dispatch: AppDispatch, state: RootState) => {
   }
 
   // Le fondateur en formation ne produit pas ; son avancement est conservé.
-  const founderBusy = isFounderResearching(state);
+  // En formation ou en entretien, le fondateur ne produit pas.
+  const founderBusy =
+    isFounderResearching(state) || state.employe.interview != null;
   // Outils et langages progressent avec les technologies : à stat égale, on
   // produit plus vite en 1995 qu'en 1970 (cf. `utils/technology`).
   const productivity = techProductivity(time);
+  // Rythme de travail de chaque studio (cf. `utils/workSchedule`).
+  const schedules = scheduleByBuilding(state.company.buildingList);
 
   for (const employe of state.employe.employeList) {
     if (!isProductionPerson(employe)) continue;
@@ -144,26 +176,44 @@ export const produceComponents = (dispatch: AppDispatch, state: RootState) => {
     const synergy = buildingSynergyMultiplier(
       occupantsByBuilding[employe.buildingId] ?? 1,
     );
+    const schedule = schedules.get(employe.buildingId) ?? "NORMAL";
     const effectiveStat =
       stat *
+      productionSpeedMultiplier(employe) *
       moraleProductivityMultiplier(employe.morale) *
       synergy *
-      productivity;
+      productivity *
+      scheduleOutput(schedule);
     let current = (progress[employe.id] ?? 0) + effectiveStat;
 
     while (current >= PRODUCTION_THRESHOLD) {
       current -= PRODUCTION_THRESHOLD;
+      const { quality, lucky } = rollComponent(
+        stat,
+        qualityBonus(employe) + scheduleQuality(schedule),
+      );
       produced.push({
         type,
-        quality: rollComponentQuality(stat),
+        quality,
         producedBy: employe.id,
         producedAt: time,
+        ...(lucky ? { lucky: true } : {}),
       });
+      if (lucky) {
+        strokesOfGenius.push(
+          `Coup de génie ! ${employe.firstName} ${employe.lastName} sort un composant ${type} ${QUALITY_LABELS[quality]}.`,
+        );
+      }
     }
     progress[employe.id] = current;
   }
 
   dispatch(applyProductionTick({ progress, produced }));
+  // Seul le tirage rare (~3 % des composants) mérite un toast : une
+  // notification par composant noierait le journal en vitesse rapide.
+  for (const message of strokesOfGenius) {
+    dispatch(pushNotification({ message, type: "success" }));
+  }
 };
 
 // Vieillissement du stock : chaque composant non consommé perd un niveau de

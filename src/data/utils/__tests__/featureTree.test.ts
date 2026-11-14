@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { COMPONENT_GRAIN as G } from "@/data/interface";
 import {
   Component,
   ComponentQuality,
@@ -106,7 +107,7 @@ describe("buildFeatureTree", () => {
     const tree = buildFeatureTree(
       product(ProductGenre.JEU, ["multiplayer"]),
       // Bande-son : 6 Visuel + 1 UX — couverte. Mode histoire : 3/5/3 — non.
-      stockOf({ [ComponentType.VISUEL]: 6, [ComponentType.UX]: 1 }),
+      stockOf({ [ComponentType.VISUEL]: 6 * G, [ComponentType.UX]: 1 * G }),
     );
     expect(tree.root.state).toBe("owned");
     expect(nodeOf(tree, "multiplayer").state).toBe("owned");
@@ -114,7 +115,7 @@ describe("buildFeatureTree", () => {
     const story = nodeOf(tree, "story_mode");
     expect(story.state).toBe("short");
     expect(story.missing).toEqual(
-      expect.arrayContaining([{ type: ComponentType.CODE, quantity: 3 }]),
+      expect.arrayContaining([{ type: ComponentType.CODE, quantity: 3 * G }]),
     );
     expect(tree.acquired).toBe(1);
   });

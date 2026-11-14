@@ -22,41 +22,48 @@ export const CopyToSlotModal: FC<CopyToSlotModalProps> = ({
     role="dialog"
     aria-modal="true"
     aria-label="Copier vers un slot"
-    className="fixed inset-0 z-[60] flex items-center justify-center bg-base-900/70 p-4"
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/60 p-4"
     onClick={onClose}
   >
     <div
-      className="card w-full max-w-md bg-base-100 border-4 border-info shadow-xl"
+      className="w-full max-w-md overflow-hidden rounded-[1.75rem] border-[3px] border-ink bg-base-100 shadow-[0_8px_0_var(--color-ink)]"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="card-body space-y-4">
-        <h2 className="card-title gap-2">
-          <Copy /> Copier l'auto-save vers…
+      <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-5 py-3.5">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-[2.5px] border-ink bg-sun">
+          <Copy width={17} height={17} strokeWidth={2.4} aria-hidden />
+        </span>
+        <h2 className="font-display text-xl font-bold">
+          Copier l'auto-save vers…
         </h2>
-        <div className="flex flex-col gap-2">
-          {manual.map((meta, index) => (
-            <button
-              key={`copy_target_${index}`}
-              type="button"
-              className="btn btn-block h-auto flex-col items-start py-3"
-              onClick={() => onPick(index)}
-            >
-              <span className="font-medium">
-                {meta ? meta.slotName : `Slot ${index + 1}`}
-              </span>
-              <span className="text-xs font-normal opacity-70">
-                {meta
-                  ? `Occupé — ${formatRealTimestamp(meta.realTimestamp)} (sera écrasé)`
-                  : "Emplacement libre"}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="modal-action mt-0">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Annuler
+      </div>
+      <div className="flex flex-col gap-2 px-5 py-4">
+        {manual.map((meta, index) => (
+          <button
+            key={`copy_target_${index}`}
+            type="button"
+            className="toy-tile flex w-full flex-col items-start px-4 py-2.5 text-left transition-colors outline-ink hover:bg-base-200/60 focus-visible:outline-2 focus-visible:outline-offset-2"
+            onClick={() => onPick(index)}
+          >
+            <span className="font-display font-semibold">
+              {meta ? meta.slotName : `Slot ${index + 1}`}
+            </span>
+            <span className="text-xs font-bold text-base-content/70">
+              {meta
+                ? `Occupé — ${formatRealTimestamp(meta.realTimestamp)} (sera écrasé)`
+                : "Emplacement libre"}
+            </span>
           </button>
-        </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-5 py-3.5">
+        <button
+          type="button"
+          className="btn btn-ghost underline underline-offset-4"
+          onClick={onClose}
+        >
+          Annuler
+        </button>
       </div>
     </div>
   </div>

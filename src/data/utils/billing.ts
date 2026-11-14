@@ -9,6 +9,7 @@ import {
   setMoney,
 } from "@/data/redux/companySlice";
 import { resignEmploye } from "@/data/redux/employeSlice";
+import { resignationMultiplier } from "@/data/utils/traits";
 import { processMonthlyMorale } from "@/data/utils/morale";
 import {
   clearRescueLoan,
@@ -503,7 +504,7 @@ export const processMoraleTick = (dispatch: AppDispatch, state: RootState) => {
   for (const emp of state.employe.employeList) {
     if (emp.id === 1) continue; // le fondateur ne démissionne pas
     if (emp.morale >= RESIGNATION_MORALE_THRESHOLD) continue;
-    if (Math.random() < RESIGNATION_CHANCE_PER_TICK) {
+    if (Math.random() < RESIGNATION_CHANCE_PER_TICK * resignationMultiplier(emp)) {
       dispatch(resignEmploye(emp.id));
       dispatch(
         pushNotification({

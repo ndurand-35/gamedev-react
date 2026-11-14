@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef } from "react";
+import { FC, useMemo } from "react";
 import { FireFlame, WarningTriangle } from "iconoir-react";
 
 import { Employe } from "@/data/interface";
@@ -9,6 +9,7 @@ import {
   MORALE_FIRING_ELSEWHERE,
   MORALE_FIRING_SAME_BUILDING,
 } from "@/data/utils/morale";
+import { Modal } from "@/components/global/Modal";
 
 interface FireConfirmModalProps {
   /** Employés ciblés par le licenciement, ou null quand la modale est fermée. */
@@ -20,14 +21,14 @@ interface FireConfirmModalProps {
 // Modale de confirmation de licenciement (WF-1 / F6). Intercepte les deux points
 // de licenciement (bouton 🔥 unitaire et action « Licencier » batch). Affiche
 // l'indemnité one-shot (1× salaire/employé), la perte de production en cours, et
-// les places de bâtiment libérées. Focus par défaut sur « Annuler », Échap =
-// Annuler (comportement natif de <dialog>). Pas de soft-undo.
+// les places de bâtiment libérées. `targets` pilote l'ouverture (cf. Modal).
+// Focus par défaut sur « Annuler », Échap = Annuler (comportement natif de
+// <dialog>). Pas de soft-undo.
 export const FireConfirmModal: FC<FireConfirmModalProps> = ({
   targets,
   onConfirm,
   onClose,
 }) => {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const buildingList = useAppSelector((s) => s.company.buildingList);
   const productionProgress = useAppSelector(
     (s) => s.component.productionProgress,
@@ -45,15 +46,6 @@ export const FireConfirmModal: FC<FireConfirmModalProps> = ({
     [targets],
   );
 
-  const open = targets !== null;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
   const isBatch = firable.length > 1;
   const totalSalary = firable.reduce((sum, e) => sum + e.salary, 0);
 
@@ -70,114 +62,22 @@ export const FireConfirmModal: FC<FireConfirmModalProps> = ({
 
   const confirm = () => {
     onConfirm();
-    dialogRef.current?.close();
+    onClose();
   };
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="modal"
-      role="dialog"
-      aria-label="Confirmer le licenciement"
+    <Modal
+      open={targets !== null}
       onClose={onClose}
-    >
-      <div className="modal-box max-w-md">
-        <h3 className="font-bold text-lg flex items-center gap-2 mb-3">
-          <WarningTriangle width={20} height={20} className="text-error" />
-          {isBatch
-            ? `Licencier ${firable.length} employés ?`
-            : "Licencier cet employé ?"}
-        </h3>
-
-        {firable.length === 1 && (
-          <p className="text-sm mb-3">
-            {firable[0].firstName} {firable[0].lastName}
-          </p>
-        )}
-
-        {/* Indemnités. Batch : deux montants distincts, ne pas fusionner. */}
-        <div className="space-y-1 text-sm mb-3">
-          {isBatch ? (
-            <>
-              <div className="flex justify-between">
-                <span>Indemnités (one-shot)</span>
-                <span className="text-error tabular-nums font-medium">
-                  −{formatPrice(totalSalary)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Masse salariale (économie)</span>
-                <span className="text-success tabular-nums font-medium">
-                  −{formatPrice(totalSalary)} / mois
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="flex justify-between">
-              <span>Indemnité</span>
-              <span className="text-error tabular-nums font-medium">
-                −{formatPrice(totalSalary)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Impact production en cours. */}
-        <div className="space-y-1 text-sm mb-3">
-          {firable.map((e) => {
-            const progress = productionProgress[e.id] ?? 0;
-            const lost = progress > 0;
-            const pct = Math.round((progress / PRODUCTION_THRESHOLD) * 100);
-            return (
-              <div key={e.id} className="flex items-center gap-2">
-                {isBatch && (
-                  <span className="opacity-70">
-                    {e.firstName} {e.lastName} :
-                  </span>
-                )}
-                {lost ? (
-                  <span className="text-error">
-                    production en cours PERDUE ({pct}%)
-                  </span>
-                ) : (
-                  <span className="text-success">aucune perte</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Ceux qui restent : règle fixe de `utils/morale`. */}
-        <p className="text-sm text-warning mb-3">
-          Le moral de l'équipe baissera : −{MORALE_FIRING_SAME_BUILDING} dans le
-          même bâtiment, −{MORALE_FIRING_ELSEWHERE} ailleurs.
-        </p>
-
-        {/* Places de bâtiment libérées. */}
-        {Object.keys(placesByBuilding).length > 0 && (
-          <div className="space-y-1 text-sm mb-3">
-            {Object.entries(placesByBuilding).map(([id, count]) => {
-              const building = buildingList.find((b) => b.id === Number(id));
-              return (
-                <div key={id} className="opacity-70">
-                  {count} place{count > 1 ? "s" : ""} libérée
-                  {count > 1 ? "s" : ""} —{" "}
-                  {building?.name ?? "bâtiment inconnu"}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {fondateurPresent && (
-          <p className="text-xs opacity-60 mb-2">Fondateur exclu.</p>
-        )}
-
-        <p className="text-xs opacity-60 mb-1">
-          Action irréversible (pas d'annulation).
-        </p>
-
-        <div className="modal-action">
+      size="md"
+      title={
+        isBatch
+          ? `Licencier ${firable.length} employés ?`
+          : "Licencier cet employé ?"
+      }
+      icon={<WarningTriangle width={20} height={20} className="text-error" />}
+      actions={
+        <>
           <form method="dialog">
             {/* Focus par défaut + Échap : « Annuler ». */}
             <button type="submit" className="btn" autoFocus>
@@ -188,11 +88,95 @@ export const FireConfirmModal: FC<FireConfirmModalProps> = ({
             <FireFlame />
             Licencier
           </button>
-        </div>
+        </>
+      }
+    >
+      {firable.length === 1 && (
+        <p className="text-sm mb-3">
+          {firable[0].firstName} {firable[0].lastName}
+        </p>
+      )}
+
+      {/* Indemnités. Batch : deux montants distincts, ne pas fusionner. */}
+      <div className="space-y-1 text-sm mb-3">
+        {isBatch ? (
+          <>
+            <div className="flex justify-between">
+              <span>Indemnités (one-shot)</span>
+              <span className="text-error tabular-nums font-medium">
+                −{formatPrice(totalSalary)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Masse salariale (économie)</span>
+              <span className="text-success tabular-nums font-medium">
+                −{formatPrice(totalSalary)} / mois
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-between">
+            <span>Indemnité</span>
+            <span className="text-error tabular-nums font-medium">
+              −{formatPrice(totalSalary)}
+            </span>
+          </div>
+        )}
       </div>
-      <form method="dialog" className="modal-backdrop">
-        <button type="submit">close</button>
-      </form>
-    </dialog>
+
+      {/* Impact production en cours. */}
+      <div className="space-y-1 text-sm mb-3">
+        {firable.map((e) => {
+          const progress = productionProgress[e.id] ?? 0;
+          const lost = progress > 0;
+          const pct = Math.round((progress / PRODUCTION_THRESHOLD) * 100);
+          return (
+            <div key={e.id} className="flex items-center gap-2">
+              {isBatch && (
+                <span className="opacity-70">
+                  {e.firstName} {e.lastName} :
+                </span>
+              )}
+              {lost ? (
+                <span className="text-error">
+                  production en cours PERDUE ({pct}%)
+                </span>
+              ) : (
+                <span className="text-success">aucune perte</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Ceux qui restent : règle fixe de `utils/morale`. */}
+      <p className="text-sm text-warning mb-3">
+        Le moral de l'équipe baissera : −{MORALE_FIRING_SAME_BUILDING} dans le
+        même bâtiment, −{MORALE_FIRING_ELSEWHERE} ailleurs.
+      </p>
+
+      {/* Places de bâtiment libérées. */}
+      {Object.keys(placesByBuilding).length > 0 && (
+        <div className="space-y-1 text-sm mb-3">
+          {Object.entries(placesByBuilding).map(([id, count]) => {
+            const building = buildingList.find((b) => b.id === Number(id));
+            return (
+              <div key={id} className="opacity-70">
+                {count} place{count > 1 ? "s" : ""} libérée
+                {count > 1 ? "s" : ""} — {building?.name ?? "bâtiment inconnu"}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {fondateurPresent && (
+        <p className="text-xs opacity-60 mb-2">Fondateur exclu.</p>
+      )}
+
+      <p className="text-xs opacity-60 mb-1">
+        Action irréversible (pas d'annulation).
+      </p>
+    </Modal>
   );
 };

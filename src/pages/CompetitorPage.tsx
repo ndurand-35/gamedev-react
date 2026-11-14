@@ -15,9 +15,11 @@ const pageTopMenuItems: TopMenuItem[] = [];
 export const CompetitorPage: React.FC = (): ReactElement => {
   useTopMenu(pageTopMenuItems);
   return (
-    <div className="p-8 mt-14 mb-20 space-y-4">
-      <h1>Concurrents</h1>
-      <CompetitorTable />
+    <div className="page-shell">
+      <div className="toy-frame page-frame space-y-5">
+        <h1 className="font-display text-2xl font-bold">Concurrents</h1>
+        <CompetitorTable />
+      </div>
     </div>
   );
 };

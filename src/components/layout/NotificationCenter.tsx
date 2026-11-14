@@ -10,6 +10,7 @@ import {
 } from "iconoir-react";
 
 import { Alert, useAlerts } from "@/data/hooks/useAlerts";
+import { TOGGLE_JOURNAL_EVENT } from "@/data/hooks/useGameShortcuts";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import {
   Notification,
@@ -91,6 +92,13 @@ export const NotificationCenter = () => {
   const dispatch = useAppDispatch();
   const [open, setOpen] = useState(false);
   const [journalFilter, setJournalFilter] = useState<JournalFilter>("all");
+
+  // Raccourci clavier « Journal » (Paramètres → Touches).
+  useEffect(() => {
+    const toggle = () => setOpen((v) => !v);
+    window.addEventListener(TOGGLE_JOURNAL_EVENT, toggle);
+    return () => window.removeEventListener(TOGGLE_JOURNAL_EVENT, toggle);
+  }, []);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const costed = useAppSelector((s) =>
     hasFounderSkill(s.research.acquired, "management_control"),
@@ -135,17 +143,14 @@ export const NotificationCenter = () => {
   }, [open]);
 
   return (
-    <div
-      ref={containerRef}
-      className="fixed top-0 left-1/2 -translate-x-1/2 z-30"
-    >
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Centre de notifications"
         aria-expanded={open}
         className={
-          "flex flex-row items-center gap-2 px-3 py-2 bg-base-300 border-base-content/20 border-b border-x rounded-b text-sm hover:bg-base-200 " +
+          "toy-pill flex h-10 shrink-0 flex-row items-center gap-1.5 px-2.5 text-sm font-bold sm:gap-2 sm:px-3 transition-colors hover:bg-white " +
           (hasError ? "text-error" : "")
         }
       >
@@ -169,7 +174,8 @@ export const NotificationCenter = () => {
           <AlertCost
             alert={costliest}
             className={
-              "text-xs font-semibold " + ALERT_LEVEL_CLASS[costliest.level]
+              "hidden text-xs font-semibold lg:inline " +
+              ALERT_LEVEL_CLASS[costliest.level]
             }
           />
         )}
@@ -179,10 +185,12 @@ export const NotificationCenter = () => {
         <div
           role="dialog"
           aria-label="Centre de notifications"
-          className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-80 max-w-[90vw] bg-base-100 border border-base-content/20 shadow-xl rounded-md overflow-hidden flex flex-col max-h-[70vh]"
+          className="toy-frame fixed inset-x-2 top-14 flex max-h-[70dvh] flex-col overflow-hidden sm:absolute sm:inset-x-auto sm:top-full sm:left-1/2 sm:mt-3 sm:w-80 sm:-translate-x-1/2"
         >
           <div className="flex flex-row items-center justify-between px-3 py-2 border-b border-base-content/10">
-            <span className="text-sm font-semibold">Centre de notifications</span>
+            <span className="font-display text-base font-semibold">
+              Centre de notifications
+            </span>
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -206,49 +214,49 @@ export const NotificationCenter = () => {
             ) : (
               <>
                 {costliest && (
-                <section className="px-3 py-2">
-                  <h3 className="text-xs font-semibold opacity-70 mb-1">
-                    Ce qui coûte le plus cher
-                  </h3>
-                  <div
-                    className={
-                      "flex flex-col gap-2 rounded border p-2 " +
-                      ALERT_BORDER_CLASS[costliest.level]
-                    }
-                  >
-                    <div className="flex flex-row items-start gap-2">
-                      <span className={ALERT_LEVEL_CLASS[costliest.level]}>
-                        {ALERT_ICON[costliest.level]}
-                      </span>
-                      <span className="text-sm flex-1 min-w-0">
-                        {costliest.message}
-                      </span>
-                    </div>
-                    <div className="flex flex-row items-end justify-between gap-2">
-                      <div className="flex flex-col min-w-0">
-                        <AlertCost
-                          alert={costliest}
-                          className={
-                            "text-lg font-semibold leading-tight " +
-                            ALERT_LEVEL_CLASS[costliest.level]
-                          }
-                        />
-                        <span className="text-[10px] opacity-70">
-                          {costliest.costLabel}
+                  <section className="px-3 py-2">
+                    <h3 className="text-xs font-semibold opacity-70 mb-1">
+                      Ce qui coûte le plus cher
+                    </h3>
+                    <div
+                      className={
+                        "flex flex-col gap-2 rounded border p-2 " +
+                        ALERT_BORDER_CLASS[costliest.level]
+                      }
+                    >
+                      <div className="flex flex-row items-start gap-2">
+                        <span className={ALERT_LEVEL_CLASS[costliest.level]}>
+                          {ALERT_ICON[costliest.level]}
+                        </span>
+                        <span className="text-sm flex-1 min-w-0">
+                          {costliest.message}
                         </span>
                       </div>
-                      {costliest.link && (
-                        <Link
-                          to={costliest.link.to}
-                          onClick={() => setOpen(false)}
-                          className="btn btn-xs btn-outline"
-                        >
-                          {costliest.link.label}
-                        </Link>
-                      )}
+                      <div className="flex flex-row items-end justify-between gap-2">
+                        <div className="flex flex-col min-w-0">
+                          <AlertCost
+                            alert={costliest}
+                            className={
+                              "text-lg font-semibold leading-tight " +
+                              ALERT_LEVEL_CLASS[costliest.level]
+                            }
+                          />
+                          <span className="text-[10px] opacity-70">
+                            {costliest.costLabel}
+                          </span>
+                        </div>
+                        {costliest.link && (
+                          <Link
+                            to={costliest.link.to}
+                            onClick={() => setOpen(false)}
+                            className="btn btn-xs btn-outline"
+                          >
+                            {costliest.link.label}
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </section>
+                  </section>
                 )}
 
                 {others.length > 0 && (

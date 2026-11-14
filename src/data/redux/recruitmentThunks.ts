@@ -13,9 +13,13 @@ import {
   SEARCH_MAX_CANDIDATES,
   SEARCH_MIN_CANDIDATES,
   SEARCH_ROLE_LABEL,
+  SENIORITY_LABEL,
+  SENIORITY_MIN_REPUTATION,
   SearchRole,
   computeSearchCost,
+  isSeniorityUnlocked,
 } from "@/data/utils/recruitment";
+import type { CandidateSearchInfo, Seniority } from "@/data/interface";
 import { pushNotification } from "@/data/redux/notificationSlice";
 import { selectRemainingSlots } from "@/data/redux/selectors";
 
@@ -73,8 +77,11 @@ export const hireCandidateWithOffer =
 
 export interface SearchResult {
   ok: boolean;
-  /** `"money"` quand la trésorerie ne couvre pas les frais de recherche. */
-  reason?: "money";
+  /**
+   * `"money"` quand la trésorerie ne couvre pas les frais de recherche,
+   * `"locked"` quand la réputation ne permet pas encore ce niveau.
+   */
+  reason?: "money" | "locked";
   /** Montant débité (recherche réussie). */
   cost?: number;
   /** Nombre de profils ramenés. */
@@ -82,15 +89,29 @@ export interface SearchResult {
 }
 
 export const searchCandidates =
-  (payload: { role: SearchRole; count: number }) =>
+  (payload: { role: SearchRole; count: number; seniority?: Seniority }) =>
   (dispatch: AppDispatch, getState: () => RootState): SearchResult => {
     const state = getState();
     const count = Math.max(
       SEARCH_MIN_CANDIDATES,
       Math.min(SEARCH_MAX_CANDIDATES, Math.floor(payload.count)),
     );
+    const seniority = payload.seniority ?? "junior";
     const reputation = state.company.reputation;
-    const cost = computeSearchCost(payload.role, count, reputation);
+    if (!isSeniorityUnlocked(seniority, reputation)) {
+      dispatch(
+        pushNotification({
+          message: `Recherche impossible : les profils ${SENIORITY_LABEL[
+            seniority
+          ].toLowerCase()}s demandent une réputation de ${
+            SENIORITY_MIN_REPUTATION[seniority]
+          }.`,
+          type: "warning",
+        }),
+      );
+      return { ok: false, reason: "locked" };
+    }
+    const cost = computeSearchCost(payload.role, count, reputation, seniority);
     const money = state.company.money;
 
     if (money < cost) {
@@ -108,6 +129,16 @@ export const searchCandidates =
     // Échéance posée à la recherche : chaque profil quitte le vivier au bout de
     // `SEARCH_CANDIDATE_LIFETIME` (purge dans la boucle de jeu).
     const expiresAt = state.engine.time + SEARCH_CANDIDATE_LIFETIME;
+    // Les profils d'une même recherche partagent un dossier ; son identifiant
+    // reprend celui du premier profil ramené, unique par construction.
+    const search: CandidateSearchInfo = {
+      id: state.employe.nextCandidateId,
+      role: payload.role,
+      seniority,
+      at: state.engine.time,
+      cost,
+      count,
+    };
     dispatch(setMoney(money - cost));
     dispatch(
       addCandidates(
@@ -116,9 +147,11 @@ export const searchCandidates =
           count,
           reputation,
           techSalaryIndex(state.engine.time),
+          seniority,
         ).map((c) => ({
           ...c,
           expiresAt,
+          search,
         })),
       ),
     );
@@ -126,7 +159,7 @@ export const searchCandidates =
       pushNotification({
         message: `${count} profil${count > 1 ? "s" : ""} « ${
           SEARCH_ROLE_LABEL[payload.role]
-        } » ramené${count > 1 ? "s" : ""} pour ${formatPrice(cost)}.`,
+        } · ${SENIORITY_LABEL[seniority]} » ramené${count > 1 ? "s" : ""} pour ${formatPrice(cost)}.`,
         type: "info",
       }),
     );

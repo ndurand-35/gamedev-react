@@ -1,20 +1,18 @@
 import { ReactElement } from "react";
 
 import { BuildingTable } from "@/components/building/BuildingTable";
-import { TopMenuItem } from "@/data/interface";
+import { SectionTabs } from "@/components/layout/SectionTabs";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
-
-const pageTopMenuItems: TopMenuItem[] = [
-  { name: "Accueil", link: "/game/building" },
-  { name: "Mes bâtiments", link: "/game/building/owned" },
-  { name: "SeLoger", link: "/game/building/buy" },
-];
+import { buildingTopMenuItems } from "@/pages/building/menu";
 
 export const OwnedPage: React.FC = (): ReactElement => {
-  useTopMenu(pageTopMenuItems);
+  useTopMenu(buildingTopMenuItems);
   return (
-    <div className="p-8 mt-14 mb-20">
-      <BuildingTable />
+    <div className="page-shell">
+      <SectionTabs items={buildingTopMenuItems} ariaLabel="Section Bâtiments" />
+      <div className="toy-frame page-frame space-y-5">
+        <BuildingTable />
+      </div>
     </div>
   );
 };

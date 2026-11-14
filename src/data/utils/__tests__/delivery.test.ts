@@ -10,11 +10,14 @@ import {
   StartedContract,
 } from "@/data/interface";
 import {
+  CONTRACT_REPUTATION_PER_MONTH,
   DEADLINE_REPUTATION_MALUS,
   EARLY_DELIVERY_BONUS,
   EARLY_DELIVERY_RATIO,
   computeContractPayout,
+  contractReputationAllowance,
   deliverContract,
+  gameMonthKey,
   qualityMultiplier,
   treatTasks,
 } from "@/data/utils/task";
@@ -23,6 +26,7 @@ import { removeTask, setTaskList } from "@/data/redux/taskSlice";
 import {
   addReputation,
   applyContractMalus,
+  recordContractReputation,
   setMoney,
 } from "@/data/redux/companySlice";
 import type { RootState } from "@/data/redux/store";
@@ -60,12 +64,16 @@ const stateWith = (over: {
   money?: number;
   time?: number;
   employes?: { id: number }[];
+  contractReputation?: { month: string; gained: number };
 }): RootState =>
   ({
     task: { taskList: over.taskList ?? [] },
     employe: { employeList: over.employes ?? [] },
     component: { stock: over.stock ?? [] },
-    company: { money: over.money ?? 5000 },
+    company: {
+      money: over.money ?? 5000,
+      contractReputation: over.contractReputation,
+    },
     engine: { time: over.time ?? 0 },
   }) as unknown as RootState;
 
@@ -141,6 +149,53 @@ describe("deliverContract", () => {
     expect(kinds).toContain("notification/pushNotification");
   });
 
+  it("la réputation des contrats est plafonnée par mois, pas leurs pertes", () => {
+    const deliver = (
+      stock: Component[],
+      contractReputation?: { month: string; gained: number },
+    ) => {
+      const dispatch = vi.fn();
+      const state = stateWith({
+        taskList: [makeContract()],
+        stock,
+        contractReputation,
+      });
+      deliverContract(1)(dispatch as never, (() => state) as never);
+      return dispatch;
+    };
+    const excellent = [
+      makeComponent({ id: 10, quality: ComponentQuality.EXCELLENT }),
+      makeComponent({ id: 11, quality: ComponentQuality.EXCELLENT }),
+    ];
+    // Qualité 5 : +4 « mérités », ramenés au plafond du mois.
+    const first = deliver(excellent);
+    expect(first).toHaveBeenCalledWith(
+      addReputation(CONTRACT_REPUTATION_PER_MONTH),
+    );
+    expect(first).toHaveBeenCalledWith(
+      recordContractReputation({
+        month: gameMonthKey(0),
+        gained: CONTRACT_REPUTATION_PER_MONTH,
+      }),
+    );
+    // Le mois est déjà servi : plus rien.
+    const second = deliver(excellent, {
+      month: gameMonthKey(0),
+      gained: CONTRACT_REPUTATION_PER_MONTH,
+    });
+    const kinds = second.mock.calls.map((c) => c[0].type);
+    expect(kinds).not.toContain(addReputation(0).type);
+    // Du bâclé coûte sa réputation, plafond atteint ou non.
+    const bacle = deliver(
+      [
+        makeComponent({ id: 10, quality: ComponentQuality.BACLE }),
+        makeComponent({ id: 11, quality: ComponentQuality.BACLE }),
+      ],
+      { month: gameMonthKey(0), gained: CONTRACT_REPUTATION_PER_MONTH },
+    );
+    expect(bacle).toHaveBeenCalledWith(addReputation(-1));
+  });
+
   it("ignore un contrat inconnu", () => {
     const dispatch = vi.fn();
     deliverContract(99)(
@@ -148,6 +203,28 @@ describe("deliverContract", () => {
       (() => stateWith({ taskList: [makeContract()] })) as never,
     );
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("contractReputationAllowance", () => {
+  it("repart à zéro chaque mois de jeu", () => {
+    const january = gameMonthKey(0);
+    expect(contractReputationAllowance(undefined, 0)).toBe(
+      CONTRACT_REPUTATION_PER_MONTH,
+    );
+    expect(
+      contractReputationAllowance(
+        { month: january, gained: CONTRACT_REPUTATION_PER_MONTH },
+        0,
+      ),
+    ).toBe(0);
+    // Février : la limite de janvier ne compte plus.
+    expect(
+      contractReputationAllowance(
+        { month: january, gained: CONTRACT_REPUTATION_PER_MONTH },
+        32 * 24,
+      ),
+    ).toBe(CONTRACT_REPUTATION_PER_MONTH);
   });
 });
 

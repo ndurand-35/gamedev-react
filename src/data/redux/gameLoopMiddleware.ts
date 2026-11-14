@@ -1,3 +1,4 @@
+import { processInterviewTick } from "@/data/utils/interview";
 import type { Middleware } from "@reduxjs/toolkit";
 import {
   incrementTime,
@@ -23,6 +24,7 @@ import {
 } from "@/data/utils/billing";
 import { processTrainingTick } from "@/data/utils/training";
 import { processRaiseTick } from "@/data/utils/events";
+import { processPoachingTick } from "@/data/utils/poaching";
 import { processResearchTick } from "@/data/utils/research";
 import {
   processProductLifecycle,
@@ -38,6 +40,7 @@ import type { EngineState } from "@/data/redux/engineSlice";
 import type { EmployeState } from "@/data/redux/employeSlice";
 import type { TaskState } from "@/data/redux/taskSlice";
 import type { ComponentState } from "@/data/redux/componentSlice";
+import type { AppDispatch, RootState } from "@/data/redux/store";
 
 interface GameLoopState {
   engine: EngineState;
@@ -97,7 +100,128 @@ const stop = () => {
   }
 };
 
-export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
+/**
+ * Une heure de jeu : toute la simulation, sans minuteur ni auto-save. La
+ * boucle du navigateur l'appelle à chaque tick ; la simulation hors navigateur
+ * (`sim/`) l'appelle en boucle pour jouer des années en quelques secondes.
+ */
+export const runGameTick = (
+  dispatch: AppDispatch,
+  getState: () => RootState,
+) => {
+  const state = getState();
+  treatTasks(dispatch, state);
+  produceComponents(dispatch, state);
+  decayComponents(dispatch, state);
+  processTrainingTick(dispatch, state);
+  processMonthlyBilling(dispatch, state);
+  processCampaignTick(dispatch, state);
+  processMoraleTick(dispatch, state);
+  processRaiseTick(dispatch, state);
+  // Après les demandes d'augmentation : une seule décision à la fois.
+  processPoachingTick(dispatch, getState());
+  processResearchTick(dispatch, state);
+  processInterviewTick(dispatch, state);
+  // Le marché d'abord (technologies, tendances, confiance), puis la vie
+  // des produits qui en dépend (bouche-à-oreille).
+  processMarketTick(dispatch, state);
+  processProductLifecycle(dispatch, state);
+  processPromotionTick(dispatch, state);
+  processCompetitorMarket(dispatch, state);
+
+  // Snapshot quotidien de la trésorerie pour le graphique d'accueil
+  const date = getTimeAsDate(state.engine.time);
+  if (
+    date.hour() === 0 &&
+    state.engine.lastSnapshotTime !== state.engine.time
+  ) {
+    dispatch(
+      recordMoneySnapshot({
+        money: state.company.money,
+        time: state.engine.time,
+      }),
+    );
+  }
+  // Les profils ramenés par une recherche ne patientent pas
+  // indéfiniment : on purge le vivier des candidats arrivés à échéance.
+  dispatch(expireCandidates(state.engine.time));
+  // Partie antérieure au marché (slice absent de la sauvegarde) : on
+  // le peuple à partir du carnet existant avant le premier lot.
+  if (state.competitor.roster.length === 0) {
+    dispatch(
+      initializeCompetitorState(buildRoster(state.task.clients)),
+    );
+  }
+  dispatch(
+    generateAvailableContractList({
+      time: state.engine.time,
+      reputation: state.company.reputation,
+      competitors: getState().competitor.roster,
+    }),
+  );
+  dispatch(
+    generateCompanyList({
+      time: state.engine.time,
+      reputation: state.company.reputation,
+    }),
+  );
+  // Palier de réputation franchi pour la première fois : on le dit,
+  // avec ce qu'il ouvre. À évaluer AVANT `trackRunPeaks`, qui remonte
+  // le pic auquel on se compare.
+  const milestone = crossedMilestone(
+    state.engine.peakReputation ?? 0,
+    state.company.reputation,
+  );
+  if (milestone) {
+    dispatch(
+      pushNotification({
+        message: `Palier atteint : ${milestone.name} (réputation ${milestone.threshold}). ${milestone.unlocks}`,
+        type: "success",
+      }),
+    );
+  }
+  // Suit l'effectif max et la réputation max de la partie (écran de
+  // bilan WF-3) à partir de l'état committé du tick courant.
+  dispatch(
+    trackRunPeaks({
+      headcount: state.employe.employeList.length,
+      reputation: state.company.reputation,
+    }),
+  );
+  dispatch(incrementTime());
+};
+
+/** Auto-save sur événements clés, évaluée sur l'état d'avant le tick. */
+const maybeAutoSave = (
+  state: GameLoopState,
+  getState: () => GameLoopState,
+) => {
+  const date = getTimeAsDate(state.engine.time);
+  // Auto-save (MYL-24) : événements clés + filet temporel, débouncé.
+  const now = Date.now();
+  const isDayBoundary =
+    date.hour() === 0 && lastAutoSaveDay !== state.engine.time;
+  const isMonthBoundary = date.date() === 1 && date.hour() === 0;
+  const becameGameOver = state.engine.gameOver && !prevGameOver;
+  prevGameOver = state.engine.gameOver;
+
+  const eventTrigger = isDayBoundary || isMonthBoundary;
+  const elapsed = now - lastAutoSaveAt;
+  const shouldAutoSave =
+    becameGameOver ||
+    elapsed >= AUTO_SAVE_MAX_INTERVAL_MS ||
+    (eventTrigger && elapsed >= AUTO_SAVE_MIN_INTERVAL_MS);
+
+  if (shouldAutoSave) {
+    if (date.hour() === 0) lastAutoSaveDay = state.engine.time;
+    triggerAutoSave(
+      getState() as unknown as Record<string, unknown>,
+      now,
+    );
+  }
+};
+
+export const gameLoopMiddleware: Middleware<object, GameLoopState> =
   (store) => (next) => (action) => {
     const result = next(action);
 
@@ -106,106 +230,14 @@ export const gameLoopMiddleware: Middleware<{}, GameLoopState> =
       const speed = action.payload;
       if (speed > 0) {
         intervalId = setInterval(() => {
-          const state = store.getState();
-          treatTasks(store.dispatch as any, state as any);
-          produceComponents(store.dispatch as any, state as any);
-          decayComponents(store.dispatch as any, state as any);
-          processTrainingTick(store.dispatch as any, state as any);
-          processMonthlyBilling(store.dispatch as any, state as any);
-          processCampaignTick(store.dispatch as any, state as any);
-          processMoraleTick(store.dispatch as any, state as any);
-          processRaiseTick(store.dispatch as any, state as any);
-          processResearchTick(store.dispatch as any, state as any);
-          // Le marché d'abord (technologies, tendances, confiance), puis la vie
-          // des produits qui en dépend (bouche-à-oreille).
-          processMarketTick(store.dispatch as any, state as any);
-          processProductLifecycle(store.dispatch as any, state as any);
-          processPromotionTick(store.dispatch as any, state as any);
-          processCompetitorMarket(store.dispatch as any, state as any);
-
-          // Snapshot quotidien de la trésorerie pour le graphique d'accueil
-          const date = getTimeAsDate(state.engine.time);
-          if (
-            date.hour() === 0 &&
-            state.engine.lastSnapshotTime !== state.engine.time
-          ) {
-            store.dispatch(
-              recordMoneySnapshot({
-                money: state.company.money,
-                time: state.engine.time,
-              }),
-            );
-          }
-          // Auto-save (MYL-24) : événements clés + filet temporel, débouncé.
-          const now = Date.now();
-          const isDayBoundary =
-            date.hour() === 0 && lastAutoSaveDay !== state.engine.time;
-          const isMonthBoundary = date.date() === 1 && date.hour() === 0;
-          const becameGameOver = state.engine.gameOver && !prevGameOver;
-          prevGameOver = state.engine.gameOver;
-
-          const eventTrigger = isDayBoundary || isMonthBoundary;
-          const elapsed = now - lastAutoSaveAt;
-          const shouldAutoSave =
-            becameGameOver ||
-            elapsed >= AUTO_SAVE_MAX_INTERVAL_MS ||
-            (eventTrigger && elapsed >= AUTO_SAVE_MIN_INTERVAL_MS);
-
-          if (shouldAutoSave) {
-            if (date.hour() === 0) lastAutoSaveDay = state.engine.time;
-            triggerAutoSave(
-              store.getState() as unknown as Record<string, unknown>,
-              now,
-            );
-          }
-
-          // Les profils ramenés par une recherche ne patientent pas
-          // indéfiniment : on purge le vivier des candidats arrivés à échéance.
-          store.dispatch(expireCandidates(state.engine.time));
-          // Partie antérieure au marché (slice absent de la sauvegarde) : on
-          // le peuple à partir du carnet existant avant le premier lot.
-          if (state.competitor.roster.length === 0) {
-            store.dispatch(
-              initializeCompetitorState(buildRoster(state.task.clients)),
-            );
-          }
-          store.dispatch(
-            generateAvailableContractList({
-              time: state.engine.time,
-              reputation: state.company.reputation,
-              competitors: store.getState().competitor.roster,
-            }),
+          const before = store.getState();
+          // Le middleware ne voit qu'une partie de l'état ; la boucle, elle,
+          // travaille sur le store complet.
+          runGameTick(
+            store.dispatch as AppDispatch,
+            store.getState as unknown as () => RootState,
           );
-          store.dispatch(
-            generateCompanyList({
-              time: state.engine.time,
-              reputation: state.company.reputation,
-            }),
-          );
-          // Palier de réputation franchi pour la première fois : on le dit,
-          // avec ce qu'il ouvre. À évaluer AVANT `trackRunPeaks`, qui remonte
-          // le pic auquel on se compare.
-          const milestone = crossedMilestone(
-            state.engine.peakReputation ?? 0,
-            state.company.reputation,
-          );
-          if (milestone) {
-            store.dispatch(
-              pushNotification({
-                message: `Palier atteint : ${milestone.name} (réputation ${milestone.threshold}). ${milestone.unlocks}`,
-                type: "success",
-              }),
-            );
-          }
-          // Suit l'effectif max et la réputation max de la partie (écran de
-          // bilan WF-3) à partir de l'état committé du tick courant.
-          store.dispatch(
-            trackRunPeaks({
-              headcount: state.employe.employeList.length,
-              reputation: state.company.reputation,
-            }),
-          );
-          store.dispatch(incrementTime());
+          maybeAutoSave(before, store.getState);
         }, speed);
       }
     }

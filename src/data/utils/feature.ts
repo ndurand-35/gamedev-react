@@ -1,4 +1,5 @@
 import {
+  COMPONENT_GRAIN,
   COMPONENT_TYPE_ORDER,
   ComponentRequirement,
   ComponentType,
@@ -28,9 +29,10 @@ const cost = (
   visuel: number,
   ux: number,
 ): Record<ComponentType, number> => ({
-  [ComponentType.CODE]: code,
-  [ComponentType.VISUEL]: visuel,
-  [ComponentType.UX]: ux,
+  // Coûts écrits en unités de travail, convertis au grain des composants.
+  [ComponentType.CODE]: code * COMPONENT_GRAIN,
+  [ComponentType.VISUEL]: visuel * COMPONENT_GRAIN,
+  [ComponentType.UX]: ux * COMPONENT_GRAIN,
 });
 
 const { OUTIL, SERVICE, JEU, PLATEFORME } = ProductGenre;

@@ -1,4 +1,5 @@
 import {
+  COMPONENT_GRAIN,
   CompetitorProduct,
   ComponentType,
   GENRES,
@@ -52,7 +53,7 @@ import {
 
 /** Maintenance mensuelle d'un produit lancé : socle fixe + part par composant. */
 export const MAINTENANCE_FIXED = 250;
-export const MAINTENANCE_PER_COMPONENT = 20;
+export const MAINTENANCE_PER_COMPONENT = 20 / COMPONENT_GRAIN;
 
 /** Durée du pic de lancement (mois pleins). */
 export const LAUNCH_SPIKE_MONTHS = 2;
@@ -68,7 +69,7 @@ export const BUG_MONTHLY_CHANCE = 0.3;
 /** Ajouter des fonctionnalités pour 100 % de la taille rend cette fraîcheur (mois). */
 export const UPDATE_REWIND_MONTHS = 12;
 /** Un correctif coûte ce nombre de composants Code par bug corrigé. */
-export const PATCH_CODE_PER_BUG = 1;
+export const PATCH_CODE_PER_BUG = 1 * COMPONENT_GRAIN;
 
 /** Note de lancement : poids de la qualité, le reste tient à la taille. */
 export const LAUNCH_SCORE_QUALITY_WEIGHT = 0.7;

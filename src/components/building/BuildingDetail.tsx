@@ -13,11 +13,8 @@ import {
   selectBuildingById,
   selectEmployesByBuilding,
 } from "@/data/redux/selectors";
-import { EMPLOYE_MODAL_ID, EmployeModal } from "@/components/employe";
-import {
-  COMPONENT_BTN_CLASS,
-  COMPONENT_ICON,
-} from "@/components/component";
+import { EmployeModal } from "@/components/employe";
+import { COMPONENT_BTN_CLASS, COMPONENT_ICON } from "@/components/component";
 
 interface BuildingDetailProps {
   buildingId: number | undefined;
@@ -34,12 +31,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
     null,
   );
 
-  const openEmploye = (emp: Employe) => {
-    setSelectedEmployeId(emp.id);
-    (
-      document.getElementById(EMPLOYE_MODAL_ID) as HTMLDialogElement
-    )?.showModal();
-  };
+  const openEmploye = (emp: Employe) => setSelectedEmployeId(emp.id);
 
   if (!building) {
     return (
@@ -53,7 +45,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="card bg-base-100 border border-base-content/20 p-4">
+      <div className="card toy-tile p-4">
         <h2 className="text-2xl font-bold">{building.name}</h2>
         <p className="text-sm opacity-70">
           {building.address.adr1}, {building.address.city}
@@ -91,7 +83,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
         </div>
       </div>
 
-      <div className="card bg-base-100 border border-base-content/20 p-4">
+      <div className="card toy-tile p-4">
         <h3 className="font-semibold mb-2">Employés ({employes.length})</h3>
         {employes.length === 0 ? (
           <p className="text-sm opacity-60">
@@ -123,9 +115,7 @@ export const BuildingDetail: FC<BuildingDetailProps> = ({
                     <p className="font-medium truncate">
                       {emp.firstName} {emp.lastName}
                     </p>
-                    <p className="text-xs opacity-70">
-                      {jobLabel(emp)}
-                    </p>
+                    <p className="text-xs opacity-70">{jobLabel(emp)}</p>
                   </div>
                   <button
                     type="button"

@@ -4,8 +4,16 @@ import { Plus, Rocket, Tools, Trash } from "iconoir-react";
 import { Product, ProductStatus, isProductReady } from "@/data/interface";
 import { useAppDispatch } from "@/data/redux/hooks";
 import { retireProduct } from "@/data/redux/productSlice";
-import { affinityLabel, availableFeatures, featureCost } from "@/data/utils/feature";
-import { PATCH_CODE_PER_BUG, productBugs, productGenre } from "@/data/utils/product";
+import {
+  affinityLabel,
+  availableFeatures,
+  featureCost,
+} from "@/data/utils/feature";
+import {
+  PATCH_CODE_PER_BUG,
+  productBugs,
+  productGenre,
+} from "@/data/utils/product";
 import {
   addFeatureThunk,
   investProductThunk,
@@ -69,7 +77,7 @@ export const ProductActions: FC<ProductActionsProps> = ({
       {chosen && (
         <div className={`join ${compact ? "" : "flex-1 min-w-0"}`}>
           <select
-            className={`select select-sm select-bordered join-item min-w-0 ${compact ? "max-w-40" : "flex-1"}`}
+            className={`select select-sm join-item min-w-0 ${compact ? "max-w-40" : "flex-1"}`}
             value={chosen.id}
             onChange={(e) => setNextFeature(e.target.value)}
             aria-label="Fonctionnalité à ajouter"

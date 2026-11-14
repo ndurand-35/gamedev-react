@@ -26,30 +26,38 @@ export const ConfirmModal: FC<ConfirmModalProps> = ({
     role="dialog"
     aria-modal="true"
     aria-label={title}
-    className="fixed inset-0 z-[60] flex items-center justify-center bg-base-900/70 p-4"
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/60 p-4"
     onClick={onClose}
   >
     <div
-      className="card w-full max-w-sm bg-base-100 border-4 border-warning shadow-xl"
+      className="w-full max-w-sm overflow-hidden rounded-[1.75rem] border-[3px] border-ink bg-base-100 shadow-[0_8px_0_var(--color-ink)]"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="card-body space-y-4">
-        <h2 className="card-title gap-2">
-          <WarningTriangle /> {title}
-        </h2>
-        <div className="text-sm opacity-80">{message}</div>
-        <div className="modal-action mt-0 flex gap-2">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Annuler
-          </button>
-          <button
-            type="button"
-            className={`btn ${confirmClass}`}
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+      <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-5 py-3.5">
+        <WarningTriangle
+          width={20}
+          height={20}
+          className="shrink-0 text-error"
+          aria-hidden
+        />
+        <h2 className="font-display text-xl font-bold">{title}</h2>
+      </div>
+      <div className="px-5 py-4 text-sm font-semibold">{message}</div>
+      <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-5 py-3.5">
+        <button
+          type="button"
+          className="btn btn-ghost underline underline-offset-4"
+          onClick={onClose}
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          className={`btn ml-auto ${confirmClass}`}
+          onClick={onConfirm}
+        >
+          {confirmLabel}
+        </button>
       </div>
     </div>
   </div>

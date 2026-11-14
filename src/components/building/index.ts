@@ -3,3 +3,5 @@ export * from "@/components/building/BuildingSwitcher";
 export * from "@/components/building/BuildingDetail";
 export * from "@/components/building/BuildingEmployeView";
 export * from "@/components/building/BuildingReleaseModal";
+export * from "@/components/building/SeatAssignModal";
+export * from "@/components/building/WorkScheduleSelect";

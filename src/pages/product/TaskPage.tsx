@@ -1,10 +1,17 @@
+import { SectionTabs } from "@/components/layout/SectionTabs";
 import { ReactElement, useMemo, useState } from "react";
 
 import { SortableHeader } from "@/components/SortableHeader";
 import { useAppSelector } from "@/data/redux/hooks";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { Contract, StartedContract } from "@/data/interface";
-import { ContractCard, ContractDelivery } from "@/components/contract";
+import {
+  ContractCard,
+  ContractDelivery,
+  ContractTile,
+} from "@/components/contract";
+import { useMediaQuery } from "@/data/hooks/useMediaQuery";
+import { CodexLink } from "@/components/codex/CodexLink";
 import { productTopMenuItems } from "@/pages/product/menu";
 import {
   ContractSort,
@@ -31,6 +38,7 @@ export const TaskPage: React.FC = (): ReactElement => {
   const canEstimate = hasFounderSkill(acquiredSkills, "contract_estimate");
   const stock = useAppSelector((state) => state.component.stock);
   const employes = useAppSelector((state) => state.employe.employeList);
+  const buildings = useAppSelector((state) => state.company.buildingList);
   const productionProgress = useAppSelector(
     (state) => state.component.productionProgress,
   );
@@ -51,6 +59,7 @@ export const TaskPage: React.FC = (): ReactElement => {
           employes: producing,
           productionProgress,
           time,
+          buildings,
         }),
       );
     }
@@ -63,6 +72,7 @@ export const TaskPage: React.FC = (): ReactElement => {
     employes,
     productionProgress,
     time,
+    buildings,
   ]);
 
   const [sort, setSort] = useState<ContractSort | null>(null);
@@ -76,93 +86,159 @@ export const TaskPage: React.FC = (): ReactElement => {
   );
 
   const headerProps = { sort, onSort: toggleSort };
+  // Le tableau demande la largeur d'un grand écran (point `xl`) ; en
+  // dessous, des tuiles. Une seule vue rendue, pour une seule cible du tutoriel.
+  const wide = useMediaQuery("(min-width: 80rem)");
+  const sortValue = sort ? `${sort.key}:${sort.direction}` : "";
 
   return (
-    <div className="p-8 mt-14 mb-20 space-y-8">
-      <section className="space-y-2">
-        <h2 className="text-xl font-bold">
-          Contrats en cours ({taskList.length})
-        </h2>
-        <div className="bg-base-100 rounded-box shadow">
+    <div className="page-shell">
+      <SectionTabs items={productTopMenuItems} ariaLabel="Section Production" />
+      <div className="toy-frame page-frame space-y-8">
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 font-display text-2xl font-bold">
+            Contrats en cours
+            <span className="rounded-full border-2 border-ink bg-base-200 px-2 font-sans text-sm font-extrabold">
+              {taskList.length}
+            </span>
+            <CodexLink id="contrats" />
+          </h2>
           {taskList.length === 0 ? (
-            <p className="p-4 text-sm opacity-60">
-              Aucun contrat signé. Signez un contrat ci-dessous, produisez les
-              composants demandés, puis livrez quand le stock vous convient.
+            <p className="rounded-[0.9rem] border-2 border-dashed border-base-content/25 p-4 text-center text-sm font-bold text-base-content/60">
+              Aucun contrat signé.
             </p>
           ) : (
-            <div className="flex flex-col divide-y divide-base-content/10">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {taskList.map((t: StartedContract) => (
                 <ContractDelivery contract={t} key={`started_${t.id}`} />
               ))}
             </div>
           )}
-        </div>
-      </section>
+        </section>
 
-      <section className="space-y-2">
-        <h2 className="text-xl font-bold">Contrats disponibles</h2>
-        <table className="table table-zebra bg-base-100 rounded-box shadow">
-          <thead>
-            <tr>
-              <SortableHeader label="Contrat" sortKey="name" {...headerProps} />
-              <SortableHeader
-                label="Client"
-                sortKey="client"
-                {...headerProps}
-              />
-              <SortableHeader
-                label="Difficulté"
-                sortKey="difficulty"
-                {...headerProps}
-              />
-              <SortableHeader label="Délai" sortKey="time" {...headerProps} />
-              {canEstimate && (
-                <th>
-                  <span
-                    className="tooltip tooltip-bottom cursor-help"
-                    data-tip="Temps pour réunir les composants avec le stock et l'effectif actuels (compétence du fondateur)"
-                  >
-                    Estimation
-                  </span>
-                </th>
-              )}
-              <SortableHeader
-                label="Acompte"
-                sortKey="deposit"
-                align="right"
-                {...headerProps}
-              />
-              <SortableHeader
-                label="Solde"
-                sortKey="additional"
-                align="right"
-                {...headerProps}
-              />
-              <SortableHeader
-                label="Malus"
-                sortKey="malus"
-                align="right"
-                {...headerProps}
-              />
-              <SortableHeader
-                label="Composants demandés"
-                sortKey="requirements"
-                {...headerProps}
-              />
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedContracts.map((aC: Contract) => (
-              <ContractCard
-                contract={aC}
-                leadTimeHours={leadTimeById?.get(aC.id)}
-                key={`contract_${aC.id}`}
-              />
-            ))}
-          </tbody>
-        </table>
-      </section>
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display text-2xl font-bold">
+              Contrats disponibles
+              <span className="rounded-full border-2 border-ink bg-base-200 px-2 font-sans text-sm font-extrabold">
+                {sortedContracts.length}
+              </span>
+            </h2>
+            {/* Sans en-têtes de colonnes, le tri passe par une liste. */}
+            {!wide && (
+              <label className="flex items-center gap-2 rounded-full bg-white py-1 pr-1 pl-3 text-xs font-extrabold">
+                Trier par
+                <select
+                  className="select select-xs w-auto rounded-full border-0 bg-base-200 [--input-color:transparent]"
+                  value={sortValue}
+                  onChange={(e) => {
+                    const [key, direction] = e.target.value.split(":");
+                    setSort(
+                      key
+                        ? {
+                            key: key as ContractSortKey,
+                            direction: direction as "asc" | "desc",
+                          }
+                        : null,
+                    );
+                  }}
+                >
+                  <option value="">Arrivée</option>
+                  <option value="additional:desc">Solde</option>
+                  <option value="deposit:desc">Acompte</option>
+                  <option value="time:asc">Délai</option>
+                  <option value="difficulty:asc">Difficulté</option>
+                  <option value="requirements:asc">Composants</option>
+                  <option value="malus:asc">Malus</option>
+                </select>
+              </label>
+            )}
+          </div>
+          {!wide ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {sortedContracts.map((aC: Contract) => (
+                <ContractTile
+                  contract={aC}
+                  leadTimeHours={leadTimeById?.get(aC.id)}
+                  key={`contract_${aC.id}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <SortableHeader
+                      label="Contrat"
+                      sortKey="name"
+                      {...headerProps}
+                    />
+                    <SortableHeader
+                      label="Client"
+                      sortKey="client"
+                      {...headerProps}
+                    />
+                    <SortableHeader
+                      label="Difficulté"
+                      sortKey="difficulty"
+                      {...headerProps}
+                    />
+                    <SortableHeader
+                      label="Délai"
+                      sortKey="time"
+                      {...headerProps}
+                    />
+                    {canEstimate && (
+                      <th>
+                        <span
+                          className="tooltip tooltip-bottom cursor-help"
+                          data-tip="Délai estimé"
+                        >
+                          Estimation
+                        </span>
+                      </th>
+                    )}
+                    <SortableHeader
+                      label="Acompte"
+                      sortKey="deposit"
+                      align="right"
+                      {...headerProps}
+                    />
+                    <SortableHeader
+                      label="Solde"
+                      sortKey="additional"
+                      align="right"
+                      {...headerProps}
+                    />
+                    <SortableHeader
+                      label="Malus"
+                      sortKey="malus"
+                      align="right"
+                      {...headerProps}
+                    />
+                    <SortableHeader
+                      label="Composants demandés"
+                      sortKey="requirements"
+                      {...headerProps}
+                    />
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedContracts.map((aC: Contract) => (
+                    <ContractCard
+                      contract={aC}
+                      leadTimeHours={leadTimeById?.get(aC.id)}
+                      key={`contract_${aC.id}`}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 };

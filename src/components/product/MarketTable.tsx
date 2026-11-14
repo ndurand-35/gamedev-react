@@ -34,7 +34,7 @@ export const MarketTable: FC<MarketTableProps> = ({ rows, onOpen }) => {
 
   return (
     <div className="overflow-x-auto">
-      <table className="table table-sm bg-base-100 rounded-box shadow">
+      <table className="table table-sm">
         <thead>
           <tr>
             <SortableHeader label="Produit" sortKey="name" {...headerProps} />

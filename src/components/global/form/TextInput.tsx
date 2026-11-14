@@ -15,12 +15,11 @@ export const TextInput: React.FC<TextInputProps> = ({
   return (
     <>
       <div className="label">
-        <span className="label-text">{label}</span>
+        <span className="text-sm font-bold">{label}</span>
       </div>
       <input
         className={
-          "input input-bordered w-full text-black" +
-          (showError ? " input-error" : "")
+          "input w-full text-black" + (showError ? " input-error" : "")
         }
         placeholder={placeholder}
         value={field.state.value}

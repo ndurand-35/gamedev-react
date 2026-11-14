@@ -8,18 +8,21 @@ import {
   selectCurrentBuilding,
   selectEmployesByBuilding,
 } from "@/data/redux/selectors";
-import { EMPLOYE_MODAL_ID, EmployeModal } from "@/components/employe";
+import { EmployeModal } from "@/components/employe";
+import { BuildingSidebar } from "@/components/building/BuildingSidebar";
 
 const pageTopMenuItems: TopMenuItem[] = [];
 
 /**
  * Vue studio : l'effectif du bâtiment courant. Le bâtiment se choisit depuis
- * le sélecteur du menu du bas (`BuildingSwitcher`), pas ici.
+ * le sélecteur du menu du bas (`BuildingSwitcher`) et, à partir de deux
+ * bâtiments, depuis la colonne de gauche qui signale les alertes de chacun.
  */
 export const HomePage: React.FC = (): ReactElement => {
   useTopMenu(pageTopMenuItems);
 
   const building = useAppSelector(selectCurrentBuilding);
+  const buildingCount = useAppSelector((s) => s.company.buildingList.length);
   const employes = useAppSelector((s) =>
     building == null ? [] : selectEmployesByBuilding(s, building.id),
   );
@@ -28,24 +31,31 @@ export const HomePage: React.FC = (): ReactElement => {
     null,
   );
 
-  const openEmploye = (id: number) => {
-    setSelectedEmployeId(id);
-    (
-      document.getElementById(EMPLOYE_MODAL_ID) as HTMLDialogElement
-    )?.showModal();
-  };
+  const openEmploye = (id: number) => setSelectedEmployeId(id);
 
   return (
-    <div className="fixed inset-x-0 top-14 bottom-14 flex flex-col gap-2 p-3 overflow-hidden">
-      {/* Effectif du bâtiment sélectionné : occupe l'espace restant de l'Accueil */}
-      <div className="flex flex-1 min-h-0 flex-col bg-base-100">
+    <div
+      className={
+        "fixed inset-x-0 top-14 bottom-20 grid grid-cols-1 gap-4 overflow-hidden px-2 pt-3 pb-2 sm:px-4 " +
+        (buildingCount >= 2 ? "md:grid-cols-[15rem_minmax(0,1fr)]" : "")
+      }
+    >
+      {/* Sur téléphone, le sélecteur du dock suffit : la colonne écraserait
+          l'effectif. */}
+      {buildingCount >= 2 && (
+        <div className="hidden min-h-0 md:contents">
+          <BuildingSidebar />
+        </div>
+      )}
+      {/* Effectif du bâtiment sélectionné : occupe l'espace restant de l'Accueil.
+          Même vide, il s'affiche : ses places libres servent à installer
+          quelqu'un. */}
+      {/* Le cadre reste crème la nuit, comme sur les autres pages : seul le
+          papier autour passe au bleu nuit. */}
+      <div className="toy-frame relative flex min-h-0 flex-col">
         {!building ? (
           <p className="m-auto p-8 text-center opacity-70">
             Aucun bâtiment. Achetez-en un depuis SeLoger.
-          </p>
-        ) : employes.length === 0 ? (
-          <p className="m-auto p-8 text-center text-sm opacity-60">
-            Aucun employé affecté à ce bâtiment.
           </p>
         ) : (
           <BuildingEmployeView

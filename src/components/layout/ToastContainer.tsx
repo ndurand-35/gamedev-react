@@ -10,18 +10,19 @@ import {
 
 const TOAST_TTL_MS = 5000;
 
-const TYPE_CLASS: Record<NotificationType, string> = {
-  success: "alert-success",
-  warning: "alert-warning",
-  error: "alert-error",
-  info: "alert-info",
+// Le toast reste une tuile blanche : seule la pastille d'icône porte le ton.
+const TYPE_DOT: Record<NotificationType, string> = {
+  success: "bg-[#a9ddb4]",
+  warning: "bg-[#ffe08a]",
+  error: "bg-[#f4a3a8]",
+  info: "bg-role-prod",
 };
 
 const TYPE_ICON: Record<NotificationType, React.ReactElement> = {
-  success: <CheckCircle width={18} height={18} />,
-  warning: <WarningCircle width={18} height={18} />,
-  error: <WarningCircle width={18} height={18} />,
-  info: <InfoCircle width={18} height={18} />,
+  success: <CheckCircle width={16} height={16} strokeWidth={2.2} />,
+  warning: <WarningCircle width={16} height={16} strokeWidth={2.2} />,
+  error: <WarningCircle width={16} height={16} strokeWidth={2.2} />,
+  info: <InfoCircle width={16} height={16} strokeWidth={2.2} />,
 };
 
 const Toast = ({ notification }: { notification: Notification }) => {
@@ -40,13 +41,14 @@ const Toast = ({ notification }: { notification: Notification }) => {
   return (
     <div
       role="alert"
-      className={
-        "alert shadow-lg pr-2 py-2 text-sm gap-2 " +
-        TYPE_CLASS[notification.type]
-      }
+      className="toy-tile flex items-center gap-2.5 py-2 pr-2 pl-2.5 text-sm font-semibold shadow-toy-sm"
     >
-      {TYPE_ICON[notification.type]}
-      <span className="flex-1">{notification.message}</span>
+      <span
+        className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-ink ${TYPE_DOT[notification.type]}`}
+      >
+        {TYPE_ICON[notification.type]}
+      </span>
+      <span className="flex-1 leading-snug">{notification.message}</span>
       <button
         type="button"
         aria-label="Fermer"
@@ -70,7 +72,7 @@ export const ToastContainer = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-16 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div className="pointer-events-none fixed top-16 right-2 left-2 z-50 flex flex-col gap-2 sm:right-4 sm:left-auto sm:w-full sm:max-w-sm">
       <div className="flex flex-col gap-2 pointer-events-auto">
         {toasts.map((n) => (
           <Toast key={n.id} notification={n} />

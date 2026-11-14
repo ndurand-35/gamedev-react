@@ -10,18 +10,17 @@ import { campaignEffectiveness } from "@/data/utils/economy";
 import {
   POPULARITY_MAX,
   PROMOTION_COST,
-  PROMOTION_DURATION_HOURS,
   busyMarketerIds,
   canPromote,
   isPromotionActive,
   popularityLabel,
-  popularityProfile,
   productPopularity,
 } from "@/data/utils/popularity";
 import { startPromotionThunk } from "@/data/utils/productLifecycle";
 import { useTrends } from "@/data/hooks/useTrends";
 import { productTrends, trendLabel } from "@/data/utils/trends";
 import { TrendBadge } from "@/components/product/Trends";
+import { CodexLink } from "@/components/codex/CodexLink";
 
 /**
  * Popularité d'un produit et sa promotion : la jauge, la campagne en cours,
@@ -43,8 +42,7 @@ export const PromotionPanel: FC<{ product: Product }> = ({ product: p }) => {
   const promoting = isPromotionActive(p, time);
   const busy = busyMarketerIds(products, campaign, time);
   const free = marketers.filter((m) => !busy.has(m.id));
-  const chosen =
-    free.find((m) => m.id === chosenId) ?? free[0] ?? undefined;
+  const chosen = free.find((m) => m.id === chosenId) ?? free[0] ?? undefined;
   const promoter = promoting
     ? marketers.find((m) => m.id === p.promotion?.marketerId)
     : undefined;
@@ -59,6 +57,7 @@ export const PromotionPanel: FC<{ product: Product }> = ({ product: p }) => {
       <div className="flex flex-row items-center justify-between gap-2 text-xs">
         <span className="inline-flex items-center gap-1 font-medium">
           <Megaphone width={14} height={14} /> Popularité
+          <CodexLink id="popularite" />
         </span>
         <span className="tabular-nums">
           <span className="font-semibold">{rounded}</span>/{POPULARITY_MAX} ·{" "}
@@ -66,7 +65,7 @@ export const PromotionPanel: FC<{ product: Product }> = ({ product: p }) => {
         </span>
       </div>
       <progress
-        className="progress progress-warning h-2 w-full"
+        className="progress progress-warning h-3 w-full rounded-full border-2 border-ink"
         value={popularity}
         max={POPULARITY_MAX}
         aria-label={`Popularité ${rounded} sur ${POPULARITY_MAX}`}
@@ -75,14 +74,12 @@ export const PromotionPanel: FC<{ product: Product }> = ({ product: p }) => {
       {touching.length > 0 && (
         <ul className="space-y-1 text-[11px]">
           {touching.map((t) => (
-            <li key={`promo_trend_${t.id}`} className="flex flex-row items-center gap-2">
+            <li
+              key={`promo_trend_${t.id}`}
+              className="flex flex-row items-center gap-2"
+            >
               <TrendBadge direction={t.direction} />
-              <span className="opacity-70">
-                {trendLabel(t)} :{" "}
-                {t.direction === "up"
-                  ? "le bouche-à-oreille et la publicité portent plus loin."
-                  : "le bouche-à-oreille et la publicité portent moins loin."}
-              </span>
+              <span className="opacity-70">{trendLabel(t)}</span>
             </li>
           ))}
         </ul>
@@ -114,13 +111,12 @@ export const PromotionPanel: FC<{ product: Product }> = ({ product: p }) => {
         </p>
       ) : free.length === 0 ? (
         <p className="text-xs opacity-70">
-          Tous vos marketeurs mènent déjà une campagne : un marketeur ne gère
-          qu'une campagne à la fois.
+          Tous vos marketeurs mènent déjà une campagne.
         </p>
       ) : (
         <div className="flex flex-row flex-wrap items-center gap-2">
           <select
-            className="select select-sm select-bordered min-w-0 flex-1"
+            className="select select-sm min-w-0 flex-1"
             value={chosen?.id ?? ""}
             onChange={(e) => setChosenId(Number(e.target.value))}
             aria-label="Marketeur qui mènera la promotion"
@@ -145,33 +141,17 @@ export const PromotionPanel: FC<{ product: Product }> = ({ product: p }) => {
             <button
               type="button"
               className="btn btn-sm btn-warning"
-              disabled={!chosen || money < PROMOTION_COST || !canPromote(p, time)}
-              onClick={() => chosen && dispatch(startPromotionThunk(p.id, chosen.id))}
+              disabled={
+                !chosen || money < PROMOTION_COST || !canPromote(p, time)
+              }
+              onClick={() =>
+                chosen && dispatch(startPromotionThunk(p.id, chosen.id))
+              }
             >
               <Megaphone width={16} height={16} />
               Promouvoir · −{formatPrice(PROMOTION_COST)} €
             </button>
           </div>
-        </div>
-      )}
-
-      {!retired && (
-        // Les règles, dites en clair ; le niveau naturel du produit, lui,
-        // n'est pas affiché — le joueur le devine à sa note et à ses bugs.
-        <div className="space-y-1 text-[11px] opacity-60">
-          <p>
-            <span className="font-medium">{p.genre} :</span>{" "}
-            {popularityProfile(p.genre).hint}
-          </p>
-          <p>
-            Une promotion dure {PROMOTION_DURATION_HOURS / 24} jours et monte
-            d'autant plus vite que le marketeur est bon et que le produit est
-            peu connu. Sans promotion, la popularité revient chaque mois vers
-            ce que le produit vaut aux yeux du public : sa qualité, sa taille,
-            et ses bugs non corrigés.
-            {p.status === ProductStatus.DEVELOPING &&
-              " Pas encore sorti, il n'a personne pour en parler : sa popularité retombe sans promotion — mais promu avant sa sortie, il arrive avec un pic de lancement plus fort."}
-          </p>
         </div>
       )}
     </div>

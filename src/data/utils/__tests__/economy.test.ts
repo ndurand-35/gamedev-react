@@ -137,24 +137,24 @@ describe("aggregateQaDetection", () => {
   it("somme les bugDetectionStat (et ignore les valeurs négatives/absentes)", () => {
     expect(
       aggregateQaDetection([
-        { bugDetectionStat: 10 },
-        { bugDetectionStat: 5 },
-        { bugDetectionStat: -3 },
+        { bugDetectionStat: 100 },
+        { bugDetectionStat: 50 },
+        { bugDetectionStat: -30 },
         {},
       ]),
-    ).toBe(15);
+    ).toBe(150);
   });
 });
 
 describe("qaCancelProbability / qaLossReductionRatio", () => {
   it("croissent avec la détection mais restent bornées", () => {
     expect(qaCancelProbability(0)).toBe(0);
-    expect(qaCancelProbability(10)).toBeCloseTo(0.1, 5);
-    expect(qaCancelProbability(10000)).toBe(QA_MAX_CANCEL_PROB);
+    expect(qaCancelProbability(100)).toBeCloseTo(0.1, 5);
+    expect(qaCancelProbability(100000)).toBe(QA_MAX_CANCEL_PROB);
 
     expect(qaLossReductionRatio(0)).toBe(0);
-    expect(qaLossReductionRatio(10)).toBeCloseTo(0.2, 5);
-    expect(qaLossReductionRatio(10000)).toBe(QA_MAX_LOSS_REDUCTION);
+    expect(qaLossReductionRatio(100)).toBeCloseTo(0.2, 5);
+    expect(qaLossReductionRatio(100000)).toBe(QA_MAX_LOSS_REDUCTION);
   });
 });
 
@@ -166,22 +166,22 @@ describe("computeQaBugOutcome", () => {
   });
 
   it("annule le bug quand le tirage tombe sous la probabilité d'annulation", () => {
-    // détection 30 → cancelProbability 0.30
-    const out = computeQaBugOutcome(30, 0.1);
+    // détection 300 → cancelProbability 0.30
+    const out = computeQaBugOutcome(300, 0.1);
     expect(out.cancelProbability).toBeCloseTo(0.3, 5);
     expect(out.cancelled).toBe(true);
     expect(out.progressionLoss).toBe(0);
   });
 
   it("réduit la perte (sans annuler) quand le tirage dépasse la probabilité", () => {
-    // détection 20 → reduction 0.40 → perte 10*0.6 = 6 ; cancelProb 0.20
-    const out = computeQaBugOutcome(20, 0.99);
+    // détection 200 → reduction 0.40 → perte 10*0.6 = 6 ; cancelProb 0.20
+    const out = computeQaBugOutcome(200, 0.99);
     expect(out.cancelled).toBe(false);
     expect(out.progressionLoss).toBe(6);
   });
 
   it("ne réduit jamais la perte sous le plancher (max 75%)", () => {
-    const out = computeQaBugOutcome(10000, 1);
+    const out = computeQaBugOutcome(100000, 1);
     expect(out.progressionLoss).toBe(
       Math.round(BUG_BASE_PROGRESSION_LOSS * (1 - QA_MAX_LOSS_REDUCTION)),
     );
@@ -199,12 +199,12 @@ describe("campaignEffectiveness", () => {
   });
 
   it("atteint 100% à stats maximales", () => {
-    expect(campaignEffectiveness(20, 20)).toBeCloseTo(1, 5);
+    expect(campaignEffectiveness(200, 200)).toBeCloseTo(1, 5);
   });
 
   it("est monotone croissante avec les stats", () => {
-    expect(campaignEffectiveness(10, 10)).toBeGreaterThan(
-      campaignEffectiveness(5, 5),
+    expect(campaignEffectiveness(100, 100)).toBeGreaterThan(
+      campaignEffectiveness(50, 50),
     );
   });
 });

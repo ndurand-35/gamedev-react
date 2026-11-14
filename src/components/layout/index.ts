@@ -7,4 +7,5 @@ export * from "@/components/layout/BottomNavigation";
 export * from "@/components/layout/ToastContainer";
 export * from "@/components/layout/HomeDashboard";
 export * from "@/components/layout/NotificationCenter";
-export * from "@/components/layout/SavePanel";
+export * from "@/components/layout/SettingsPanel";
+export * from "@/components/layout/TutorialSpotlight";

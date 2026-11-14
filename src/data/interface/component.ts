@@ -1,3 +1,11 @@
+// Grain des composants : un composant représente 1 / COMPONENT_GRAIN de
+// l'effort d'origine. On en produit d'autant plus, et contrats, fonctionnalités
+// et tailles de produits en demandent d'autant plus : le travail total,
+// l'argent et l'équilibre ne bougent pas, mais il se passe davantage de choses
+// à l'écran. Tout ce qui se compte en composants est multiplié par le grain,
+// tout ce qui se paie ou se mesure « par composant » est divisé.
+export const COMPONENT_GRAIN = 5;
+
 export enum ComponentType {
   CODE = "Code",
   VISUEL = "Visuel",
@@ -54,6 +62,8 @@ export interface Component {
   // Horodatage (heures de jeu) de la dernière érosion appliquée. Absent sur les
   // composants d'anciennes sauvegardes : on repart alors de `producedAt`.
   lastDecayAt?: number;
+  /** Sorti d'un coup de génie (bonus rare du tirage). Absent sinon. */
+  lucky?: boolean;
 }
 
 // --- Obsolescence des composants -------------------------------------------

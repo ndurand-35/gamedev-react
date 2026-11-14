@@ -24,12 +24,14 @@ export const REPUTATION_MILESTONES: ReputationMilestone[] = [
   {
     name: "Studio indé",
     threshold: 25,
-    unlocks: "Prêt PME (50 000 €), 9 contrats et 5 annonces par semaine.",
+    unlocks:
+      "Recrutement de profils confirmés, prêt PME (50 000 €), 9 contrats et 5 annonces par semaine.",
   },
   {
     name: "Studio reconnu",
     threshold: 50,
-    unlocks: "Prêt expansion (150 000 €), 10 contrats et 7 annonces par semaine.",
+    unlocks:
+      "Recrutement de seniors, prêt expansion (150 000 €), 10 contrats et 7 annonces par semaine.",
   },
   {
     name: "Studio AAA",

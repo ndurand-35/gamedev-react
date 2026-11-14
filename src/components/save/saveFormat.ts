@@ -25,7 +25,7 @@ export const INTEGRITY_LABEL: Record<Integrity, string> = {
 
 /** Classe DaisyUI du badge selon l'intégrité. */
 export const INTEGRITY_BADGE_CLASS: Record<Integrity, string> = {
-  ok: "badge-neutral",
+  ok: "bg-white",
   corrupt: "badge-error",
   outdated: "badge-warning",
 };

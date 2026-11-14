@@ -8,7 +8,15 @@ export interface Building {
   electricity: number;
   internet: number;
   image?: string | null;
+  /**
+   * Rythme de travail du studio (cf. `utils/workSchedule`). Absent d'une
+   * partie antérieure : horaires normaux, l'équilibre d'avant.
+   */
+  schedule?: WorkSchedule;
 }
+
+/** Rythmes de travail proposés pour un studio, du plus doux au plus dur. */
+export type WorkSchedule = "DETENTE" | "NORMAL" | "SOUTENU" | "CRUNCH";
 
 export const getBuildingMonthlyCharges = (b: Building): number =>
   b.rent + b.electricity + b.internet;

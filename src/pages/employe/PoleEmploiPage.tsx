@@ -2,13 +2,17 @@ import { ReactElement } from "react";
 
 import { PoleEmploye } from "@/components/employe";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
-import { pageTopMenuItems } from "../EmployePage";
+import { SectionTabs } from "@/components/layout/SectionTabs";
+import { employeTopMenuItems } from "@/pages/employe/menu";
 
 export const PoleEmploiPage: React.FC = (): ReactElement => {
-  useTopMenu(pageTopMenuItems);
+  useTopMenu(employeTopMenuItems);
   return (
-    <div className="p-8 mt-14 mb-20">
-      <PoleEmploye />
+    <div className="page-shell">
+      <SectionTabs items={employeTopMenuItems} ariaLabel="Section Employés" />
+      <div className="toy-frame page-frame">
+        <PoleEmploye />
+      </div>
     </div>
   );
 };

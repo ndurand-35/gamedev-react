@@ -36,19 +36,45 @@ export const BuildingTable = () => {
               className="tooltip tooltip-right"
               data-tip={`Loyer ${formatPrice(b.rent)} · Électricité ${formatPrice(b.electricity)} · Internet ${formatPrice(b.internet)}`}
             >
-              <span className="tabular-nums">{formatPrice(total)}</span>
+              <span className="font-extrabold text-error tabular-nums">
+                {formatPrice(total)} €
+              </span>
             </div>
           );
         },
       }),
-      columnHelper.accessor("place", { header: "Place" }),
+      columnHelper.accessor("place", {
+        header: "Place",
+        cell: (props) => (
+          <span className="tabular-nums">{props.getValue()}</span>
+        ),
+      }),
       columnHelper.display({
         header: "Employés",
-        cell: (props) => (
-          <div>
-            {getBuildingEmploye(employeList, props.row.original).length}
-          </div>
-        ),
+        cell: (props) => {
+          const b = props.row.original;
+          const occupants = getBuildingEmploye(employeList, b).length;
+          return (
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-16 overflow-hidden rounded-full border-2 border-ink bg-base-300">
+                <span
+                  className="block h-full bg-ink"
+                  style={{
+                    width: `${b.place > 0 ? Math.round((occupants / b.place) * 100) : 0}%`,
+                  }}
+                />
+              </span>
+              <span
+                className={
+                  "text-xs font-extrabold tabular-nums " +
+                  (occupants === 0 ? "text-warning" : "")
+                }
+              >
+                {occupants}
+              </span>
+            </div>
+          );
+        },
       }),
       columnHelper.display({
         header: "Action",
@@ -89,19 +115,19 @@ export const BuildingTable = () => {
   }, [employeList]);
 
   return (
-    <div className="space-y-4">
+    <div>
       <MyTable
         columns={columns}
         defaultData={buildingList}
-        title={
-          buildingList.length +
-          " Bâtiment" +
-          (buildingList.length > 1 ? "s" : "")
-        }
+        title="Mes bâtiments"
         isRowSelectable={false}
         rowSelection={rowSelection}
         setRowSelection={setRowSelection}
-        action={<></>}
+        action={
+          <span className="-ml-2 rounded-full border-2 border-ink bg-base-200 px-2 font-sans text-sm font-extrabold">
+            {buildingList.length}
+          </span>
+        }
       />
       <BuildingNameModal
         building={currentBuilding}

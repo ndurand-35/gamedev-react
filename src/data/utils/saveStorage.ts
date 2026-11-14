@@ -14,6 +14,9 @@ import { getTimeAsDate } from "@/data/utils/time";
 import { getMilestoneProgress } from "@/data/utils/milestone";
 import { buildRoster } from "@/data/utils/competitor";
 import { normalizeProduct } from "@/data/utils/product";
+import { INACTIVE_TUTORIAL } from "@/data/redux/tutorialSlice";
+import { rescaleStateStats } from "@/data/utils/statScale";
+import { rescaleStateGrain } from "@/data/utils/componentGrain";
 
 // --- Constantes ------------------------------------------------------------
 
@@ -36,7 +39,10 @@ export const GAME_VERSION = "0.0.0";
 // 6 : produits des studios concurrents (`competitor.products`).
 // 7 : produits assemblés de fonctionnalités (`product.products[].features`).
 // 8 : journal d'activité embarqué (`notification.list`).
-export const SAVE_SCHEMA_VERSION = 8;
+// 9 : premiers pas (`tutorial`).
+// 10 : stats de métier sur 0..200 (au lieu de 0..20).
+// 11 : composants au grain fin (`COMPONENT_GRAIN`).
+export const SAVE_SCHEMA_VERSION = 11;
 
 // Slots manuels exposés au joueur (wireframe §4 : 3 slots).
 export const MANUAL_SLOT_IDS = ["slot_1", "slot_2", "slot_3"] as const;
@@ -219,6 +225,18 @@ export const migrations: Record<
     ...state,
     notification: state.notification ?? { list: [] },
   }),
+  // 8 → 9 : premiers pas. Une partie d'avant n'a pas besoin du tutoriel ;
+  // sans ce défaut, l'hydratation garderait celui de la partie précédente.
+  8: (state) => ({
+    ...state,
+    tutorial: state.tutorial ?? INACTIVE_TUTORIAL,
+  }),
+  // 9 → 10 : stats sur 0..200. Tout ce qui se compte en points de stat est
+  // multiplié par 10 ; l'équilibrage, lui, ne bouge pas.
+  9: (state) => rescaleStateStats(state),
+  // 10 → 11 : grain fin des composants. Stock, exigences et tailles sont
+  // multipliés par le grain ; l'effort et l'argent ne bougent pas.
+  10: (state) => rescaleStateGrain(state),
 };
 
 /**

@@ -1,4 +1,5 @@
 import {
+  COMPONENT_GRAIN,
   Client,
   Competitor,
   ComponentQuality,
@@ -39,8 +40,10 @@ import {
   addReputation,
   addReputationByType,
   applyContractMalus,
+  recordContractReputation,
   setMoney,
 } from "@/data/redux/companySlice";
+import { getTimeAsDate } from "@/data/utils/time";
 import { MAX_CONTRACT_DIFFICULTY } from "./constant";
 import { pickContractIssuer } from "@/data/utils/competitor";
 import { applyMissedDeadlineShock } from "@/data/utils/morale";
@@ -52,13 +55,54 @@ export const EARLY_DELIVERY_RATIO = 0.7;
 export const EARLY_DELIVERY_BONUS = 1.2;
 /** Réputation perdue quand un contrat dépasse sa deadline sans être livré. */
 export const DEADLINE_REPUTATION_MALUS = -2;
+/**
+ * Réputation que les contrats peuvent rapporter, au plus, par mois de jeu. Une
+ * réputation se bâtit dans la durée : sans plafond, un gros studio enchaînait
+ * assez de livraisons pour atteindre 100 en deux ans. Les produits et les
+ * campagnes n'y sont pas soumis ; les pertes non plus.
+ */
+export const CONTRACT_REPUTATION_PER_MONTH = 1;
+
+// --- Rémunération des contrats ----------------------------------------------
+// Le prix suit le volume (composants demandés), puis la difficulté. La part
+// liée à la difficulté reste modeste : sans quoi, à réputation maximale, un
+// contrat payait ~10× ce que coûte sa production et rendait les produits
+// inutiles (cf. la simulation d'équilibre, `npm run sim`).
+/** Acompte : fixe, puis par composant, puis par point de complexité. */
+export const DEPOSIT_BASE = 150;
+export const DEPOSIT_PER_COMPONENT: [number, number] = [15, 25];
+export const DEPOSIT_PER_COMPLEXITY: [number, number] = [1, 1.5];
+/** Solde (avant qualité et bonus d'avance) : mêmes trois parts. */
+export const ADDITIONAL_BASE = 600;
+export const ADDITIONAL_PER_COMPONENT: [number, number] = [50, 70];
+export const ADDITIONAL_PER_COMPLEXITY: [number, number] = [2.5, 3.5];
+
+/** Mois de jeu (« AAAA-MM ») : la fenêtre du plafond de réputation. */
+export const gameMonthKey = (time: number): string =>
+  getTimeAsDate(time).format("YYYY-MM");
+
+/**
+ * Réputation qu'un contrat livré à `time` peut encore rapporter, compte tenu
+ * de ce que les contrats ont déjà rapporté ce mois-ci.
+ */
+export const contractReputationAllowance = (
+  already: { month: string; gained: number } | undefined,
+  time: number,
+): number => {
+  const gained = already?.month === gameMonthKey(time) ? already.gained : 0;
+  return Math.max(0, CONTRACT_REPUTATION_PER_MONTH - gained);
+};
+
+/** Tirage uniforme arrondi dans une fourchette de coefficients. */
+const priceShare = (amount: number, [min, max]: [number, number]): number =>
+  Math.round(amount * (min + Math.random() * (max - min)));
 
 // --- Calibrage temporel des contrats ---------------------------------------
 // Charge de travail d'un composant pour un développeur seul et correctement
-// staffé : PRODUCTION_THRESHOLD / ~14 points par heure ≈ 110 h de jeu. Un
-// contrat de difficulté moyenne demande ~13 composants, soit ~2 mois en solo —
+// staffé : PRODUCTION_THRESHOLD / ~140 points par heure ≈ 22 h de jeu. Un
+// contrat de difficulté moyenne demande ~65 composants, soit ~2 mois en solo —
 // et nettement moins dès qu'on met plusieurs profils dessus.
-export const CONTRACT_HOURS_PER_COMPONENT = 110;
+export const CONTRACT_HOURS_PER_COMPONENT = 110 / COMPONENT_GRAIN;
 /** Marge (en %) ajoutée par le client à l'estimation solo, tirée au hasard. */
 export const CONTRACT_DEADLINE_MIN_MARGIN = 120;
 export const CONTRACT_DEADLINE_MAX_MARGIN = 160;
@@ -93,7 +137,7 @@ const requirementsForType = (
     Math.max(
       1,
       Math.round((difficulty / 10) * multiplier) + randomIntFromInterval(1, 3),
-    );
+    ) * COMPONENT_GRAIN;
   const minQuality = minQualityForDifficulty(difficulty);
 
   switch (contractType) {
@@ -158,7 +202,9 @@ export const generateNewContract = (
 
     let requirements = requirementsForType(taskType, taskDifficulty);
     let totalQty = totalRequirementQuantity(requirements);
-    let complexity = totalQty * taskDifficulty;
+    // Prix calés sur l'effort (unités de travail), pas sur le grain.
+    const workUnits = totalQty / COMPONENT_GRAIN;
+    let complexity = workUnits * taskDifficulty;
     // Le délai suit la charge réelle du contrat plutôt qu'un tirage 1-8
     // semaines sans rapport avec le volume de composants demandé.
     let time = contractDeadlineHours(
@@ -170,9 +216,13 @@ export const generateNewContract = (
     );
 
     let priceDeposit =
-      150 + randomIntFromInterval(complexity * 6, complexity * 9);
+      DEPOSIT_BASE +
+      priceShare(workUnits, DEPOSIT_PER_COMPONENT) +
+      priceShare(complexity, DEPOSIT_PER_COMPLEXITY);
     let priceAdditional =
-      600 + randomIntFromInterval(complexity * 22, complexity * 28);
+      ADDITIONAL_BASE +
+      priceShare(workUnits, ADDITIONAL_PER_COMPONENT) +
+      priceShare(complexity, ADDITIONAL_PER_COMPLEXITY);
     let priceMalus = randomIntFromInterval(priceDeposit * 2, priceDeposit * 3);
 
     const returning =
@@ -294,11 +344,27 @@ export const deliverContract =
       state.engine.time,
     );
 
+    // Un travail bâclé coûte toujours sa réputation ; un bon travail n'en
+    // rapporte que dans la limite du mois (cf. CONTRACT_REPUTATION_PER_MONTH).
+    const time = state.engine.time;
+    const applied =
+      reputationGain > 0
+        ? Math.min(
+            reputationGain,
+            contractReputationAllowance(state.company.contractReputation, time),
+          )
+        : reputationGain;
+
     dispatch(removeComponents(consumed.map((c) => c.id)));
     dispatch(setMoney(state.company.money + reward));
-    dispatch(addReputation(reputationGain));
+    if (applied !== 0) dispatch(addReputation(applied));
+    if (applied > 0) {
+      dispatch(
+        recordContractReputation({ month: gameMonthKey(time), gained: applied }),
+      );
+    }
 
-    if (reputationGain > 0 && consumed.length > 0) {
+    if (applied > 0 && consumed.length > 0) {
       const counts: Record<ComponentType, number> = {
         [ComponentType.CODE]: 0,
         [ComponentType.VISUEL]: 0,
@@ -308,10 +374,7 @@ export const deliverContract =
       const total = consumed.length;
       for (const t of Object.values(ComponentType)) {
         if (counts[t] === 0) continue;
-        const share = Math.max(
-          1,
-          Math.round((reputationGain * counts[t]) / total),
-        );
+        const share = Math.max(1, Math.round((applied * counts[t]) / total));
         dispatch(addReputationByType({ type: t, delta: share }));
       }
     }
@@ -353,11 +416,18 @@ export const deliverContract =
     }
 
     dispatch(removeTask(contractId));
+    const reputationNote =
+      applied > 0
+        ? ` +${applied} réputation.`
+        : applied < 0
+          ? ` ${applied} réputation (travail bâclé).`
+          : "";
     dispatch(
       pushNotification({
-        message: early
-          ? `Contrat « ${contract.name} » livré en avance (+20% bonus) !`
-          : `Contrat « ${contract.name} » livré.`,
+        message:
+          (early
+            ? `Contrat « ${contract.name} » livré en avance (+20% bonus) !`
+            : `Contrat « ${contract.name} » livré.`) + reputationNote,
         type: "success",
       }),
     );

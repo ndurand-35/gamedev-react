@@ -6,6 +6,7 @@ import competitorReducer, {
   ensureCompetitor,
   initializeCompetitorState,
 } from "@/data/redux/competitorSlice";
+import { COMPETITOR_ROSTER_MAX } from "@/data/utils/competitor";
 
 const acme = { id: "acme", name: "Acme", image: "" };
 const bravo = { id: "bravo", name: "Bravo", image: "" };
@@ -27,6 +28,19 @@ describe("competitorSlice", () => {
       ensureCompetitor({ ...acme, name: "Acme renommé" }),
     );
     expect(state.roster).toEqual([acme, bravo]);
+  });
+
+  it("au-delà du plafond, un inconnu reste de passage", () => {
+    const studio = (i: number) => ({ id: `s${i}`, name: `S${i}`, image: "" });
+    let state = competitorReducer(
+      undefined,
+      initializeCompetitorState(
+        Array.from({ length: COMPETITOR_ROSTER_MAX }, (_, i) => studio(i)),
+      ),
+    );
+    state = competitorReducer(state, ensureCompetitor(bravo));
+    expect(state.roster).toHaveLength(COMPETITOR_ROSTER_MAX);
+    expect(state.roster.some((c) => c.id === "bravo")).toBe(false);
   });
 
   it("numérote les produits lancés et retire ceux en fin de vie", () => {

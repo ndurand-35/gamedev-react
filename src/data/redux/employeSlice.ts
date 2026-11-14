@@ -10,11 +10,25 @@ import {
 } from "@/data/interface";
 import { DEFAULT_EMPLOYE_STATE } from "@/data/utils/constant";
 
+/**
+ * Entretien mené par le fondateur : il l'occupe (pas de production) pendant
+ * `INTERVIEW_HOURS`, écran bloqué. Le profil est révélé à `endAt`.
+ */
+export interface InterviewState {
+  candidateId: number;
+  startAt: number;
+  endAt: number;
+  /** Vitesse de jeu à rétablir une fois l'entretien fini. */
+  speedBefore: number;
+}
+
 export interface EmployeState {
   employeList: Person[];
   candidateList: Person[];
   nextEmployeId: number;
   nextCandidateId: number;
+  /** Entretien en cours, ou null. Absent des sauvegardes d'avant. */
+  interview?: InterviewState | null;
 }
 
 const initialState: EmployeState = {
@@ -22,6 +36,7 @@ const initialState: EmployeState = {
   candidateList: [],
   nextEmployeId: 2,
   nextCandidateId: 1,
+  interview: null,
 };
 
 export const employeSlice = createSlice({
@@ -36,6 +51,13 @@ export const employeSlice = createSlice({
       state.candidateList = DEFAULT_EMPLOYE_STATE.candidateList;
       state.nextEmployeId = 2;
       state.nextCandidateId = 1;
+      state.interview = null;
+    },
+    beginInterview(state, action: PayloadAction<InterviewState>) {
+      state.interview = action.payload;
+    },
+    endInterview(state) {
+      state.interview = null;
     },
     fired(state, action: PayloadAction<number>) {
       if (action.payload === 1) return;
@@ -252,7 +274,11 @@ export const employeSlice = createSlice({
         Array<{
           employeId: number;
           progressDelta: number;
-          completed?: { statKey: keyof ProductionPerson; newValue: number };
+          completed?: {
+            statKey: keyof ProductionPerson;
+            newValue: number;
+            expectedSalary?: number;
+          };
           finished?: boolean;
         }>
       >,
@@ -267,6 +293,10 @@ export const employeSlice = createSlice({
           (employe[update.completed.statKey] as number) =
             update.completed.newValue;
           employe.trainingProgress = 0;
+          // Mieux formé, il se sait plus cher sur le marché.
+          if (update.completed.expectedSalary !== undefined) {
+            employe.expectedSalary = update.completed.expectedSalary;
+          }
         } else {
           employe.trainingProgress = current + update.progressDelta;
         }
@@ -308,6 +338,8 @@ export const {
   hireWithOffer,
   revealCandidate,
   rejectCandidate,
+  beginInterview,
+  endInterview,
   setSalary,
   setRaiseCooldown,
   setBonusCooldown,

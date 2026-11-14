@@ -52,7 +52,7 @@ export const BuildingPicker: FC<BuildingPickerProps> = ({
         );
       })}
       <li className="mt-2">
-        <Link to="/game/building/buy" className="text-primary">
+        <Link to="/game/building/buy" className="link font-bold">
           <Plus height={16} width={16} />
           Acheter un bâtiment
         </Link>

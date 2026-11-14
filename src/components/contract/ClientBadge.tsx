@@ -53,7 +53,7 @@ export const ClientBadge: FC<ClientBadgeProps> = ({
       {loyaltyBonus > 0 && (
         <span
           className="badge badge-xs badge-outline badge-success tabular-nums"
-          title="Prime de fidélité déjà comprise dans l'acompte et le solde"
+          title="Prime de fidélité"
         >
           +{Math.round(loyaltyBonus * 100)} %
         </span>

@@ -24,21 +24,28 @@ type IconComponent = typeof CoffeeCup;
 
 /** Classes de fond / bordure par type, écrites en dur pour rester purgeables. */
 const COMPONENT_SOFT_CLASS: Record<ComponentType, string> = {
-  [ComponentType.CODE]: "bg-primary/15 border-primary/50",
-  [ComponentType.VISUEL]: "bg-secondary/15 border-secondary/50",
-  [ComponentType.UX]: "bg-accent/15 border-accent/50",
+  [ComponentType.CODE]: "bg-code/15 border-code/50",
+  [ComponentType.VISUEL]: "bg-visuel/15 border-visuel/50",
+  [ComponentType.UX]: "bg-ux/15 border-ux/50",
 };
 
 const COMPONENT_ACCENT_BORDER: Record<ComponentType, string> = {
-  [ComponentType.CODE]: "border-l-primary",
-  [ComponentType.VISUEL]: "border-l-secondary",
-  [ComponentType.UX]: "border-l-accent",
+  [ComponentType.CODE]: "border-l-code",
+  [ComponentType.VISUEL]: "border-l-visuel",
+  [ComponentType.UX]: "border-l-ux",
+};
+
+/** Remplissage plein des barres « jouet » (cartes de l'Accueil). */
+const COMPONENT_FILL_CLASS: Record<ComponentType, string> = {
+  [ComponentType.CODE]: "bg-code",
+  [ComponentType.VISUEL]: "bg-visuel",
+  [ComponentType.UX]: "bg-ux",
 };
 
 const COMPONENT_PROGRESS_CLASS: Record<ComponentType, string> = {
-  [ComponentType.CODE]: "progress-primary",
-  [ComponentType.VISUEL]: "progress-secondary",
-  [ComponentType.UX]: "progress-accent",
+  [ComponentType.CODE]: "progress-code",
+  [ComponentType.VISUEL]: "progress-visuel",
+  [ComponentType.UX]: "progress-ux",
 };
 
 export interface EmployeActivity {
@@ -54,6 +61,8 @@ export interface EmployeActivity {
   accentBorderClass: string;
   /** Barre d'avancement de la tâche (même teinte que le type). */
   progressClass: string;
+  /** Fond plein de la barre « jouet », même teinte. */
+  fillClass: string;
 }
 
 const IDLE_ACTIVITY: EmployeActivity = {
@@ -64,6 +73,7 @@ const IDLE_ACTIVITY: EmployeActivity = {
   softClass: "bg-base-content/5 border-base-content/20",
   accentBorderClass: "border-l-base-content/20",
   progressClass: "",
+  fillClass: "bg-base-content/40",
 };
 
 /**
@@ -85,6 +95,7 @@ export const employeActivity = (emp: Employe): EmployeActivity => {
       softClass: COMPONENT_SOFT_CLASS[assigned],
       accentBorderClass: COMPONENT_ACCENT_BORDER[assigned],
       progressClass: COMPONENT_PROGRESS_CLASS[assigned],
+      fillClass: COMPONENT_FILL_CLASS[assigned],
     };
   }
 
@@ -100,6 +111,7 @@ export const employeActivity = (emp: Employe): EmployeActivity => {
       softClass: COMPONENT_SOFT_CLASS[training],
       accentBorderClass: COMPONENT_ACCENT_BORDER[training],
       progressClass: COMPONENT_PROGRESS_CLASS[training],
+      fillClass: COMPONENT_FILL_CLASS[training],
     };
   }
 
@@ -114,6 +126,7 @@ export const employeActivity = (emp: Employe): EmployeActivity => {
     softClass: "bg-base-content/5 border-base-content/20",
     accentBorderClass: "border-l-base-content/20",
     progressClass: "",
+    fillClass: "bg-base-content/40",
   };
 };
 
@@ -179,8 +192,16 @@ interface TaskProgressBarProps {
   activity: EmployeActivity;
   /** Avancement 0..1 (cf. `employeTaskProgress`). */
   ratio: number;
-  /** `full` : libellé + pourcentage au-dessus de la barre. `bar` : la barre seule. */
-  variant?: "full" | "bar";
+  /**
+   * `full` : libellé + pourcentage au-dessus de la barre. `bar` : la barre
+   * seule. `toy` : activité + pourcentage, barre épaisse hachurée (cartes).
+   */
+  variant?: "full" | "bar" | "toy";
+  /**
+   * Change à chaque tâche achevée (id du composant sorti) : la barre clignote
+   * pleine avant de repartir. Absent : pas d'effet.
+   */
+  flashKey?: number;
 }
 
 /**
@@ -192,8 +213,41 @@ export const TaskProgressBar = ({
   activity,
   ratio,
   variant = "full",
+  flashKey,
 }: TaskProgressBarProps): ReactElement => {
   const pct = Math.round(ratio * 100);
+  if (variant === "toy") {
+    return (
+      <span className="block w-full">
+        <span className="mb-1 flex items-center justify-between gap-2 text-xs font-extrabold">
+          <span className={`truncate ${activity.textClass}`}>
+            {activity.label}
+          </span>
+          <span className="tabular-nums">{pct} %</span>
+        </span>
+        <span
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Avancement ${pct} %`}
+          className="relative block h-4 overflow-hidden rounded-full border-[2.5px] border-ink bg-base-300"
+        >
+          <span
+            className={`stripes block h-full border-ink transition-[width] duration-300 ${activity.fillClass} ${pct > 0 && pct < 100 ? "border-r-[2.5px]" : ""}`}
+            style={{ width: `${pct}%` }}
+          />
+          {flashKey != null && (
+            <span
+              key={flashKey}
+              aria-hidden
+              className={`production-bar-flash stripes pointer-events-none absolute inset-0 ${activity.fillClass}`}
+            />
+          )}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="block w-full">
       {variant === "full" && (
@@ -202,12 +256,23 @@ export const TaskProgressBar = ({
           <span className="tabular-nums">{pct} %</span>
         </span>
       )}
-      <progress
-        className={`progress ${activity.progressClass} h-1.5 w-full`}
-        value={pct}
-        max={100}
-        aria-label={`Avancement ${pct} %`}
-      />
+      <span className="relative block">
+        <progress
+          className={`progress ${activity.progressClass} block h-1.5 w-full`}
+          value={pct}
+          max={100}
+          aria-label={`Avancement ${pct} %`}
+        />
+        {/* Tâche achevée : la barre pleine s'éteint au-dessus de la nouvelle,
+            repartie de zéro. La `key` relance l'effet à chaque composant. */}
+        {flashKey != null && (
+          <span
+            key={flashKey}
+            aria-hidden
+            className={`production-bar-flash pointer-events-none absolute inset-0 rounded-full bg-current ${activity.textClass}`}
+          />
+        )}
+      </span>
     </span>
   );
 };

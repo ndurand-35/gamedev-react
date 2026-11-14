@@ -8,6 +8,7 @@ import {
   Task,
 } from "@/data/interface";
 import { generateNewContract } from "@/data/utils/task";
+import { firstContract } from "@/data/utils/firstContract";
 import { clampRelation } from "@/data/utils/client";
 import { DEFAULT_TASK_STATE } from "@/data/utils/constant";
 
@@ -62,7 +63,13 @@ export const taskSlice = createSlice({
           ensureClients(state),
           action.payload.competitors ?? [],
         );
-        state.availableContractList = contracts.map((c) => ({
+        // Tant que le studio n'a rien signé, le premier contrat — toujours le
+        // même, couvert par le stock de départ — ouvre la liste.
+        const neverSigned =
+          state.taskList.length === 0 &&
+          Object.keys(ensureClients(state)).length === 0;
+        const lot = neverSigned ? [firstContract(), ...contracts] : contracts;
+        state.availableContractList = lot.map((c) => ({
           ...c,
           id: state.nextContractId++,
         }));

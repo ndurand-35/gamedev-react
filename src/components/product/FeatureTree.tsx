@@ -35,25 +35,25 @@ const BRANCH_STYLE: Record<
   { text: string; border: string; fill: string; line: string; ring: string }
 > = {
   [ComponentType.CODE]: {
-    text: "text-primary",
-    border: "border-primary",
-    fill: "bg-primary/15",
-    line: "bg-primary/40",
-    ring: "ring-primary",
+    text: "text-code",
+    border: "border-code",
+    fill: "bg-code/15",
+    line: "bg-code/40",
+    ring: "ring-code",
   },
   [ComponentType.VISUEL]: {
-    text: "text-secondary",
-    border: "border-secondary",
-    fill: "bg-secondary/15",
-    line: "bg-secondary/40",
-    ring: "ring-secondary",
+    text: "text-visuel",
+    border: "border-visuel",
+    fill: "bg-visuel/15",
+    line: "bg-visuel/40",
+    ring: "ring-visuel",
   },
   [ComponentType.UX]: {
-    text: "text-accent",
-    border: "border-accent",
-    fill: "bg-accent/15",
-    line: "bg-accent/40",
-    ring: "ring-accent",
+    text: "text-ux",
+    border: "border-ux",
+    fill: "bg-ux/15",
+    line: "bg-ux/40",
+    ring: "ring-ux",
   },
 };
 
@@ -154,7 +154,8 @@ const NodeButton: FC<NodeButtonProps> = ({
         </span>
         <span
           className={
-            "text-sm font-medium leading-tight flex-1" + (mystery ? " italic" : "")
+            "text-sm font-medium leading-tight flex-1" +
+            (mystery ? " italic" : "")
           }
         >
           {label}

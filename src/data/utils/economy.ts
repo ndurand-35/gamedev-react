@@ -2,6 +2,8 @@
 // Centralisées ici pour préparer le tuning futur (pas de magic numbers inline
 // dispersés dans la facturation ou les slices).
 
+import { MAX_STAT_POSSIBLE, STAT_SCALE } from "@/data/interface";
+
 // Obsolescence du revenu produit
 export const REVENUE_DECAY_GRACE_MONTHS = 3; // mois à 100 % après le lancement
 export const REVENUE_DECAY_RATE = 0.08; // -8 % / mois une fois le palier passé
@@ -66,12 +68,14 @@ export const evaluateBankruptcy = (
 // Perte de progression de base d'un « Bug critique » (alignée sur events.ts).
 export const BUG_BASE_PROGRESSION_LOSS = 10;
 
-// Plafond du stat de détection par testeur (cf. MAX_STAT_POSSIBLE = 20).
-const QA_STAT_CAP = 20;
+// Plafond du stat de détection par testeur.
+const QA_STAT_CAP = MAX_STAT_POSSIBLE;
 
-export const QA_CANCEL_PER_POINT = 0.01; // +1 % d'annulation par point de détection
+// +1 % d'annulation par tranche de 10 points de détection (STAT_SCALE).
+export const QA_CANCEL_PER_POINT = 0.01 / STAT_SCALE;
 export const QA_MAX_CANCEL_PROB = 0.5; // jamais plus de 50 % d'annulation
-export const QA_REDUCTION_PER_POINT = 0.02; // -2 % de perte par point de détection
+// -2 % de perte par tranche de 10 points de détection.
+export const QA_REDUCTION_PER_POINT = 0.02 / STAT_SCALE;
 export const QA_MAX_LOSS_REDUCTION = 0.75; // au mieux : -75 % de l'impact
 
 /** Détection QA agrégée d'une liste de testeurs (somme de bugDetectionStat). */
@@ -176,7 +180,7 @@ export interface ActiveCampaign {
   marketerId?: number;
 }
 
-// Efficacité 0.25..1 dérivée des stats du marketeur (chaque stat /20). Plancher
+// Efficacité 0.25..1 dérivée des stats du marketeur (chaque stat /200). Plancher
 // à 25 % pour qu'un marketeur faible produise tout de même un effet visible.
 export const CAMPAIGN_MIN_EFFECTIVENESS = 0.25;
 

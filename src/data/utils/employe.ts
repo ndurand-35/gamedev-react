@@ -6,8 +6,11 @@ import {
   PersonType,
   ProductionPerson,
   ProductionStatKey,
+  MAX_STAT_POSSIBLE,
   QA,
   STAT_KEY_BY_TYPE,
+  STAT_SCALE,
+  Seniority,
   Specialty,
 } from "@/data/interface";
 import { SexType, faker } from "@faker-js/faker";
@@ -20,8 +23,65 @@ import {
   Temperament,
   computeExpectedSalary,
 } from "@/data/utils/recruitment";
+import { rollTraits } from "@/data/utils/traits";
+import { rollStatRangeOffsets } from "@/data/utils/candidateStats";
 
-export const MAX_STAT_POSSIBLE = 20;
+// Plafond défini avec l'échelle des stats (interface) ; réexporté pour les
+// imports existants.
+export { MAX_STAT_POSSIBLE };
+
+/** Tirage uniforme d'une stat entre deux bornes exprimées sur l'échelle 0..20. */
+const rollScaled = ([min, max]: [number, number]): number =>
+  randomIntFromInterval(min * STAT_SCALE, max * STAT_SCALE);
+
+// ── Profils par séniorité (bornes en dizaines de points, cf. STAT_SCALE) ────
+//   focus      : stat de la spécialité d'un spécialiste de production ;
+//   fullstack  : chacune des trois stats d'un polyvalent ;
+//   off        : stats hors spécialité d'un spécialiste ;
+//   dominant / secondary : les deux stats métier d'un QA ou d'un marketeur ;
+//   growth     : marge entre le niveau de départ et le potentiel (stat max),
+//                tirée une fois par candidat et commune à toutes ses stats.
+// Un junior démarre sous le fondateur spécialisé (100) mais peut aller loin ;
+// un senior est au niveau des anciens spécialistes, presque à son plafond.
+interface SeniorityProfile {
+  focus: [number, number];
+  fullstack: [number, number];
+  off: [number, number];
+  dominant: [number, number];
+  secondary: [number, number];
+  growth: [number, number];
+}
+
+export const SENIORITY_PROFILE: Record<Seniority, SeniorityProfile> = {
+  junior: {
+    focus: [5, 9],
+    fullstack: [4, 7],
+    off: [1, 4],
+    dominant: [5, 9],
+    secondary: [3, 6],
+    growth: [8, 15],
+  },
+  confirme: {
+    focus: [9, 14],
+    fullstack: [7, 11],
+    off: [2, 6],
+    dominant: [9, 14],
+    secondary: [5, 10],
+    growth: [5, 10],
+  },
+  senior: {
+    focus: [14, 19],
+    fullstack: [10, 14],
+    off: [3, 8],
+    dominant: [14, 19],
+    secondary: [7, 13],
+    growth: [1, 5],
+  },
+};
+
+/** Potentiel d'une stat : son niveau de départ plus la marge du candidat. */
+const potentialOf = (stat: number, growth: number): number =>
+  Math.min(MAX_STAT_POSSIBLE, Math.max(stat, stat + growth));
 
 const pickSpecialty = (): Specialty => {
   const r = Math.random();
@@ -30,91 +90,103 @@ const pickSpecialty = (): Specialty => {
   return types[Math.floor(Math.random() * types.length)] as ComponentType;
 };
 
-// Un spécialiste est fort (14..20) sur la stat de sa tâche, faible ailleurs ;
-// un fullstack est moyen partout (7..13).
-const rollStat = (specialty: Specialty, statKey: ProductionStatKey): number => {
-  if (specialty === "FULLSTACK") {
-    return randomIntFromInterval(7, 13);
-  }
+// Un spécialiste est fort sur la stat de sa tâche, faible ailleurs ; un
+// fullstack est moyen partout. Les bornes dépendent de la séniorité.
+const rollStat = (
+  profile: SeniorityProfile,
+  specialty: Specialty,
+  statKey: ProductionStatKey,
+): number => {
+  if (specialty === "FULLSTACK") return rollScaled(profile.fullstack);
   if (STAT_KEY_BY_TYPE[specialty as ComponentType] === statKey) {
-    return randomIntFromInterval(14, MAX_STAT_POSSIBLE);
+    return rollScaled(profile.focus);
   }
-  return randomIntFromInterval(1, 8);
+  return rollScaled(profile.off);
 };
 
-const salaryForSpecialty = (specialty: Specialty): number => {
-  if (specialty === "FULLSTACK") return randomIntFromInterval(1400, 2200);
-  return randomIntFromInterval(1600, 2600);
-};
-
-// Attributs communs à tout candidat (identité, salaire, moral de départ).
-const baseCandidate = (salary: number): Person => {
+// Attributs communs à tout candidat (identité, moral de départ). Le salaire
+// est fixé ensuite par `enrichCandidate`, d'après le niveau tiré.
+const baseCandidate = (seniority: Seniority): Person => {
   const sex = faker.person.sex();
   return {
     id: 0, // assigné par le slice via nextCandidateId
     sex,
     firstName: faker.person.firstName(sex as SexType),
     lastName: faker.person.lastName(sex as SexType),
-    salary,
+    salary: 0,
     personType: PersonType.PROD,
     morale: DEFAULT_MORALE + randomIntFromInterval(-10, 10),
+    seniority,
   };
 };
 
 const generateProductionCandidate = (
+  seniority: Seniority,
   specialty: Specialty = pickSpecialty(),
 ): ProductionPerson => {
+  const profile = SENIORITY_PROFILE[seniority];
+  const growth = rollScaled(profile.growth);
+  const codeStat = rollStat(profile, specialty, "codeStat");
+  const visualStat = rollStat(profile, specialty, "visualStat");
+  const uxStat = rollStat(profile, specialty, "uxStat");
   return {
-    ...baseCandidate(salaryForSpecialty(specialty)),
+    ...baseCandidate(seniority),
     personType: PersonType.PROD,
     specialty,
-    codeStat: rollStat(specialty, "codeStat"),
-    codeMaxStat: MAX_STAT_POSSIBLE,
-    visualStat: rollStat(specialty, "visualStat"),
-    visualMaxStat: MAX_STAT_POSSIBLE,
-    uxStat: rollStat(specialty, "uxStat"),
-    uxMaxStat: MAX_STAT_POSSIBLE,
+    codeStat,
+    codeMaxStat: potentialOf(codeStat, growth),
+    visualStat,
+    visualMaxStat: potentialOf(visualStat, growth),
+    uxStat,
+    uxMaxStat: potentialOf(uxStat, growth),
   };
 };
 
-// Un stat « métier » (QA / Marketing) : 8..20, l'un des deux étant la spécialité
-// dominante (14..20) pour donner du relief aux candidats.
-const rollRoleStat = (dominant: boolean): number =>
-  dominant
-    ? randomIntFromInterval(14, MAX_STAT_POSSIBLE)
-    : randomIntFromInterval(6, 13);
+// Deux stats « métier » (QA / Marketing), l'une étant la spécialité dominante
+// pour donner du relief aux candidats.
+const rollRoleStat = (profile: SeniorityProfile, dominant: boolean): number =>
+  rollScaled(dominant ? profile.dominant : profile.secondary);
 
-const generateQaCandidate = (): QA => {
+const generateQaCandidate = (seniority: Seniority): QA => {
+  const profile = SENIORITY_PROFILE[seniority];
+  const growth = rollScaled(profile.growth);
   const detectionDominant = Math.random() < 0.6;
+  const testStat = rollRoleStat(profile, !detectionDominant);
+  const bugDetectionStat = rollRoleStat(profile, detectionDominant);
   return {
-    ...baseCandidate(randomIntFromInterval(1500, 2400)),
+    ...baseCandidate(seniority),
     personType: PersonType.QA,
-    testStat: rollRoleStat(!detectionDominant),
-    testMaxStat: MAX_STAT_POSSIBLE,
-    bugDetectionStat: rollRoleStat(detectionDominant),
-    bugDetectionMaxStat: MAX_STAT_POSSIBLE,
+    testStat,
+    testMaxStat: potentialOf(testStat, growth),
+    bugDetectionStat,
+    bugDetectionMaxStat: potentialOf(bugDetectionStat, growth),
   };
 };
 
-const generateMarketingCandidate = (): Marketing => {
+const generateMarketingCandidate = (seniority: Seniority): Marketing => {
+  const profile = SENIORITY_PROFILE[seniority];
+  const growth = rollScaled(profile.growth);
   const commDominant = Math.random() < 0.5;
+  const communicationStat = rollRoleStat(profile, commDominant);
+  const campaignManagementStat = rollRoleStat(profile, !commDominant);
   return {
-    ...baseCandidate(randomIntFromInterval(1500, 2400)),
+    ...baseCandidate(seniority),
     personType: PersonType.MARKETING,
-    communicationStat: rollRoleStat(commDominant),
-    communicationMaxStat: MAX_STAT_POSSIBLE,
-    campaignManagementStat: rollRoleStat(!commDominant),
-    campaignManagementMaxStat: MAX_STAT_POSSIBLE,
+    communicationStat,
+    communicationMaxStat: potentialOf(communicationStat, growth),
+    campaignManagementStat,
+    campaignManagementMaxStat: potentialOf(campaignManagementStat, growth),
   };
 };
 
-// Profil brut correspondant au poste commandé par le joueur : la spécialité
-// n'est plus tirée au sort côté production, c'est la commande qui la fixe.
-// `pickSpecialty` ne sert donc plus que de repli (poste "Polyvalent" exclu).
-const generateCandidateForRole = (role: SearchRole): Person => {
-  if (role === PersonType.QA) return generateQaCandidate();
-  if (role === PersonType.MARKETING) return generateMarketingCandidate();
-  return generateProductionCandidate(role as Specialty);
+// Profil brut correspondant au poste et au niveau commandés par le joueur.
+const generateCandidateForRole = (
+  role: SearchRole,
+  seniority: Seniority,
+): Person => {
+  if (role === PersonType.QA) return generateQaCandidate(seniority);
+  if (role === PersonType.MARKETING) return generateMarketingCandidate(seniority);
+  return generateProductionCandidate(seniority, role as Specialty);
 };
 
 const pickTemperament = (): Temperament =>
@@ -141,7 +213,9 @@ const enrichCandidate = (
     expectedSalary,
     salary: expectedSalary,
     temperament: pickTemperament(),
+    traits: rollTraits(candidate.personType),
     revealedStats: false,
+    statRangeOffsets: rollStatRangeOffsets(candidate),
   };
 };
 
@@ -157,6 +231,7 @@ export const generateCandidatesForRole = (
   reputation: number,
   /** Indice des salaires du marché à l'heure de la recherche (1 en 1970). */
   salaryIndex: number = 1,
+  seniority: Seniority = "junior",
 ): Person[] => {
   const n = Math.max(
     SEARCH_MIN_CANDIDATES,
@@ -165,7 +240,11 @@ export const generateCandidatesForRole = (
   const generated: Person[] = [];
   for (let i = 0; i < n; i++) {
     generated.push(
-      enrichCandidate(generateCandidateForRole(role), reputation, salaryIndex),
+      enrichCandidate(
+        generateCandidateForRole(role, seniority),
+        reputation,
+        salaryIndex,
+      ),
     );
   }
   return generated;

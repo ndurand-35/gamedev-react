@@ -26,7 +26,7 @@ export const WorkshopCard: FC<WorkshopCardProps> = ({ product: p, onOpen }) => {
   const features = productFeatures(p);
   const size = productSize(p);
   return (
-    <div className="card bg-base-100 shadow-md border border-base-300">
+    <div className="card toy-frame">
       <div className="p-4 space-y-3">
         <div>
           <button

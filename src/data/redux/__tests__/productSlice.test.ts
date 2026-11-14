@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COMPONENT_GRAIN as G,
   ComponentQuality,
   ComponentType,
   ProductGenre,
@@ -21,7 +22,7 @@ import { UPDATE_REWIND_MONTHS } from "@/data/utils/product";
 const consumed = (type: ComponentType, n: number, quality: ComponentQuality) =>
   Array.from({ length: n }, (_, i) => ({ id: i + 1, type, quality }));
 
-/** Outil réduit à son socle : 4 Code, 1 Visuel, 1 UX. */
+/** Outil réduit à son socle : 4 Code, 1 Visuel, 1 UX (× grain). */
 const created = () =>
   productReducer(
     undefined,
@@ -38,7 +39,7 @@ const readyToLaunch = () => {
     state,
     investInProduct({
       productId: 1,
-      consumed: consumed(ComponentType.CODE, 4, ComponentQuality.BON),
+      consumed: consumed(ComponentType.CODE, 4 * G, ComponentQuality.BON),
     }),
   );
   state = productReducer(
@@ -46,8 +47,8 @@ const readyToLaunch = () => {
     investInProduct({
       productId: 1,
       consumed: [
-        ...consumed(ComponentType.VISUEL, 1, ComponentQuality.BON),
-        ...consumed(ComponentType.UX, 1, ComponentQuality.BON),
+        ...consumed(ComponentType.VISUEL, 1 * G, ComponentQuality.BON),
+        ...consumed(ComponentType.UX, 1 * G, ComponentQuality.BON),
       ],
     }),
   );
@@ -114,7 +115,7 @@ describe("productSlice", () => {
         consumed: consumed(ComponentType.CODE, 2, ComponentQuality.EXCELLENT),
       }),
     );
-    expect(state.products[0].invested[ComponentType.CODE]).toBe(4);
+    expect(state.products[0].invested[ComponentType.CODE]).toBe(4 * G);
 
     const automation = FEATURE_BY_ID.automation; // 5 Code, 1 Visuel, 2 UX = 8
     const later = UPDATE_REWIND_MONTHS * 30 * 24 * 2; // bien après un rappel plein
@@ -128,25 +129,25 @@ describe("productSlice", () => {
         productId: 1,
         featureId: automation.id,
         consumed: [
-          ...consumed(ComponentType.CODE, 5, ComponentQuality.EXCELLENT),
-          ...consumed(ComponentType.VISUEL, 1, ComponentQuality.EXCELLENT),
-          ...consumed(ComponentType.UX, 2, ComponentQuality.EXCELLENT),
+          ...consumed(ComponentType.CODE, 5 * G, ComponentQuality.EXCELLENT),
+          ...consumed(ComponentType.VISUEL, 1 * G, ComponentQuality.EXCELLENT),
+          ...consumed(ComponentType.UX, 2 * G, ComponentQuality.EXCELLENT),
         ],
         time: later,
       }),
     );
     const [p] = state.products;
     expect(p.features).toEqual(["core_tool", "automation"]);
-    expect(p.requirements[ComponentType.CODE]).toBe(4 + 5);
-    expect(p.invested[ComponentType.CODE]).toBe(4 + 5);
-    expect(p.qualityCount).toBe(6 + 8);
+    expect(p.requirements[ComponentType.CODE]).toBe((4 + 5) * G);
+    expect(p.invested[ComponentType.CODE]).toBe((4 + 5) * G);
+    expect(p.qualityCount).toBe((6 + 8) * G);
     expect(p.bugs).toBe(0);
     expect(p.updates).toBe(1);
     // 8 composants ajoutés sur 6 : 8/6 × 12 mois = 16 mois de rappel, sous
     // les 24 mois écoulés → l'ancre avance de 16 mois depuis 0.
     expect(p.freshAt).toBe(
       Math.round(
-        (UPDATE_REWIND_MONTHS * 30 * 24 * featureCost(automation)) / 6,
+        (UPDATE_REWIND_MONTHS * 30 * 24 * featureCost(automation)) / (6 * G),
       ),
     );
   });

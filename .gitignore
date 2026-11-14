@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Bilans de la simulation d'équilibre (npm run sim)
+sim-output/

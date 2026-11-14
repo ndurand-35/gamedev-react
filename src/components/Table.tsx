@@ -1,6 +1,7 @@
 import {
   HTMLProps,
   ReactElement,
+  ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -43,6 +44,8 @@ interface TableProps<T> {
   rowSelection: RowSelectionState;
   setRowSelection: OnChangeFn<RowSelectionState>;
   action: ReactElement;
+  /** Barre affichée entre l'en-tête et le tableau (ex. actions groupées). */
+  toolbar?: ReactNode;
 }
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -59,6 +62,7 @@ export function MyTable<T>({
   setRowSelection,
   isRowSelectable,
   action,
+  toolbar,
 }: TableProps<T>): ReactElement {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -111,21 +115,28 @@ export function MyTable<T>({
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-row justify-between">
-        <div className="flex flew-row items-center space-x-4">
-          <h1 className="heading-1">{title}</h1>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          {title && (
+            <h1 className="font-display text-2xl font-bold">{title}</h1>
+          )}
           {action}
         </div>
-        <div className="flex flew-row space-x-2">
+        <div className="flex items-center gap-2">
           <DebouncedInput
             value={globalFilter ?? ""}
             onChange={(value) => setGlobalFilter(String(value))}
-            className="input input-sm input-bordered placeholder-base-content/70"
-            placeholder="Chercher"
+            className="input input-sm w-52 rounded-full border-0 bg-white font-semibold [--input-color:transparent] placeholder-base-content/60"
+            placeholder="Rechercher…"
+            aria-label="Rechercher"
           />
           <div className="dropdown dropdown-end">
-            <label tabIndex={0} className="btn btn-sm btn-square">
+            <label
+              tabIndex={0}
+              className="btn btn-ghost btn-sm btn-circle bg-white"
+              aria-label="Filtres"
+            >
               <FilterAlt height={16} width={16} />
             </label>
             <ul
@@ -151,94 +162,102 @@ export function MyTable<T>({
           </div>
         </div>
       </div>
-      <table className="table">
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                return (
-                  <th key={header.id} colSpan={header.colSpan}>
-                    {header.isPlaceholder ? null : (
-                      <div
-                        {...{
-                          className: header.column.getCanSort()
-                            ? "cursor-pointer select-none flex flex-row"
-                            : "",
-                          onClick: header.column.getToggleSortingHandler(),
-                        }}
-                      >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                        {{
-                          asc: <SortUp className="ml-2" />,
-                          desc: <SortDown className="ml-2" />,
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </div>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              className="hover cursor-pointer"
-              onClick={() => row.toggleSelected()}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="flex justify-between items-center gap-2">
-        <span className="flex items-center gap-1">
-          <div>Page</div>
-          <strong>
-            {table.getState().pagination.pageIndex + 1} sur{" "}
-            {table.getPageCount()}
-          </strong>
-        </span>
-        <div className="join">
-          <button
-            className="join-item btn btn-sm"
-            aria-label="Page précédente"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <NavArrowLeft />
-          </button>
-          <button
-            className="join-item btn btn-sm"
-            aria-label="Page suivante"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            <NavArrowRight />
-          </button>
-        </div>
-        <select
-          className="select select-sm select-bordered"
-          value={table.getState().pagination.pageSize}
-          onChange={(e) => {
-            table.setPageSize(Number(e.target.value));
-          }}
-        >
-          {[10, 20, 30, 40, 50].map((pageSize) => (
-            <option key={pageSize} value={pageSize}>
-              Afficher {pageSize}
-            </option>
-          ))}
-        </select>
+      {toolbar}
+      <div className="overflow-x-auto">
+        <table className="table">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <th key={header.id} colSpan={header.colSpan}>
+                      {header.isPlaceholder ? null : (
+                        <div
+                          {...{
+                            className: header.column.getCanSort()
+                              ? "cursor-pointer select-none flex flex-row"
+                              : "",
+                            onClick: header.column.getToggleSortingHandler(),
+                          }}
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                          {{
+                            asc: <SortUp className="ml-2" />,
+                            desc: <SortDown className="ml-2" />,
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                className="cursor-pointer"
+                data-selected={row.getIsSelected() || undefined}
+                onClick={() => row.toggleSelected()}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+      {/* Pagination : seulement quand il y a plus d'une page. */}
+      {table.getPageCount() > 1 && (
+        <div className="flex items-center justify-between gap-2 text-sm font-bold">
+          <span className="flex items-center gap-1">
+            <div>Page</div>
+            <strong>
+              {table.getState().pagination.pageIndex + 1} sur{" "}
+              {table.getPageCount()}
+            </strong>
+          </span>
+          <div className="flex gap-1">
+            <button
+              className="btn btn-ghost btn-sm btn-circle bg-white"
+              aria-label="Page précédente"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <NavArrowLeft />
+            </button>
+            <button
+              className="btn btn-ghost btn-sm btn-circle bg-white"
+              aria-label="Page suivante"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <NavArrowRight />
+            </button>
+          </div>
+          <select
+            className="select select-sm w-auto rounded-full border-0 bg-white [--input-color:transparent]"
+            aria-label="Lignes par page"
+            value={table.getState().pagination.pageSize}
+            onChange={(e) => {
+              table.setPageSize(Number(e.target.value));
+            }}
+          >
+            {[10, 20, 30, 40, 50].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                {pageSize} par page
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }
@@ -277,7 +296,7 @@ function Filter({
             column.setFilterValue((old: [number, number]) => [value, old?.[1]])
           }
           placeholder={`Min ${column.getFacetedMinMaxValues()?.[0] ? `(${column.getFacetedMinMaxValues()?.[0]})` : ""}`}
-          className="input input-sm input-bordered placeholder-base-content/70"
+          className="input input-sm placeholder-base-content/70"
         />
         <DebouncedInput
           type="number"
@@ -288,7 +307,7 @@ function Filter({
             column.setFilterValue((old: [number, number]) => [old?.[0], value])
           }
           placeholder={`Max ${column.getFacetedMinMaxValues()?.[1] ? `(${column.getFacetedMinMaxValues()?.[1]})` : ""}`}
-          className="input input-sm input-bordered placeholder-base-content/70"
+          className="input input-sm placeholder-base-content/70"
         />
       </div>
       <div className="h-1" />
@@ -305,7 +324,7 @@ function Filter({
         value={(columnFilterValue ?? "") as string}
         onChange={(value) => column.setFilterValue(value)}
         placeholder={`${column.columnDef.header} (${column.getFacetedUniqueValues().size})`}
-        className="input input-sm input-bordered"
+        className="input input-sm"
         list={column.id + "list"}
       />
     </div>

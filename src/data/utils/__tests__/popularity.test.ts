@@ -269,8 +269,8 @@ describe("startPromotionThunk / processPromotionTick", () => {
     firstName: "Mia",
     lastName: "K",
     personType: PersonType.MARKETING,
-    communicationStat: 20,
-    campaignManagementStat: 20,
+    communicationStat: 200,
+    campaignManagementStat: 200,
   };
   const stateWith = (over: {
     money?: number;

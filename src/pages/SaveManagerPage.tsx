@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
-import { WarningTriangle, Xmark } from "iconoir-react";
+import { ArrowLeft, WarningTriangle, Xmark } from "iconoir-react";
 
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import {
@@ -32,9 +32,11 @@ interface SaveManagerPageProps {
   // "manage" (in-game) : sauvegarde + chargement. "load" (accueil, MYL-26 §2) :
   // chargement seul — réutilise la même liste de slots sans Sauvegarder/Écraser.
   mode?: "manage" | "load";
-  // "page" : écran plein (accueil). "panel" : contenu d'une modale (in-game,
-  // <SavePanel />) — pas de marges d'écran, fermeture déléguée à `onClose`.
-  variant?: "page" | "panel";
+  // "page" : écran plein (accueil). "panel" : contenu d'une modale
+  // — pas de marges d'écran, fermeture déléguée à `onClose`.
+  // "embedded" : comme "panel", sans barre de titre (le menu pause fournit la
+  // sienne, avec son bouton Retour).
+  variant?: "page" | "panel" | "embedded";
   // Fourni en variante "panel" : ferme la modale au lieu de revenir en arrière.
   onClose?: () => void;
 }
@@ -125,30 +127,31 @@ export const SaveManagerPage = ({
     setConfirm(null);
   };
 
-  return (
-    <div
-      className={
-        variant === "panel"
-          ? "space-y-6"
-          : "p-8 mt-14 mb-20 max-w-3xl mx-auto space-y-6"
-      }
-    >
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-medium">
+  const content = (
+    <>
+      {variant === "panel" && (
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl font-bold">
+            {loadMode ? "Charger une partie" : "Sauvegardes"}
+          </h1>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => (onClose ? onClose() : navigate(-1))}
+          >
+            {onClose ? "Fermer" : "Retour"}
+          </button>
+        </div>
+      )}
+      {variant === "page" && (
+        <h1 className="font-display text-2xl font-bold">
           {loadMode ? "Charger une partie" : "Sauvegardes"}
         </h1>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => (onClose ? onClose() : navigate(-1))}
-        >
-          {onClose ? "Fermer" : "Retour"}
-        </button>
-      </div>
+      )}
 
       {error && (
-        <div role="alert" className="alert alert-error">
-          <WarningTriangle className="w-5 h-5" />
+        <div role="alert" className="alert alert-soft alert-error">
+          <WarningTriangle className="h-5 w-5" />
           <span className="text-sm">{error}</span>
           <button
             type="button"
@@ -156,7 +159,7 @@ export const SaveManagerPage = ({
             onClick={() => dispatch(clearSaveError())}
             aria-label="Fermer l'erreur"
           >
-            <Xmark className="w-4 h-4" />
+            <Xmark className="h-4 w-4" />
           </button>
         </div>
       )}
@@ -168,25 +171,30 @@ export const SaveManagerPage = ({
         onCopy={() => setCopyOpen(true)}
       />
 
-      <div className="divider text-xs opacity-60">Slots manuels</div>
+      <section className="space-y-2.5">
+        <h2 className="font-display text-lg font-semibold">Slots manuels</h2>
+        <div className="flex flex-col gap-2.5">
+          {MANUAL_SLOT_IDS.map((slotId, index) => (
+            <SaveSlotCard
+              key={slotId}
+              index={index}
+              meta={manual[index] ?? null}
+              busy={busySlot === slotId}
+              busyStatus={status}
+              mode={mode}
+              onSave={() => handleSave(index)}
+              onLoad={() => handleLoad(slotId)}
+              onOverwrite={() => setConfirm({ kind: "overwrite", index })}
+              onDelete={() => setConfirm({ kind: "delete", index })}
+            />
+          ))}
+        </div>
+      </section>
+    </>
+  );
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {MANUAL_SLOT_IDS.map((slotId, index) => (
-          <SaveSlotCard
-            key={slotId}
-            index={index}
-            meta={manual[index] ?? null}
-            busy={busySlot === slotId}
-            busyStatus={status}
-            mode={mode}
-            onSave={() => handleSave(index)}
-            onLoad={() => handleLoad(slotId)}
-            onOverwrite={() => setConfirm({ kind: "overwrite", index })}
-            onDelete={() => setConfirm({ kind: "delete", index })}
-          />
-        ))}
-      </div>
-
+  const modals = (
+    <>
       {copyOpen && (
         <CopyToSlotModal
           manual={manual}
@@ -244,7 +252,7 @@ export const SaveManagerPage = ({
             </>
           }
           confirmLabel="Charger"
-          confirmClass="btn-warning"
+          confirmClass="btn-primary"
           onConfirm={runConfirm}
           onClose={() => setConfirm(null)}
         />
@@ -264,11 +272,34 @@ export const SaveManagerPage = ({
             </>
           }
           confirmLabel="Copier et écraser"
-          confirmClass="btn-warning"
           onConfirm={runConfirm}
           onClose={() => setConfirm(null)}
         />
       )}
+    </>
+  );
+
+  if (variant === "page") {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-6 sm:py-10">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm w-fit gap-1"
+          onClick={() => (onClose ? onClose() : navigate(-1))}
+        >
+          <ArrowLeft width={16} height={16} />
+          {onClose ? "Fermer" : "Retour"}
+        </button>
+        <div className="toy-frame page-frame space-y-5">{content}</div>
+        {modals}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {content}
+      {modals}
     </div>
   );
 };

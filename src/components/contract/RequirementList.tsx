@@ -7,7 +7,14 @@ import {
   QUALITY_LABELS,
   requirementsByType,
 } from "@/data/interface";
-import { ComponentTypeBadge } from "@/components/component";
+import { COMPONENT_ICON } from "@/components/component";
+
+/** Pastille du type, dans sa couleur. */
+const TYPE_FILL: Record<ComponentType, string> = {
+  [ComponentType.CODE]: "bg-code",
+  [ComponentType.VISUEL]: "bg-visuel",
+  [ComponentType.UX]: "bg-ux",
+};
 
 interface RequirementListProps {
   requirements: ComponentRequirement[];
@@ -28,19 +35,20 @@ export const RequirementList: FC<RequirementListProps> = ({
   const byType = requirementsByType(requirements);
 
   return (
-    <div className="flex flex-row gap-1">
+    <div className="flex flex-row gap-1.5">
       {COMPONENT_TYPE_ORDER.map((type) => {
         const req = byType[type];
+        const Icon = COMPONENT_ICON[type];
 
         if (!req) {
           return (
             <div
               key={`req_slot_${type}`}
-              className="flex flex-col items-center w-20 gap-0.5 opacity-20"
+              className="flex w-[5.25rem] items-center gap-1.5 rounded-full border-2 border-dashed border-base-content/15 px-1.5 py-1 text-base-content/30"
               title={`${type} : non demandé`}
             >
-              <ComponentTypeBadge type={type} variant="icon" size={16} />
-              <span className="text-xs">—</span>
+              <Icon width={14} height={14} className="ml-1" />
+              <span className="text-xs font-bold">—</span>
             </div>
           );
         }
@@ -51,27 +59,36 @@ export const RequirementList: FC<RequirementListProps> = ({
         return (
           <div
             key={`req_slot_${type}`}
-            className="flex flex-col items-center w-20 gap-0.5"
+            className={
+              "flex w-[5.25rem] items-center gap-1.5 rounded-full px-1 py-1 " +
+              (enough ? "bg-success/12" : "bg-base-200")
+            }
             title={
               `${type} : ${held}/${req.quantity} en stock` +
               (req.minQuality != null
                 ? `, qualité ≥ ${QUALITY_LABELS[req.minQuality]}`
-                : "")
+                : ", toute qualité")
             }
           >
-            <ComponentTypeBadge type={type} variant="icon" size={16} />
             <span
-              className={
-                "text-xs font-semibold tabular-nums " +
-                (enough ? "text-success" : "text-error")
-              }
+              className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-ink text-white ${TYPE_FILL[type]}`}
             >
-              {held}/{req.quantity}
+              <Icon width={12} height={12} strokeWidth={2.4} />
             </span>
-            <span className="text-[10px] leading-none opacity-60 whitespace-nowrap">
-              {req.minQuality != null
-                ? `≥ ${QUALITY_LABELS[req.minQuality]}`
-                : "toute qualité"}
+            <span className="flex flex-col leading-none">
+              <span
+                className={
+                  "text-[13px] font-extrabold tabular-nums " +
+                  (enough ? "text-success" : "text-error")
+                }
+              >
+                {held}/{req.quantity}
+              </span>
+              {req.minQuality != null && (
+                <span className="text-[10px] font-bold whitespace-nowrap text-base-content/70">
+                  ≥ {QUALITY_LABELS[req.minQuality]}
+                </span>
+              )}
             </span>
           </div>
         );

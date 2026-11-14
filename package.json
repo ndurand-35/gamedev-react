@@ -10,10 +10,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "sim": "vitest run --config vitest.sim.config.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md}\""
   },
   "dependencies": {
     "@faker-js/faker": "^9.9.0",
+    "@fontsource-variable/fredoka": "^5.3.0",
+    "@fontsource-variable/nunito": "^5.3.0",
     "@reduxjs/toolkit": "^2.11.2",
     "@tanstack/match-sorter-utils": "^8.19.4",
     "@tanstack/react-form": "^0.34.4",

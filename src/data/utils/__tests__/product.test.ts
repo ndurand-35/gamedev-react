@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COMPONENT_GRAIN as G,
   ComponentType,
   GENRES,
   Product,
@@ -40,6 +41,9 @@ import {
 } from "@/data/utils/product";
 import { addMonthsToTime } from "@/data/utils/time";
 import { segmentDemand } from "@/data/utils/marketDemand";
+
+/** Concurrence diffuse du segment Outil : un produit de cette taille l'égale. */
+const AT_BASELINE = { size: GENRES[ProductGenre.OUTIL].baseline };
 
 const mix = (
   code: number,
@@ -111,7 +115,7 @@ describe("attractivité", () => {
 
 describe("revenu par segment", () => {
   it("donne la moitié de la demande à un produit d'attractivité égale à la concurrence diffuse", () => {
-    const p = launched(); // attractivité 15 = baseline Outil
+    const p = launched(AT_BASELINE); // attractivité = baseline Outil
     expect(computeProductRevenue([p], AFTER_SPIKE)).toBe(
       Math.round(segmentDemand(ProductGenre.OUTIL, AFTER_SPIKE) / 2),
     );
@@ -124,7 +128,7 @@ describe("revenu par segment", () => {
     const both = computeProductRevenues([a, b], AFTER_SPIKE);
     expect(both[1]).toBe(both[2]);
     expect(both[1]).toBeLessThan(alone);
-    // Mais le segment rapporte plus au total : 30/45 contre 15/30.
+    // Mais le segment rapporte plus au total : deux produits pèsent plus qu'un.
     expect(both[1] + both[2]).toBeGreaterThan(alone);
   });
 
@@ -147,7 +151,7 @@ describe("revenu par segment", () => {
   });
 
   it("expose la part de chaque produit et de chaque segment", () => {
-    const p = launched();
+    const p = launched(AT_BASELINE);
     expect(computeProductShares([p], AFTER_SPIKE)[1]).toBeCloseTo(0.5);
     const reports = segmentReports([p], AFTER_SPIKE);
     const outil = reports.find((r) => r.genre.genre === ProductGenre.OUTIL)!;
@@ -162,7 +166,7 @@ describe("revenu par segment", () => {
   });
 
   it("applique la campagne d'acquisition sur le revenu réparti", () => {
-    const p = launched();
+    const p = launched(AT_BASELINE);
     const campaign = {
       type: CampaignType.ACQUISITION,
       effectiveness: 1,
@@ -212,10 +216,10 @@ describe("lancement", () => {
   });
 
   it("note la qualité d'abord, la taille ensuite", () => {
-    // Outil : minSize 6 → la taille fait le plein à 12 composants.
-    expect(launchScore(launched({ size: 12, quality: 5 }))).toBe(10);
-    expect(launchScore(launched({ size: 12, quality: 0 }))).toBe(3);
-    expect(launchScore(launched({ size: 6, quality: 5 }))).toBe(8.5);
+    // Outil : minSize 6 (× grain) → la taille fait le plein au double.
+    expect(launchScore(launched({ size: 12 * G, quality: 5 }))).toBe(10);
+    expect(launchScore(launched({ size: 12 * G, quality: 0 }))).toBe(3);
+    expect(launchScore(launched({ size: 6 * G, quality: 5 }))).toBe(8.5);
   });
 
   it("fait bouger la réputation par palier de note", () => {
@@ -267,7 +271,9 @@ describe("produits d'une partie antérieure", () => {
     expect(inferGenre(mix(5, 3, 2))).toBe(ProductGenre.OUTIL);
     expect(inferGenre(mix(2, 6, 1))).toBe(ProductGenre.JEU);
     expect(inferGenre(mix(2, 1, 6))).toBe(ProductGenre.SERVICE);
-    expect(inferGenre(mix(10, 10, 10))).toBe(ProductGenre.PLATEFORME);
+    expect(inferGenre(mix(10 * G, 10 * G, 10 * G))).toBe(
+      ProductGenre.PLATEFORME,
+    );
   });
 
   it("remet un produit au format courant sans toucher à ce qu'il a déjà", () => {

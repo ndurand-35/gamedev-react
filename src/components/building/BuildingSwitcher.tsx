@@ -31,17 +31,24 @@ export const BuildingSwitcher: FC = (): ReactElement => {
         role="button"
         aria-label="Changer de bâtiment"
         title={current ? `Bâtiment : ${current.name}` : "Bâtiments"}
-        className="btn btn-sm btn-ghost gap-1 px-2 max-w-48"
+        className="btn max-w-56 gap-1 px-2 max-sm:h-12 sm:gap-2 sm:px-3"
       >
         <BuildingIcon height={20} width={20} />
         {current && (
-          <span className="hidden lg:inline text-sm font-normal truncate">
+          <span className="hidden lg:inline text-sm truncate">
             {current.name}
           </span>
         )}
-        <NavArrowUp height={12} width={12} className="opacity-60" />
+        <NavArrowUp
+          height={12}
+          width={12}
+          className="hidden opacity-60 sm:block"
+        />
       </div>
-      <div tabIndex={0} className="dropdown-content z-50 mb-2 w-72 shadow-xl">
+      <div
+        tabIndex={0}
+        className="dropdown-content z-50 mb-2 w-72 max-w-[calc(100vw-1rem)] shadow-xl"
+      >
         <BuildingPicker selectedId={current?.id} onSelect={onSelect} />
       </div>
     </div>

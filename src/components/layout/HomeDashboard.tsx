@@ -88,7 +88,7 @@ const StatCard = ({
           ? "text-error"
           : "text-base-content";
   return (
-    <div className="card bg-base-100 shadow-md border border-base-300">
+    <div className="card toy-frame">
       <div className="p-3 flex flex-row items-center space-x-3">
         <div className={"opacity-70 " + toneClass}>{icon}</div>
         <div>
@@ -170,7 +170,7 @@ export const HomeDashboard = () => {
         />
       </div>
 
-      <div className="card bg-base-100 shadow-md border border-base-300">
+      <div className="card toy-frame">
         <div className="p-4 space-y-2">
           <div className="flex flex-row items-center justify-between">
             <h2 className="text-lg font-semibold">Trésorerie sur 30 jours</h2>

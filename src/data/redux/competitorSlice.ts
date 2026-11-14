@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
 import { Competitor, CompetitorProduct } from "@/data/interface";
+import { COMPETITOR_ROSTER_MAX } from "@/data/utils/competitor";
 
 // ── Le marché ────────────────────────────────────────────────────────────────
 // Roster des studios concurrents, tiré à la nouvelle partie (`buildRoster`) et
@@ -34,9 +35,11 @@ export const competitorSlice = createSlice({
       state.lastMarketTime = null;
     },
     // Un studio qu'on ne connaissait pas signe avec nous (contrat d'un
-    // inconnu de passage) : il rejoint le marché. Idempotent.
+    // inconnu de passage) : il rejoint le marché, tant que celui-ci n'est pas
+    // plein — au-delà, il reste de passage. Idempotent.
     ensureCompetitor(state, action: PayloadAction<Competitor>) {
       if (state.roster.some((c) => c.id === action.payload.id)) return;
+      if (state.roster.length >= COMPETITOR_ROSTER_MAX) return;
       state.roster.push(action.payload);
     },
     /** Tick mensuel : produits lancés et retirés ce mois-ci. */

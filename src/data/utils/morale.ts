@@ -10,6 +10,8 @@ import { pushNotification } from "@/data/redux/notificationSlice";
 import type { AppDispatch, RootState } from "@/data/redux/store";
 import { formatPrice } from "@/data/utils";
 import { isProductionPerson } from "@/data/utils/component";
+import { moraleAura } from "@/data/utils/traits";
+import { employeSchedule, scheduleMorale } from "@/data/utils/workSchedule";
 import {
   HOURS_PER_MONTH,
   RAISE_COOLDOWN_GRANTED,
@@ -24,13 +26,16 @@ import {
 //   Chaque mois, à la paie (cumulatif, en plus du +1 de la paie versée) :
 //     • salaire sous les attentes  → −2, ou −4 sous 90 % de l'attendu ;
 //     • bâtiment plein             → −2 (on gagne en synergie, on perd en confort) ;
-//     • production à l'arrêt       → −2 (ni bureau, ou ni tâche ni formation).
+//     • production à l'arrêt       → −2 (ni bureau, ou ni tâche ni formation) ;
+//     • rythme du studio           → +2 en Détente, −2 en Soutenu, −8 en Crunch
+//                                    (cf. `utils/workSchedule`).
 //   Sur le coup :
 //     • un collègue licencié       → −5 dans son bâtiment, −2 ailleurs ;
 //     • une deadline manquée       → −3 pour toute l'équipe.
 //
 // Le fondateur est hors système : il ne se paie pas, ne réclame rien et ne
-// démissionne pas. Il garde seulement le +1 mensuel d'avant.
+// démissionne pas. Il garde seulement le +1 mensuel d'avant — et la fatigue de
+// son studio : un crunch use aussi le fondateur, qui produit alors moins.
 
 const FOUNDER_ID = 1;
 
@@ -54,12 +59,19 @@ export const BONUS_COOLDOWN_MONTHS = 3;
 export const PROACTIVE_RAISE_RATE = 0.05;
 export const PROACTIVE_RAISE_MORALE = 8;
 
-export type MoraleCause = "underpaid" | "crowded" | "idle";
+export type MoraleCause =
+  | "underpaid"
+  | "crowded"
+  | "idle"
+  | "gloomy"
+  | "overworked";
 
 export const MORALE_CAUSE_LABEL: Record<MoraleCause, string> = {
   underpaid: "salaire sous les attentes",
   crowded: "bureaux pleins",
   idle: "production à l'arrêt",
+  gloomy: "collègue rabat-joie",
+  overworked: "horaires épuisants",
 };
 
 export interface MoraleDrift {
@@ -109,11 +121,18 @@ export const computeMonthlyMoraleDrift = (
   );
 
   return employes.map((e) => {
+    // Rythme du studio : la fatigue (ou le repos) touche tout le monde.
+    const pace = scheduleMorale(employeSchedule(e, buildings));
+    const paceCauses: MoraleCause[] = pace < 0 ? ["overworked"] : [];
     if (e.id === FOUNDER_ID) {
-      return { employeId: e.id, delta: PAID_MORALE_BONUS, causes: [] };
+      return {
+        employeId: e.id,
+        delta: PAID_MORALE_BONUS + pace,
+        causes: paceCauses,
+      };
     }
-    const causes: MoraleCause[] = [];
-    let delta = PAID_MORALE_BONUS;
+    const causes: MoraleCause[] = [...paceCauses];
+    let delta = PAID_MORALE_BONUS + pace;
 
     const underpay = underpayPenalty(e);
     if (underpay > 0) {
@@ -128,6 +147,10 @@ export const computeMonthlyMoraleDrift = (
       delta -= MORALE_IDLE_PENALTY;
       causes.push("idle");
     }
+    // Ambiance du bâtiment : boute-en-train et rabat-joie (traits).
+    const aura = moraleAura(e, employes);
+    delta += aura;
+    if (aura < 0) causes.push("gloomy");
     return { employeId: e.id, delta, causes };
   });
 };
@@ -156,6 +179,8 @@ export const processMonthlyMorale = (
     underpaid: 0,
     crowded: 0,
     idle: 0,
+    gloomy: 0,
+    overworked: 0,
   };
   for (const d of unhappy) for (const c of d.causes) counts[c]++;
   const detail = (Object.keys(counts) as MoraleCause[])

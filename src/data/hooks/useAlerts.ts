@@ -182,6 +182,7 @@ export const useAlerts = (): Alert[] => {
                   : employes,
                 productionProgress,
                 time,
+                buildings,
               }),
             )
           : 0,

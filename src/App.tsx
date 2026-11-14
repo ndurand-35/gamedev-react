@@ -1,3 +1,4 @@
+import { InterviewOverlay } from "@/components/employe/InterviewOverlay";
 import { useEffect } from "react";
 import {
   createBrowserRouter,
@@ -8,19 +9,21 @@ import {
 
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import { setGameSpeed } from "@/data/redux/engineSlice";
-import { GAME_SPEEDS } from "@/data/utils/constant";
+import { normalizeGameSpeed } from "@/data/utils/constant";
+import { useGameShortcuts } from "@/data/hooks/useGameShortcuts";
 import { useStudioOpenChime } from "@/audio/useStudioOpenChime";
+import { useAudioDirector } from "@/audio/useAudioDirector";
+import { useGameSounds } from "@/audio/useGameSounds";
 
 import {
   BottomNavigation,
   DecisionModal,
   GameOverIndicator,
   Header,
-  NotificationCenter,
   PauseIndicator,
   RescueLoanModal,
-  SavePanel,
   ToastContainer,
+  TutorialSpotlight,
 } from "@/components/layout/index";
 import {
   HomePage,
@@ -28,6 +31,7 @@ import {
   TaskPage,
   BuildingPage,
   PoleEmploiPage,
+  DossierPage,
   EmployeListPage,
   ResearchPage,
   CompetitorPage,
@@ -41,6 +45,7 @@ import {
 
 import { OwnedPage } from "@/pages/building/OwnedPage";
 import MainMenu from "@/pages/start/MainMenu";
+import { useDayCycle } from "@/data/hooks/useDayCycle";
 import NewGamePage from "@/pages/start/NewGamePage";
 
 const router = createBrowserRouter([
@@ -57,6 +62,10 @@ const router = createBrowserRouter([
       { path: "/game/employe", element: <EmployePage /> },
       { path: "/game/employe/list", element: <EmployeListPage /> },
       { path: "/game/employe/recruit", element: <PoleEmploiPage /> },
+      {
+        path: "/game/employe/recruit/:dossierId",
+        element: <DossierPage />,
+      },
       { path: "/game/component", element: <ComponentPage /> },
       { path: "/game/product", element: <ProductPage /> },
       { path: "/game/product/contract", element: <TaskPage /> },
@@ -72,85 +81,51 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  // Son de l'interface et musique de fond, menu principal compris.
+  useAudioDirector();
   return <RouterProvider router={router} />;
 }
-
-// Raccourcis clavier de vitesse, sur `event.code` (position physique de la
-// touche) : sur un clavier AZERTY, la rangée du haut sans Maj donne « & é " »
-// dans `event.key`, ce qui rendrait 1/2/3 inaccessibles.
-const SPEED_SHORTCUTS: Record<string, number> = {
-  Digit1: GAME_SPEEDS.X1,
-  Numpad1: GAME_SPEEDS.X1,
-  Digit2: GAME_SPEEDS.X2,
-  Numpad2: GAME_SPEEDS.X2,
-  Digit3: GAME_SPEEDS.X3,
-  Numpad3: GAME_SPEEDS.X3,
-};
-
-const isEditableTarget = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
-  );
-};
 
 function Game() {
   const dispatch = useAppDispatch();
   const gameName = useAppSelector((state) => state.engine.gameName);
   const gameSpeed = useAppSelector((state) => state.engine.gameSpeed);
-  const gameOver = useAppSelector((state) => state.engine.gameOver);
-  const pendingRescue = useAppSelector((state) => state.engine.pendingRescue);
-  const pendingDecision = useAppSelector((state) => state.events.pending);
-  // Une modale bloquante (décision, prêt de sauvetage, faillite) impose la
-  // pause : le clavier ne doit pas pouvoir relancer le jeu par-dessus.
-  const speedLocked = gameOver || !!pendingRescue || !!pendingDecision;
 
   // MapMonde §7 / Audio (MYL-22) : sting de succès au déblocage d'un studio,
   // accroché au hook `studio.pendingReveal` du Stage 1. Monté ici (niveau jeu)
   // pour sonner quelle que soit la page d'où part l'ouverture.
   useStudioOpenChime();
+  // Notifications, décisions en attente, faillite.
+  useGameSounds();
 
   useEffect(() => {
-    dispatch(setGameSpeed(gameSpeed));
+    dispatch(setGameSpeed(normalizeGameSpeed(gameSpeed)));
     return () => {
       dispatch(setGameSpeed(0));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" || event.key === "Esc") {
-        dispatch(setGameSpeed(GAME_SPEEDS.PAUSE));
-        return;
-      }
-      const speed = SPEED_SHORTCUTS[event.code];
-      if (speed === undefined || speedLocked) return;
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
-      if (isEditableTarget(event.target)) return;
-      event.preventDefault();
-      dispatch(setGameSpeed(speed));
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch, speedLocked]);
+  // Raccourcis clavier, configurables dans Paramètres → Touches.
+  useGameShortcuts();
+  // Ambiance jour / nuit selon l'heure de jeu.
+  useDayCycle();
 
   if (gameName === undefined) {
     return <Navigate to="/" replace />;
   }
 
   return (
-    <div className="prose-h1:text-2xl prose-h1:font-medium prose-h2:text-2xl">
+    <div>
       <Header />
-      <NotificationCenter />
       <Outlet />
       <PauseIndicator />
+      <InterviewOverlay />
       <DecisionModal />
       <RescueLoanModal />
-      <SavePanel />
       <GameOverIndicator />
       <ToastContainer />
+      <TutorialSpotlight />
       <BottomNavigation />
     </div>
   );

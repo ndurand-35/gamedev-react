@@ -6,6 +6,7 @@ import {
 } from "@/data/redux/companySlice";
 import {
   adjustMorale,
+  resignEmploye,
   setPendingRaise,
   setRaiseCooldown,
   setSalary,
@@ -84,6 +85,9 @@ export const resolveEffects = (
           }),
         );
         break;
+      case "leave":
+        dispatch(resignEmploye(effect.employeId));
+        break;
     }
   }
 };
@@ -107,6 +111,12 @@ export const resolveDecision =
 // Présente une décision : mémorise la vitesse courante puis met le jeu en pause
 // douce (speed 0). La boucle de jeu étant arrêtée à speed 0, aucun autre
 // événement ne se déclenche tant que la décision n'est pas résolue.
+export const presentChoice = (
+  dispatch: AppDispatch,
+  state: RootState,
+  event: ChoiceEvent,
+) => present(dispatch, state, event);
+
 const present = (
   dispatch: AppDispatch,
   state: RootState,

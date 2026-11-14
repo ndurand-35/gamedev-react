@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   Building,
+  GENRES,
   Person,
   Product,
   ProductGenre,
@@ -44,11 +45,11 @@ const employe = (id: number, salary: number, buildingId?: number) =>
   ({ id, salary, buildingId }) as unknown as Person;
 
 /**
- * Outil de 15 composants à qualité moyenne 2,5 : attractivité 15, soit
- * exactement la concurrence diffuse du segment → 50 % de 12 000 € = 6 000 €
- * par mois, une fois le pic de lancement passé. Maintenance : 250 + 20 × 15.
+ * Outil à qualité moyenne 2,5 dont la taille vaut la concurrence diffuse du
+ * segment : son attractivité l'égale, il prend 50 % de la demande une fois le
+ * pic de lancement passé.
  */
-const OUTIL_SIZE = 15;
+const OUTIL_SIZE = GENRES[ProductGenre.OUTIL].baseline;
 // Revenu d'un outil seul sur son segment (moitié de la demande, qui
 // varie avec l'année de jeu — cf. `utils/marketDemand`).
 const outilRevenueAt = (time: number): number =>

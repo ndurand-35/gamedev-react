@@ -61,35 +61,40 @@ const makeDev = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
   morale: 100,
   buildingId: 1,
   specialty: ComponentType.CODE,
-  codeStat: 20,
-  codeMaxStat: 20,
-  visualStat: 5,
-  visualMaxStat: 5,
-  uxStat: 5,
-  uxMaxStat: 5,
+  codeStat: 200,
+  codeMaxStat: 200,
+  visualStat: 50,
+  visualMaxStat: 50,
+  uxStat: 50,
+  uxMaxStat: 50,
   assignedComponentType: ComponentType.CODE,
   ...over,
 });
 
 // 1600 points à 20/h : un composant tous les 80 h de jeu.
-const HOURS_PER_COMPONENT = PRODUCTION_THRESHOLD / 20;
+const HOURS_PER_COMPONENT = PRODUCTION_THRESHOLD / 200;
 
 describe("expectedComponentQuality", () => {
   it("retient la qualité modale du tirage de production", () => {
-    expect(expectedComponentQuality(20)).toBe(ComponentQuality.TRES_BON);
-    expect(expectedComponentQuality(15)).toBe(ComponentQuality.BON);
+    expect(expectedComponentQuality(200)).toBe(ComponentQuality.TRES_BON);
+    expect(expectedComponentQuality(150)).toBe(ComponentQuality.BON);
     expect(expectedComponentQuality(0)).toBe(ComponentQuality.BACLE);
   });
 
   it("borne le résultat à l'échelle de qualité", () => {
-    expect(expectedComponentQuality(100)).toBe(ComponentQuality.EXCELLENT);
-    expect(expectedComponentQuality(-10)).toBe(ComponentQuality.BACLE);
+    expect(expectedComponentQuality(1000)).toBe(ComponentQuality.EXCELLENT);
+    expect(expectedComponentQuality(-100)).toBe(ComponentQuality.BACLE);
   });
 });
 
 describe("forecastProduction", () => {
   it("date chaque composant au tick où le seuil de points est franchi", () => {
-    const forecast = forecastProduction([makeDev()], {}, 0, 200);
+    const forecast = forecastProduction(
+      [makeDev()],
+      {},
+      0,
+      2.5 * HOURS_PER_COMPONENT,
+    );
 
     expect(forecast.map((f) => f.at)).toEqual([
       HOURS_PER_COMPONENT,
@@ -100,16 +105,31 @@ describe("forecastProduction", () => {
   });
 
   it("repart de l'avancement de production déjà accumulé", () => {
-    const forecast = forecastProduction([makeDev()], { 1: 800 }, 0, 200);
+    const forecast = forecastProduction(
+      [makeDev()],
+      { 1: PRODUCTION_THRESHOLD / 2 },
+      0,
+      2.5 * HOURS_PER_COMPONENT,
+    );
 
-    // 800 points d'avance : le premier composant tombe 40 h plus tôt.
-    expect(forecast.map((f) => f.at)).toEqual([40, 120, 200]);
+    // Une demi-pièce d'avance : le premier composant tombe à mi-chemin.
+    expect(forecast.map((f) => f.at)).toEqual([
+      0.5 * HOURS_PER_COMPONENT,
+      1.5 * HOURS_PER_COMPONENT,
+      2.5 * HOURS_PER_COMPONENT,
+    ]);
   });
 
   it("décale la sortie selon le moral", () => {
-    // Moral 50 → ×0.7 → 14 points/h → 1600/14 = 115 h (arrondi au tick).
-    const forecast = forecastProduction([makeDev({ morale: 50 })], {}, 0, 150);
-    expect(forecast.map((f) => f.at)).toEqual([Math.ceil(1600 / 14)]);
+    // Moral 50 → ×0.7 → 140 points/h (arrondi au tick).
+    const first = Math.ceil(PRODUCTION_THRESHOLD / 140);
+    const forecast = forecastProduction(
+      [makeDev({ morale: 50 })],
+      {},
+      0,
+      Math.floor(first * 1.5),
+    );
+    expect(forecast.map((f) => f.at)).toEqual([first]);
   });
 
   it("ignore un employé sans tâche assignée ou sans bâtiment", () => {
@@ -129,8 +149,17 @@ describe("forecastProduction", () => {
 
 describe("projectStock", () => {
   it("ajoute les composants prévus sous un id négatif et écarte les suivants", () => {
-    const forecast = forecastProduction([makeDev()], {}, 0, 200);
-    const projected = projectStock([makeComponent({ id: 7 })], forecast, 100);
+    const forecast = forecastProduction(
+      [makeDev()],
+      {},
+      0,
+      2.5 * HOURS_PER_COMPONENT,
+    );
+    const projected = projectStock(
+      [makeComponent({ id: 7 })],
+      forecast,
+      1.25 * HOURS_PER_COMPONENT,
+    );
 
     expect(projected).toHaveLength(2);
     expect(projected[0].id).toBe(7);
@@ -287,7 +316,7 @@ describe("adviseDelivery", () => {
       id: 2,
       specialty: ComponentType.VISUEL,
       assignedComponentType: ComponentType.VISUEL,
-      visualStat: 25,
+      visualStat: 250,
     });
 
     const advice = adviseDelivery({

@@ -97,3 +97,60 @@ export const EmployeTag: FC<{ employe: Employe }> = ({ employe }) =>
   ) : (
     <RoleBadge personType={employe.personType} />
   );
+
+const HEART_PATH =
+  "M12 21l-1.4-1.3C5.4 15 2 12 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1C13.2 3.8 14.9 3 16.6 3 19.6 3 22 5.4 22 8.4c0 3.6-3.4 6.6-8.6 11.3z";
+
+interface MoraleHeartsProps {
+  morale: number;
+  /** Taille d'un cœur (px). */
+  size?: number;
+  /** Affiche « Moral 82 » à côté des cœurs. */
+  showValue?: boolean;
+}
+
+/**
+ * Moral en cinq cœurs (un cœur = 20 points). Le libellé et la valeur chiffrée
+ * accompagnent les cœurs : la forme et la couleur ne portent pas l'info seules.
+ */
+export const MoraleHearts: FC<MoraleHeartsProps> = ({
+  morale,
+  size = 16,
+  showValue = true,
+}) => {
+  const { label } = moraleMood(morale);
+  const value = Math.round(morale);
+  const full = Math.max(0, Math.min(5, Math.round(morale / 20)));
+  const low = morale < LOW_MORALE_THRESHOLD;
+  return (
+    <span
+      role="img"
+      aria-label={`Moral ${label} (${value} %)`}
+      title={`Moral ${label} (${value} %)`}
+      className="inline-flex items-center gap-0.5"
+    >
+      {Array.from({ length: 5 }, (_, i) => (
+        <svg
+          key={i}
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className={i < full ? "fill-heart" : "fill-white"}
+          stroke="var(--color-ink)"
+          strokeWidth={2.2}
+          strokeLinejoin="round"
+        >
+          <path d={HEART_PATH} />
+        </svg>
+      ))}
+      {showValue && (
+        <span
+          className={`ml-1.5 text-xs font-bold ${low ? "text-error" : "text-base-content/70"}`}
+        >
+          Moral {value}
+        </span>
+      )}
+    </span>
+  );
+};

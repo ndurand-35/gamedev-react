@@ -11,6 +11,22 @@ export enum PersonType {
 // pour éviter un cycle d'import avec utils/recruitment.
 export type Temperament = "loyal" | "ambitieux" | "cameleon";
 
+// Séniorité : choisie par le joueur à la commande d'une recherche. Elle fixe le
+// niveau de départ du candidat et l'écart à son potentiel (stats max).
+export type Seniority = "junior" | "confirme" | "senior";
+
+// Traits de caractère (cf. `utils/traits`) : un ou deux par recrue, cachés
+// jusqu'à l'entretien. Défini ici pour éviter un cycle d'import.
+export type TraitId =
+  | "perfectionniste"
+  | "rapide"
+  | "autodidacte"
+  | "mentor"
+  | "bouteEnTrain"
+  | "rabatJoie"
+  | "fidele"
+  | "mercenaire";
+
 // Interface générique pour les attributs communs à tous les employés
 export interface Person {
   id: number;
@@ -28,8 +44,17 @@ export interface Person {
   // Salaire signé à l'embauche, figé : plafond cumulé des augmentations (§6.3).
   signedSalary?: number;
   temperament?: Temperament;
+  // Niveau commandé à la recherche. Absent sur le fondateur et les profils
+  // d'avant la séniorité.
+  seniority?: Seniority;
+  // Traits de caractère. Absent sur le fondateur et les profils d'avant.
+  traits?: TraitId[];
   // Volet A : tant que false, stats affichées en fourchette floue côté UI.
   revealedStats?: boolean;
+  // Volet A : position de la vraie valeur dans chaque fourchette estimée,
+  // tirée à la génération (cf. `utils/candidateStats`) pour que le milieu de
+  // la fourchette ne trahisse pas la stat réelle.
+  statRangeOffsets?: Partial<Record<CandidateStatKey, number>>;
   // Volet C : temps de jeu (heures) avant lequel l'employé ne peut pas réclamer.
   raiseCooldownUntil?: number;
   // Volet C : true tant qu'une demande d'augmentation est en attente de décision.
@@ -41,7 +66,35 @@ export interface Person {
   // le vivier — un candidat ramené par une recherche ne patiente pas
   // indéfiniment. Absent sur un employé embauché.
   expiresAt?: number;
+  // Candidat uniquement : la recherche du Pôle Emploi qui l'a ramené. Les
+  // profils d'une même recherche forment un dossier. Absent sur les profils
+  // des sauvegardes antérieures aux dossiers.
+  search?: CandidateSearchInfo;
 }
+
+/** Recherche du Pôle Emploi qui a ramené un candidat : son « dossier ». */
+export interface CandidateSearchInfo {
+  /** Identifiant commun aux profils d'une même recherche. */
+  id: number;
+  /** Poste recherché (spécialité de production, QA ou marketing). */
+  role: Specialty | PersonType.QA | PersonType.MARKETING;
+  seniority: Seniority;
+  /** Heure de jeu de la commande. */
+  at: number;
+  /** Frais réglés pour la recherche. */
+  cost: number;
+  /** Nombre de profils demandés. */
+  count: number;
+}
+
+// Échelle des stats de métier : elles vont de 0 à 20 × STAT_SCALE (= 200). Les
+// formules d'équilibrage ont été écrites sur l'ancienne échelle 0..20 ; elles
+// divisent par STAT_SCALE quand elles lisent une stat brute, ce qui garde
+// l'équilibrage identique tout en donnant de la finesse aux valeurs.
+export const STAT_SCALE = 10;
+export const MAX_STAT_POSSIBLE = 20 * STAT_SCALE;
+/** Stat par cran de qualité d'un composant : 50 → Moyen (1), 200 → 4. */
+export const QUALITY_STAT_STEP = 5 * STAT_SCALE;
 
 export const DEFAULT_MORALE = 70;
 export const MAX_MORALE = 100;
@@ -120,6 +173,14 @@ export const MAX_STAT_KEY_BY_TYPE: Record<
   [ComponentType.VISUEL]: "visualMaxStat",
   [ComponentType.UX]: "uxMaxStat",
 };
+
+/** Toute stat de métier qu'un candidat peut porter (prod, QA, marketing). */
+export type CandidateStatKey =
+  | ProductionStatKey
+  | "testStat"
+  | "bugDetectionStat"
+  | "communicationStat"
+  | "campaignManagementStat";
 
 export const PRODUCTION_STAT_KEYS: ProductionStatKey[] = [
   "codeStat",

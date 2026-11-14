@@ -11,6 +11,7 @@ import type { AppDispatch, RootState } from "@/data/redux/store";
 import { setGameSpeed } from "@/data/redux/engineSlice";
 import * as saveStorage from "@/data/utils/saveStorage";
 import type { SaveMeta, Integrity } from "@/data/utils/saveStorage";
+import { GAME_SPEEDS, normalizeGameSpeed } from "@/data/utils/constant";
 
 export type SaveStatus = "idle" | "loading" | "saving" | "deleting" | "error";
 
@@ -175,9 +176,10 @@ export const loadSlot =
       // Pause franche, remplacement d'état, puis relance de la boucle.
       dispatch(setGameSpeed(0));
       dispatch(hydrateFromSave(loaded.state));
-      const speed =
+      const speed = normalizeGameSpeed(
         (loaded.state.engine as { gameSpeed?: number } | undefined)
-          ?.gameSpeed ?? 600;
+          ?.gameSpeed ?? GAME_SPEEDS.X1,
+      );
       dispatch(setGameSpeed(speed));
 
       dispatch(saveIdle());

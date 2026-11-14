@@ -14,6 +14,13 @@ import { SortState, nextSort, sortBy } from "@/data/utils/sort";
 
 /** Taille du marché : assez pour varier les contrats, assez peu pour retenir les noms. */
 export const COMPETITOR_ROSTER_SIZE = 10;
+/**
+ * Plafond du marché. Un inconnu de passage qui signe avec nous y entre, mais
+ * pas au-delà : sinon, une fois brouillé avec tous les studios, chaque contrat
+ * ajouterait un concurrent de plus, et ces centaines de studios inonderaient
+ * les segments de sorties (krach permanent).
+ */
+export const COMPETITOR_ROSTER_MAX = 2 * COMPETITOR_ROSTER_SIZE;
 
 /**
  * Roster de départ. Les clients déjà au carnet (partie antérieure au marché)

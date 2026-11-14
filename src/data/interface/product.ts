@@ -1,4 +1,4 @@
-import { ComponentType } from "@/data/interface/component";
+import { COMPONENT_GRAIN, ComponentType } from "@/data/interface/component";
 import type { ProductPromotion } from "@/data/utils/popularity";
 
 export enum ProductStatus {
@@ -37,37 +37,40 @@ export interface GenreDef {
   spike: number;
 }
 
+// Demande et concurrence diffuse ont été doublées ensemble (simulation
+// d'équilibre) : un produit pèse autant face au marché, mais le marché est
+// assez grand pour qu'un studio vive de ses produits plutôt que des contrats.
 export const GENRES: Record<ProductGenre, GenreDef> = {
   [ProductGenre.OUTIL]: {
     genre: ProductGenre.OUTIL,
     description: "Petit marché, vite occupé : un premier produit y suffit.",
-    demand: 12_000,
-    baseline: 15,
-    minSize: 6,
+    demand: 24_000,
+    baseline: 30 * COMPONENT_GRAIN,
+    minSize: 6 * COMPONENT_GRAIN,
     spike: 0.5,
   },
   [ProductGenre.SERVICE]: {
     genre: ProductGenre.SERVICE,
     description: "Abonnements réguliers, sensibles aux bugs et à l'âge.",
-    demand: 18_000,
-    baseline: 20,
-    minSize: 10,
+    demand: 36_000,
+    baseline: 40 * COMPONENT_GRAIN,
+    minSize: 10 * COMPONENT_GRAIN,
     spike: 0.5,
   },
   [ProductGenre.JEU]: {
     genre: ProductGenre.JEU,
     description: "Marché de coups : tout se joue au lancement.",
-    demand: 25_000,
-    baseline: 30,
-    minSize: 12,
+    demand: 50_000,
+    baseline: 60 * COMPONENT_GRAIN,
+    minSize: 12 * COMPONENT_GRAIN,
     spike: 1,
   },
   [ProductGenre.PLATEFORME]: {
     genre: ProductGenre.PLATEFORME,
     description: "Énorme demande, mais il faut un gros produit pour y peser.",
-    demand: 40_000,
-    baseline: 60,
-    minSize: 25,
+    demand: 80_000,
+    baseline: 120 * COMPONENT_GRAIN,
+    minSize: 25 * COMPONENT_GRAIN,
     spike: 0.5,
   },
 };

@@ -17,6 +17,8 @@ import {
   PersonType,
   ProductionPerson,
   QA,
+  STAT_SCALE,
+  Seniority,
   Specialty,
   Temperament,
 } from "@/data/interface";
@@ -30,11 +32,13 @@ export const TEMPERAMENTS: Temperament[] = ["loyal", "ambitieux", "cameleon"];
 
 // expectedSalary : enveloppe de salaire existante par rôle (garde-fou faillite).
 export type SalaryRole = "FULLSTACK" | "PROD_SPE" | "QA" | "MKT";
+// Le plancher paie un junior, le plafond un senior au sommet : l'enveloppe
+// couvre tout l'éventail de séniorité (cf. `computeCandidateLevel`).
 export const SALARY_ENVELOPE: Record<SalaryRole, [number, number]> = {
-  FULLSTACK: [1400, 2200],
-  PROD_SPE: [1600, 2600],
-  QA: [1500, 2400],
-  MKT: [1500, 2400],
+  FULLSTACK: [900, 2200],
+  PROD_SPE: [1000, 2600],
+  QA: [1000, 2400],
+  MKT: [1000, 2400],
 };
 export const MARKET_INDEX_PER_REPUTATION = 0.002;
 export const MARKET_INDEX_CAP = 1.2;
@@ -98,8 +102,8 @@ export const RAISE_FIRM_FLOOR = 35; // 35–39 : demande ferme
 export const RAISE_ULTIMATUM_FLOOR = 20; // 20–34 : ultimatum
 
 // Entretien.
-export const INTERVIEW_BASE_HOURS = 3;
-export const INTERVIEW_EXTRA_Q_HOURS = 2;
+/** Heures de jeu d'un entretien mené par le fondateur (écran bloqué). */
+export const INTERVIEW_HOURS = 4;
 export const INTERVIEW_EXPRESS_FEE = 150;
 
 // ── Recherche de candidats à la demande (pôle emploi) ───────────────────────
@@ -148,6 +152,44 @@ export const SEARCH_REPUTATION_DISCOUNT_PER_POINT = 0.0025;
 export const SEARCH_REPUTATION_DISCOUNT_CAP = 0.25;
 
 /** Enveloppe salariale (donc grille tarifaire) visée par un poste commandé. */
+// ── Séniorité commandée ─────────────────────────────────────────────────────
+// Le joueur choisit le niveau des profils recherchés. Un junior est accessible
+// d'emblée, peu cher et peu productif, mais a de la marge de progression ; un
+// senior est fort tout de suite, plus cher à sourcer et à payer, et proche de
+// son plafond. Les niveaux supérieurs se débloquent avec la réputation : un
+// garage n'attire pas les seniors.
+export const SENIORITIES: Seniority[] = ["junior", "confirme", "senior"];
+
+export const SENIORITY_LABEL: Record<Seniority, string> = {
+  junior: "Junior",
+  confirme: "Confirmé",
+  senior: "Senior",
+};
+
+/** Réputation nécessaire pour commander ce niveau (jalons Studio indé / reconnu). */
+export const SENIORITY_MIN_REPUTATION: Record<Seniority, number> = {
+  junior: 0,
+  confirme: 25,
+  senior: 50,
+};
+
+/** Majoration des frais de recherche : un profil expérimenté est plus rare. */
+export const SENIORITY_FEE_MULT: Record<Seniority, number> = {
+  junior: 1,
+  confirme: 1.5,
+  senior: 2.5,
+};
+
+export const isSeniorityUnlocked = (
+  seniority: Seniority,
+  reputation: number,
+): boolean => reputation >= SENIORITY_MIN_REPUTATION[seniority];
+
+/** Niveau le plus élevé que la réputation permet de commander. */
+export const bestUnlockedSeniority = (reputation: number): Seniority =>
+  [...SENIORITIES].reverse().find((s) => isSeniorityUnlocked(s, reputation)) ??
+  "junior";
+
 export const searchSalaryRole = (role: SearchRole): SalaryRole => {
   if (role === PersonType.QA) return "QA";
   if (role === PersonType.MARKETING) return "MKT";
@@ -163,6 +205,7 @@ export const computeSearchCost = (
   role: SearchRole,
   count: number,
   reputation: number,
+  seniority: Seniority = "junior",
 ): number => {
   const n = clamp(
     Math.floor(count),
@@ -179,6 +222,7 @@ export const computeSearchCost = (
     (SEARCH_BASE_FEE +
       SEARCH_FEE_PER_CANDIDATE * Math.pow(n, SEARCH_VOLUME_EXPONENT)) *
     SEARCH_ROLE_FEE_MULT[searchSalaryRole(role)] *
+    SENIORITY_FEE_MULT[seniority] *
     discount;
   return round10(raw);
 };
@@ -215,21 +259,24 @@ export const salaryRole = (p: Person): SalaryRole => {
  * (formules §6.1). Sert de prix↔qualité pour `computeExpectedSalary`.
  */
 export const computeCandidateLevel = (p: Person): number => {
+  // Bornes exprimées en dizaines de points (STAT_SCALE) : 0 → plancher de
+  // l'enveloppe (junior débutant), 1 → plafond (senior au sommet).
+  const S = STAT_SCALE;
   if (isProd(p)) {
     if ((p.specialty as Specialty) === "FULLSTACK") {
-      const m = (p.codeStat + p.visualStat + p.uxStat) / 3;
-      return clamp01((m - 7) / 9);
+      const m = (p.codeStat + p.visualStat + p.uxStat) / 3 / S;
+      return clamp01((m - 4) / 10);
     }
-    const focus = Math.max(p.codeStat, p.visualStat, p.uxStat);
-    return clamp01((focus - 8) / 12);
+    const focus = Math.max(p.codeStat, p.visualStat, p.uxStat) / S;
+    return clamp01((focus - 5) / 15);
   }
   if (isQa(p)) {
-    const d = Math.max(p.testStat, p.bugDetectionStat);
-    return clamp01((d - 6) / 14);
+    const d = Math.max(p.testStat, p.bugDetectionStat) / S;
+    return clamp01((d - 5) / 15);
   }
   if (isMarketing(p)) {
-    const d = Math.max(p.communicationStat, p.campaignManagementStat);
-    return clamp01((d - 6) / 14);
+    const d = Math.max(p.communicationStat, p.campaignManagementStat) / S;
+    return clamp01((d - 5) / 15);
   }
   return 0.5;
 };
@@ -415,8 +462,10 @@ export interface RaiseProposal {
 
 /**
  * Construit la demande d'augmentation d'un employé. `granted` est écrêté au
- * plafond `min(expected×1.25, signed×1.40)` (garde-fou anti-runaway). Si l'écart
- * au plafond est nul (déjà au plafond), `capped = true` → pas de demande.
+ * plafond `min(expected×1.25, signed×1.40)` (garde-fou anti-runaway), mais ne
+ * descend jamais sous l'attendu : un employé formé, qui vaut désormais bien
+ * plus que son salaire d'embauche, doit pouvoir être rattrapé. Si l'écart au
+ * plafond est nul (déjà au plafond), `capped = true` → pas de demande.
  */
 export const buildRaiseProposal = (
   type: RaiseType,
@@ -427,7 +476,7 @@ export const buildRaiseProposal = (
   const p = raisePercent(type, salary, expectedSalary);
   const ceil = Math.min(
     expectedSalary * RAISE_INDIVIDUAL_CEIL_VS_EXPECTED,
-    signedSalary * RAISE_CUMULATIVE_CEIL_VS_SIGNED,
+    Math.max(signedSalary * RAISE_CUMULATIVE_CEIL_VS_SIGNED, expectedSalary),
   );
   const asked = round10(salary * (1 + p));
   const granted = round10(Math.min(asked, ceil));

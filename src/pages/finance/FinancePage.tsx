@@ -2,10 +2,8 @@ import { FC, ReactElement, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Bank as BankIcon,
-  Coins,
   NavArrowRight,
-  ReceiveEuros,
-  SendEuros,
+  WarningTriangle,
 } from "iconoir-react";
 
 import { useFounderSkill } from "@/data/hooks/useFounderSkill";
@@ -22,50 +20,25 @@ import {
   computeRunwayMonths,
 } from "@/data/utils/finance";
 import { companyTopMenuItems } from "@/pages/company/menu";
+import {
+  CountPill,
+  Kpi,
+  NotePill,
+  Panel,
+  Unit,
+} from "@/pages/finance/FinanceBlocks";
+import { CodexLink } from "@/components/codex/CodexLink";
+import { SectionTabs } from "@/components/layout/SectionTabs";
 
 // Nombre de mois clôturés affichés dans l'historique (l'état en conserve 24).
 const HISTORY_MONTHS = 12;
 
-interface StatCardProps {
-  label: string;
-  value: string;
-  icon: ReactElement;
-  hint?: string;
-  tone?: "neutral" | "success" | "warning" | "error";
-}
-
-const StatCard = ({
-  label,
-  value,
-  icon,
-  hint,
-  tone = "neutral",
-}: StatCardProps) => {
-  const toneClass =
-    tone === "success"
-      ? "text-success"
-      : tone === "warning"
-        ? "text-warning"
-        : tone === "error"
-          ? "text-error"
-          : "text-base-content";
-  return (
-    <div className="card bg-base-100 shadow-md border border-base-300">
-      <div className="p-4 flex flex-row items-center space-x-4">
-        <div className={"opacity-70 " + toneClass}>{icon}</div>
-        <div>
-          <p className="text-sm opacity-70">{label}</p>
-          <p className={"text-2xl font-semibold " + toneClass}>{value}</p>
-          {hint && <p className="text-xs opacity-60">{hint}</p>}
-        </div>
-      </div>
-    </div>
-  );
-};
+const signed = (value: number): string =>
+  (value >= 0 ? "+" : "−") + formatPrice(Math.abs(value));
 
 // Ligne du compte de résultat : libellé, montant signé, part de l'assiette.
-// Toutes les barres ont la même teinte : la longueur suffit à comparer les
-// flux, et la couleur reste réservée au résultat net et aux alertes.
+// Toutes les barres ont la même teinte d'encre : la longueur suffit à comparer
+// les flux, et la couleur reste réservée au résultat net et aux alertes.
 const PnlRow = ({
   label,
   value,
@@ -78,19 +51,18 @@ const PnlRow = ({
   hint?: string;
 }) => (
   <div className="space-y-1">
-    <div className="flex flex-row items-baseline justify-between text-sm">
-      <span>
+    <div className="flex flex-row items-baseline justify-between gap-2 text-sm">
+      <span className="font-bold">
         {label}
-        {hint && <span className="opacity-60 text-xs"> · {hint}</span>}
+        {hint && (
+          <span className="text-xs text-base-content/60"> · {hint}</span>
+        )}
       </span>
-      <span className="tabular-nums">
-        {value >= 0 ? "+" : "−"}
-        {formatPrice(Math.abs(value))} €
-      </span>
+      <span className="font-extrabold tabular-nums">{signed(value)} €</span>
     </div>
-    <div className="h-1.5 w-full rounded bg-base-200 overflow-hidden">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-base-200">
       <div
-        className="h-full bg-base-content/40"
+        className="h-full rounded-full bg-ink/55"
         style={{ width: Math.min(100, share * 100) + "%" }}
       />
     </div>
@@ -98,41 +70,47 @@ const PnlRow = ({
 );
 
 // Histogramme des résultats nets mensuels (barres au-dessus / en dessous de 0).
+// Encre au-dessus, rouge en dessous : la seule couleur du graphique.
 const NetHistoryChart = ({ reports }: { reports: MonthlyReport[] }) => {
   const scale = Math.max(...reports.map((r) => Math.abs(r.net)), 1);
   return (
-    <div className="flex flex-row items-stretch gap-1 h-24">
+    <div
+      className="relative flex h-28 flex-row items-stretch gap-1.5"
+      role="img"
+      aria-label={reports
+        .map((r) => `${r.label} : ${signed(r.net)} €`)
+        .join(", ")}
+    >
       {reports.map((r) => {
-        const ratio = Math.abs(r.net) / scale;
+        const height = `max(4px, ${Math.round((Math.abs(r.net) / scale) * 100)}%)`;
         const positive = r.net >= 0;
         return (
           <div
             key={`net_${r.time}`}
-            className="flex-1 flex flex-col justify-center min-w-0"
-            title={`${r.label} — ${r.net >= 0 ? "+" : "−"}${formatPrice(
-              Math.abs(r.net),
-            )} €`}
+            className="flex min-w-0 flex-1 flex-col justify-center"
+            title={`${r.label} — ${signed(r.net)} €`}
           >
-            <div className="h-1/2 flex flex-col justify-end">
+            <div className="flex h-1/2 flex-col justify-end">
               {positive && (
                 <div
-                  className="bg-base-content/40 rounded-t"
-                  style={{ height: Math.max(2, ratio * 100) + "%" }}
+                  className="mx-auto w-full max-w-14 rounded-t-[5px] border-2 border-b-0 border-ink bg-ink/40"
+                  style={{ height }}
                 />
               )}
             </div>
-            <div className="h-px bg-base-content/20" />
             <div className="h-1/2">
               {!positive && (
                 <div
-                  className="bg-error rounded-b"
-                  style={{ height: Math.max(2, ratio * 100) + "%" }}
+                  className="mx-auto w-full max-w-14 rounded-b-[5px] border-2 border-t-0 border-ink bg-error"
+                  style={{ height }}
                 />
               )}
             </div>
           </div>
         );
       })}
+      {/* Axe du zéro, continu sous toutes les colonnes. */}
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 bg-ink" />
     </div>
   );
 };
@@ -226,8 +204,8 @@ export const FinancePage: FC = (): ReactElement => {
   // Assiette des barres du compte de résultat : le plus gros flux du mois.
   const scale = Math.max(projection.revenue, projection.expenses, 1);
 
-  // Segments de la répartition : un dégradé d'une seule teinte suffit à les
-  // distinguer avec la légende, sans concurrencer les couleurs d'alerte.
+  // Segments de la répartition : une échelle d'encre suffit à les distinguer
+  // avec la légende, sans concurrencer les couleurs d'alerte.
   const expenseLines: {
     label: string;
     value: number;
@@ -237,174 +215,180 @@ export const FinancePage: FC = (): ReactElement => {
     {
       label: "Charges fixes",
       value: projection.fixedCharges,
-      bg: "bg-base-content/80",
-      fg: "text-base-100",
+      bg: "bg-ink/85",
+      fg: "text-white",
     },
     {
       label: "Charges variables",
       value: projection.variableCharges,
-      bg: "bg-base-content/60",
-      fg: "text-base-100",
+      bg: "bg-ink/60",
+      fg: "text-white",
     },
     {
       label: "Masse salariale",
       value: projection.payroll,
-      bg: "bg-base-content/40",
-      fg: "text-base-content",
+      bg: "bg-ink/40",
+      fg: "text-ink",
     },
     {
       label: "Mensualités de prêt",
       value: projection.loanPayments,
-      bg: "bg-base-content/25",
-      fg: "text-base-content",
+      bg: "bg-ink/20",
+      fg: "text-ink",
     },
     {
       label: "Maintenance produits",
       value: projection.maintenance,
-      bg: "bg-base-content/15",
-      fg: "text-base-content",
+      bg: "bg-ink/5",
+      fg: "text-ink",
     },
   ];
+  const visibleExpenses = expenseLines.filter((line) => line.value !== 0);
 
   return (
-    <div className="p-8 mt-14 mb-20 space-y-6">
-      <h1 className="mb-4">Finances</h1>
+    <div className="page-shell">
+      <SectionTabs items={companyTopMenuItems} ariaLabel="Section Entreprise" />
+      <div className="toy-frame page-frame space-y-5">
+        <h1 className="font-display text-2xl font-bold">Finances</h1>
 
-      <div className="grid lg:grid-cols-4 md:grid-cols-2 grid-cols-1 gap-4">
-        <StatCard
-          label="Trésorerie"
-          value={formatPrice(money) + " €"}
-          icon={<Coins height={32} width={32} />}
-          hint={
-            !hasForecast
-              ? undefined
-              : runway === null
-                ? "Résultat mensuel positif"
-                : `≈ ${runway} mois d'autonomie`
-          }
-          tone={money < 0 ? "error" : "neutral"}
-        />
-        <StatCard
-          label={hasForecast ? "Revenus mensuels" : "Revenus du dernier mois"}
-          value={formatPrice(projection.revenue) + " /mois"}
-          hint={
-            hasForecast ? "Produits lancés, après obsolescence" : `Produits, ${scope}`
-          }
-          icon={<ReceiveEuros height={32} width={32} />}
-        />
-        <StatCard
-          label={
-            hasForecast ? "Dépenses mensuelles" : "Dépenses du dernier mois"
-          }
-          value={formatPrice(projection.expenses) + " /mois"}
-          hint="Charges + salaires + prêts + maintenance"
-          icon={<SendEuros height={32} width={32} />}
-        />
-        <StatCard
-          label={hasForecast ? "Résultat prévisionnel" : "Résultat récurrent"}
-          value={
-            (projection.net >= 0 ? "+" : "−") +
-            formatPrice(Math.abs(projection.net)) +
-            " /mois"
-          }
-          hint={
-            monthlyReports.length > 0
-              ? `Moyenne réelle 3 mois : ${avg3 >= 0 ? "+" : "−"}${formatPrice(
-                  Math.abs(avg3),
-                )} €`
-              : "Aucun mois encore clôturé"
-          }
-          icon={<Coins height={32} width={32} />}
-          tone={projection.net >= 0 ? "success" : "error"}
-        />
-      </div>
+        {/* Chiffres clés */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi
+            label="Trésorerie"
+            value={formatPrice(money) + " €"}
+            valueTone={money < 0 ? "error" : "neutral"}
+            sub={
+              !hasForecast
+                ? undefined
+                : runway === null
+                  ? "Résultat mensuel positif"
+                  : `≈ ${runway} mois d'autonomie`
+            }
+          />
+          <Kpi
+            label={hasForecast ? "Revenus mensuels" : "Revenus du dernier mois"}
+            value={
+              <>
+                {formatPrice(projection.revenue)} €<Unit> / mois</Unit>
+              </>
+            }
+            sub={hasForecast ? undefined : `Produits, ${scope}`}
+          />
+          <Kpi
+            label={
+              hasForecast ? "Dépenses mensuelles" : "Dépenses du dernier mois"
+            }
+            value={
+              <>
+                {formatPrice(projection.expenses)} €<Unit> / mois</Unit>
+              </>
+            }
+          />
+          <Kpi
+            label={hasForecast ? "Résultat prévisionnel" : "Résultat récurrent"}
+            value={
+              <>
+                {signed(projection.net)} €<Unit> / mois</Unit>
+              </>
+            }
+            valueTone={projection.net >= 0 ? "success" : "error"}
+            sub={
+              monthlyReports.length > 0
+                ? `Moyenne réelle 3 mois : ${signed(avg3)} €`
+                : "Aucun mois encore clôturé"
+            }
+          />
+        </div>
 
-      <div className="grid lg:grid-cols-2 grid-cols-1 gap-4 items-start">
-        <div className="card bg-base-100 shadow-md border border-base-300">
-          <div className="p-4 space-y-3">
-            <div className="flex flex-row items-center justify-between">
-              <h2 className="text-lg font-semibold">
+        <div className="grid grid-cols-1 items-start gap-3.5 lg:grid-cols-2">
+          {/* Compte de résultat */}
+          <Panel
+            title={
+              <>
                 {hasForecast
                   ? "Compte de résultat prévisionnel"
                   : "Compte de résultat"}
-              </h2>
-              <span className="text-xs opacity-60">{scope}</span>
-            </div>
-
+                <CodexLink id="tresorerie" />
+              </>
+            }
+            aside={<NotePill>{scope}</NotePill>}
+          >
             <PnlRow
               label="Revenus produits"
               value={projection.revenue}
               share={projection.revenue / scale}
               hint={
-                hasForecast && campaign ? `campagne ${campaign.type}` : undefined
+                hasForecast && campaign
+                  ? `campagne ${campaign.type}`
+                  : undefined
               }
             />
 
-            <div className="divider my-1" />
+            <div className="space-y-3 border-t-[1.5px] border-base-300 pt-3">
+              {expenseLines.map((line) => (
+                <PnlRow
+                  key={`pnl_${line.label}`}
+                  label={line.label}
+                  value={-line.value}
+                  share={line.value / scale}
+                />
+              ))}
+            </div>
 
-            {expenseLines.map((line) => (
-              <PnlRow
-                key={`pnl_${line.label}`}
-                label={line.label}
-                value={-line.value}
-                share={line.value / scale}
-              />
-            ))}
-
-            <div className="divider my-1" />
-
-            <div className="flex flex-row items-baseline justify-between">
-              <span className="font-semibold">Résultat net</span>
+            <div className="flex flex-row items-baseline justify-between gap-2 border-t-2 border-dashed border-base-content/25 pt-3">
+              <span className="font-extrabold">Résultat net</span>
               <span
                 className={
-                  "text-xl font-semibold tabular-nums " +
+                  "font-display text-2xl font-bold tabular-nums " +
                   (projection.net >= 0 ? "text-success" : "text-error")
                 }
               >
-                {projection.net >= 0 ? "+" : "−"}
-                {formatPrice(Math.abs(projection.net))} € /mois
+                {signed(projection.net)} €
+                <span className="text-base"> / mois</span>
               </span>
             </div>
 
             {runway !== null && (
-              <p className="text-xs text-warning">
-                ⚠️ À ce rythme, la trésorerie tient ≈ {runway} mois.
+              <p className="flex items-center gap-1.5 text-xs font-extrabold text-warning">
+                <WarningTriangle width={14} height={14} strokeWidth={2.4} />À ce
+                rythme, la trésorerie tient ≈ {runway} mois.
               </p>
             )}
             {!hasForecast && (
-              <p className="text-xs opacity-60">
-                Flux récurrents du dernier mois clôturé, hors mouvements
-                ponctuels. Le prévisionnel et l'autonomie de trésorerie
-                s'apprennent : formation « Prévision de trésorerie » du
-                fondateur.
+              <p className="text-xs font-bold text-base-content/60">
+                Dernier mois clôturé, hors ponctuels.
               </p>
             )}
-          </div>
-        </div>
+          </Panel>
 
-        <div className="card bg-base-100 shadow-md border border-base-300">
-          <div className="p-4 space-y-3">
-            <div className="flex flex-row items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                Répartition des dépenses
-              </h2>
-              <span className="text-sm opacity-60 tabular-nums">
-                {formatPrice(projection.expenses)} € / mois
-              </span>
-            </div>
-
+          {/* Répartition des dépenses et accès à la banque */}
+          <Panel
+            title="Répartition des dépenses"
+            aside={
+              <NotePill>{formatPrice(projection.expenses)} € / mois</NotePill>
+            }
+          >
             {projection.expenses === 0 ? (
-              <p className="text-sm opacity-60">Aucune dépense récurrente.</p>
+              <p className="rounded-xl border-2 border-dashed border-base-300 py-4 text-center text-sm font-bold text-base-content/60">
+                Aucune dépense récurrente.
+              </p>
             ) : (
               <>
-                <div className="flex flex-row h-6 w-full overflow-hidden rounded">
-                  {expenseLines.map((line) => {
-                    if (line.value === 0) return null;
+                <div
+                  className="flex h-7 w-full flex-row overflow-hidden rounded-full border-[2.5px] border-ink bg-base-200"
+                  role="img"
+                  aria-label={visibleExpenses
+                    .map(
+                      (line) => `${line.label} : ${formatPrice(line.value)} €`,
+                    )
+                    .join(", ")}
+                >
+                  {visibleExpenses.map((line, i) => {
                     const pct = (line.value / projection.expenses) * 100;
                     return (
                       <div
                         key={`share_${line.label}`}
-                        className={`${line.bg} ${line.fg} flex items-center justify-center text-xs`}
+                        className={`${line.bg} ${line.fg} flex items-center justify-center border-ink text-xs font-extrabold ${i < visibleExpenses.length - 1 ? "border-r-2" : ""}`}
                         style={{ width: pct + "%" }}
                         title={`${line.label} — ${formatPrice(line.value)} €`}
                       >
@@ -414,33 +398,41 @@ export const FinancePage: FC = (): ReactElement => {
                   })}
                 </div>
 
-                <div className="flex flex-row flex-wrap gap-x-4 gap-y-1 text-sm">
+                <ul className="grid list-none grid-cols-1 gap-x-5 gap-y-1.5 p-0 sm:grid-cols-2">
                   {expenseLines.map((line) => (
-                    <div
+                    <li
                       key={`legend_${line.label}`}
-                      className="flex flex-row items-center space-x-2"
+                      className={
+                        "flex items-center gap-2 text-sm font-bold " +
+                        (line.value === 0 ? "text-base-content/50" : "")
+                      }
                     >
                       <span
-                        className={"inline-block w-3 h-3 rounded " + line.bg}
+                        className={`size-3 shrink-0 rounded-[4px] border-2 border-ink ${line.bg}`}
                       />
-                      <span>
-                        {line.label} : {formatPrice(line.value)} €
+                      <span className="truncate">{line.label}</span>
+                      <span className="ml-auto font-extrabold tabular-nums">
+                        {formatPrice(line.value)} €
                       </span>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </>
             )}
 
-            <Link
-              to="/game/finance/bank"
-              className="flex flex-row items-center justify-between rounded-lg border border-base-300 p-3 hover:border-primary transition-colors"
-            >
-              <div className="flex flex-row items-center space-x-3">
-                <BankIcon height={24} width={24} className="opacity-70" />
-                <div>
-                  <p className="font-medium">Banque</p>
-                  <p className="text-xs opacity-70">
+            <div className="mt-1 border-t-[1.5px] border-base-300 pt-2">
+              <Link
+                to="/game/finance/bank"
+                className="-mx-1.5 flex flex-row items-center gap-3 rounded-xl px-1.5 py-1.5 transition-colors hover:bg-base-200/60"
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-[2.5px] border-ink bg-white">
+                  <BankIcon width={18} height={18} strokeWidth={2.2} />
+                </span>
+                <span className="min-w-0 flex-1 leading-snug">
+                  <span className="block font-display font-semibold">
+                    Banque
+                  </span>
+                  <span className="block text-xs font-bold text-base-content/70">
                     {loanSummary.count > 0
                       ? `${loanSummary.count} prêt${
                           loanSummary.count > 1 ? "s" : ""
@@ -449,28 +441,30 @@ export const FinancePage: FC = (): ReactElement => {
                     {loanSummary.hasMissed && (
                       <span className="text-error"> · impayés</span>
                     )}
-                  </p>
-                </div>
-              </div>
-              <NavArrowRight height={24} />
-            </Link>
-          </div>
+                  </span>
+                </span>
+                <NavArrowRight width={22} height={22} strokeWidth={2.2} />
+              </Link>
+            </div>
+          </Panel>
         </div>
-      </div>
 
-      <div className="card bg-base-100 shadow-md border border-base-300">
-        <div className="p-4 space-y-3">
-          <div className="flex flex-row items-center justify-between">
-            <h2 className="text-lg font-semibold">Historique mensuel</h2>
-            <span className="text-sm opacity-60">
+        {/* Historique */}
+        <Panel
+          title={
+            <>
+              Historique mensuel <CodexLink id="tresorerie" />
+            </>
+          }
+          aside={
+            <CountPill>
               {history.length} mois clôturé{history.length > 1 ? "s" : ""}
-            </span>
-          </div>
-
+            </CountPill>
+          }
+        >
           {history.length === 0 ? (
-            <p className="text-sm opacity-60 italic py-4">
-              Aucun mois clôturé pour l'instant — le détail apparaît après la
-              première facturation mensuelle.
+            <p className="rounded-xl border-2 border-dashed border-base-300 py-4 text-center text-sm font-bold text-base-content/60">
+              Aucun mois clôturé pour l'instant.
             </p>
           ) : (
             <>
@@ -482,10 +476,20 @@ export const FinancePage: FC = (): ReactElement => {
                     <tr>
                       <th>Mois</th>
                       <th className="text-right">Revenus</th>
-                      <th className="text-right">Charges</th>
+                      <th
+                        className="text-right"
+                        title="Charges immobilières et maintenance des produits"
+                      >
+                        Charges
+                      </th>
                       <th className="text-right">Salaires</th>
                       <th className="text-right">Prêts</th>
-                      <th className="text-right">Autres</th>
+                      <th
+                        className="text-right"
+                        title="Mouvements ponctuels : contrats, bâtiments, indemnités, prêts"
+                      >
+                        Autres
+                      </th>
                       <th className="text-right">Net</th>
                       <th className="text-right">Trésorerie</th>
                     </tr>
@@ -493,7 +497,7 @@ export const FinancePage: FC = (): ReactElement => {
                   <tbody className="tabular-nums">
                     {[...history].reverse().map((r) => (
                       <tr key={`row_${r.time}`}>
-                        <td>{r.label}</td>
+                        <td className="font-bold">{r.label}</td>
                         <td className="text-right">
                           +{formatPrice(r.revenue)}
                         </td>
@@ -514,21 +518,17 @@ export const FinancePage: FC = (): ReactElement => {
                             : "—"}
                         </td>
                         <td className="text-right">
-                          {r.other === 0
-                            ? "—"
-                            : (r.other > 0 ? "+" : "−") +
-                              formatPrice(Math.abs(r.other))}
+                          {r.other === 0 ? "—" : signed(r.other)}
                         </td>
                         <td
                           className={
-                            "text-right font-medium " +
+                            "text-right font-extrabold " +
                             (r.net >= 0 ? "text-success" : "text-error")
                           }
                         >
-                          {(r.net >= 0 ? "+" : "−") +
-                            formatPrice(Math.abs(r.net))}
+                          {signed(r.net)}
                         </td>
-                        <td className="text-right">
+                        <td className="text-right font-bold">
                           {formatPrice(r.moneyAfter)}
                         </td>
                       </tr>
@@ -536,16 +536,9 @@ export const FinancePage: FC = (): ReactElement => {
                   </tbody>
                 </table>
               </div>
-
-              <p className="text-xs opacity-60">
-                « Charges » réunit charges immobilières et maintenance des
-                produits. « Autres » regroupe les mouvements ponctuels du mois :
-                contrats encaissés, achats de bâtiment, indemnités, versements
-                de prêt.
-              </p>
             </>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );
