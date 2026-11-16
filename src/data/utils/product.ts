@@ -55,6 +55,18 @@ import {
 export const MAINTENANCE_FIXED = 250;
 export const MAINTENANCE_PER_COMPONENT = 20 / COMPONENT_GRAIN;
 
+/**
+ * Frais de création d'un produit, débités au lancement du projet : étude,
+ * outillage, juridique. Un studio naissant n'a pas de quoi les payer ; il vit
+ * d'abord des contrats et met de côté. Les grands segments coûtent plus cher.
+ */
+export const PRODUCT_CREATION_COST: Record<ProductGenre, number> = {
+  [ProductGenre.OUTIL]: 12_000,
+  [ProductGenre.SERVICE]: 20_000,
+  [ProductGenre.JEU]: 30_000,
+  [ProductGenre.PLATEFORME]: 50_000,
+};
+
 /** Durée du pic de lancement (mois pleins). */
 export const LAUNCH_SPIKE_MONTHS = 2;
 /** Part du pic acquise sans aucune hype ; le reste vient de la campagne. */

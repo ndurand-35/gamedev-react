@@ -42,12 +42,13 @@ export const TUTORIAL_OUTRO = "Le garage est à toi. Fais-en un studio.";
 
 /**
  * Trésorerie à partir de laquelle Henri passe à l'étape : on vit d'abord des
- * contrats, on recrute quand la caisse le permet, et le premier produit vient
- * une fois le studio installé.
+ * contrats en mettant de côté, le premier produit vient quand on peut payer
+ * ses frais de création (Outil : 12 000 €) et tenir pendant son
+ * développement, et on recrute une fois qu'il rapporte.
  */
 export const STEP_MONEY: Partial<Record<TutorialStepId, number>> = {
-  hire: 15_000,
-  product: 50_000,
+  product: 15_000,
+  hire: 25_000,
 };
 
 /** Où en est la partie : ce dont dépendent les seuils et le guidage. */
@@ -59,8 +60,8 @@ export interface TutorialContext {
 }
 
 // Le garage ouvre avec le stock du premier contrat : on le signe et on le
-// livre d'abord, puis on se met à produire. Le premier produit vient en
-// dernier, une fois quelques contrats livrés.
+// livre d'abord, puis on se met à produire. Le premier produit vient une fois
+// ses frais mis de côté, l'embauche en dernier.
 export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "sign",
@@ -83,14 +84,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     line: "Surveille tes comptes. Si la caisse est vide en fin de mois, la banque ne fera pas de cadeau.",
   },
   {
-    id: "hire",
-    title: "Recrutez",
-    line: "Quinze mille en caisse : tu peux te payer de l'aide. Il reste deux chaises dans ce garage.",
-  },
-  {
     id: "product",
     title: "Créez votre premier produit",
-    line: "Cinquante mille en caisse : tu as de quoi voir plus grand. Un produit à toi rapporte tous les mois.",
+    line: "Quinze mille en caisse : de quoi lancer un petit outil. Garde de quoi tenir le temps de le développer, il ne rapportera qu'une fois sorti.",
+  },
+  {
+    id: "hire",
+    title: "Recrutez",
+    line: "Vingt-cinq mille en caisse : tu peux te payer de l'aide. Il reste deux chaises dans ce garage.",
   },
 ];
 

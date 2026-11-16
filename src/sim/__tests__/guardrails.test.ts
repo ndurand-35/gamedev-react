@@ -51,6 +51,7 @@ const game = (
 ): SimulationResult => ({
   seed: 1,
   years: Array.from({ length: 40 }, (_, i) => year(1970 + i, over(1970 + i))),
+  months: [],
   products: [],
   bankruptAt,
   counters: emptyCounters(),

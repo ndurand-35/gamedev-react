@@ -102,9 +102,31 @@ export interface ProductRecord {
   maintenance: number;
 }
 
+/** Point mensuel, pris à chaque clôture de mois (début de partie surtout). */
+export interface MonthRecord {
+  /** Mois écoulés depuis le début de la partie (1 = fin du premier mois). */
+  month: number;
+  /** Trésorerie juste après la clôture, et au plus bas du mois. */
+  money: number;
+  minMoney: number;
+  reputation: number;
+  headcount: number;
+  /** Ce que la clôture a encaissé et payé. */
+  productRevenue: number;
+  payroll: number;
+  premises: number;
+  /** Cumuls depuis le début de la partie. */
+  contractsDelivered: number;
+  contractsFailed: number;
+  contractIncome: number;
+  launches: number;
+  rescueLoans: number;
+}
+
 export interface SimulationResult {
   seed: number;
   years: YearRecord[];
+  months: MonthRecord[];
   products: ProductRecord[];
   /** Année de la faillite, si elle survient. */
   bankruptAt: number | null;
@@ -167,6 +189,7 @@ export const simulate = ({
   onYear,
   schedule = "NORMAL",
   amenities = true,
+  productsFromMonth = 0,
 }: {
   seed: number;
   years: number;
@@ -174,6 +197,8 @@ export const simulate = ({
   schedule?: SchedulePolicy;
   /** Le bot achète-t-il des aménagements ? */
   amenities?: boolean;
+  /** Mois avant le premier projet produit du bot (joueur « contrats d'abord »). */
+  productsFromMonth?: number;
   /** Appelé à chaque année close : suivi de progression. */
   onYear?: (record: YearRecord) => void;
 }): SimulationResult => {
@@ -187,9 +212,11 @@ export const simulate = ({
     });
     const dispatch = store.dispatch as (a: unknown) => unknown;
     newGame(dispatch);
-    const bot = new Bot(store, schedule, amenities);
+    const bot = new Bot(store, schedule, amenities, productsFromMonth);
 
     const records: YearRecord[] = [];
+    const months: MonthRecord[] = [];
+    let monthMin = Infinity;
     let bankruptAt: number | null = null;
     const startJournal = () => ({ ...journal });
     let journalAtYearStart = startJournal();
@@ -355,6 +382,25 @@ export const simulate = ({
 
       const after = simState(store);
       acc.minMoney = Math.min(acc.minMoney, after.company.money);
+      monthMin = Math.min(monthMin, after.company.money);
+      if (plan) {
+        months.push({
+          month: months.length + 1,
+          money: Math.round(after.company.money),
+          minMoney: Math.round(monthMin),
+          reputation: after.company.reputation,
+          headcount: after.employe.employeList.length,
+          productRevenue: Math.round(plan.totalRevenue),
+          payroll: Math.round(plan.payroll),
+          premises: Math.round(plan.totalCharges + plan.totalVariableCharges),
+          contractsDelivered: bot.counters.contractsDelivered,
+          contractsFailed: journal.failed,
+          contractIncome: Math.round(bot.counters.contractIncome),
+          launches: bot.counters.launches,
+          rescueLoans: bot.counters.rescueLoans,
+        });
+        monthMin = after.company.money;
+      }
       if (plan) bot.monthly(plan.totalRevenue);
       if (date.hour() === 9) bot.daily();
     }
@@ -382,6 +428,7 @@ export const simulate = ({
     return {
       seed,
       years: records,
+      months,
       products,
       bankruptAt,
       counters: bot.counters,

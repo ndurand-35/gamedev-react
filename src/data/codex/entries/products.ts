@@ -44,6 +44,20 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
         type: "p",
         text: "La **maintenance** mensuelle d'un produit lancé comprend un socle fixe et une part par composant : plus le produit est gros, plus il coûte. Le montant est annoncé dès l'assemblage et prélevé à la clôture du mois.",
       },
+      {
+        type: "table",
+        head: ["Genre", "Frais de création"],
+        rows: [
+          ["Outil", "12 000 €"],
+          ["Service", "20 000 €"],
+          ["Jeu", "30 000 €"],
+          ["Plateforme", "50 000 €"],
+        ],
+      },
+      {
+        type: "p",
+        text: "Lancer un projet coûte des **frais de création**, débités d'un coup, selon le genre. Un studio naissant n'a pas de quoi les payer : il vit d'abord des **contrats** et met de côté. Prévoir aussi de quoi tenir pendant le développement : le produit ne rapporte qu'une fois lancé.",
+      },
     ],
     related: [
       "genres",

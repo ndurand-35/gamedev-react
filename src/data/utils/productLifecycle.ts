@@ -1,10 +1,16 @@
-import { Product, ProductStatus, isProductReady } from "@/data/interface";
+import {
+  Product,
+  ProductGenre,
+  ProductStatus,
+  isProductReady,
+} from "@/data/interface";
 import { removeComponents } from "@/data/redux/componentSlice";
 import { addReputation, setMoney } from "@/data/redux/companySlice";
 import { pushNotification } from "@/data/redux/notificationSlice";
 import {
   addFeature,
   applyProductLifecycle,
+  createProduct,
   investInProduct,
   launchProduct,
   normalizeProducts,
@@ -36,6 +42,7 @@ import {
 } from "@/data/utils/feature";
 import {
   PATCH_CODE_PER_BUG,
+  PRODUCT_CREATION_COST,
   computeProductRevenues,
   launchHype,
   launchReputationDelta,
@@ -60,6 +67,38 @@ import {
 
 const formatScore = (score: number): string =>
   score.toFixed(1).replace(".", ",");
+
+/**
+ * Création d'un projet produit : débite les frais du segment
+ * (`PRODUCT_CREATION_COST`). Refusée, sans rien créer, si la trésorerie ne
+ * les couvre pas.
+ */
+export const createProductThunk =
+  (payload: {
+    name: string;
+    genre: ProductGenre;
+    features: string[];
+    time?: number;
+  }) =>
+  (dispatch: AppDispatch, getState: () => RootState): { ok: boolean } => {
+    const state = getState();
+    const cost = PRODUCT_CREATION_COST[payload.genre];
+    if (state.company.money < cost) {
+      dispatch(
+        pushNotification({
+          message: `Il faut ${formatPrice(cost)} € pour lancer un projet « ${payload.genre} ».`,
+          type: "error",
+        }),
+      );
+      return { ok: false };
+    }
+    const id = state.product.nextProductId;
+    dispatch(createProduct(payload));
+    // Assemblage refusé par le reducer : rien n'est débité.
+    if (getState().product.nextProductId === id) return { ok: false };
+    dispatch(setMoney(state.company.money - cost));
+    return { ok: true };
+  };
 
 /**
  * Développement : verse dans le produit les meilleurs composants du stock qui

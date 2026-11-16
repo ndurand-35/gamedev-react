@@ -19,6 +19,7 @@ import {
 import {
   MAINTENANCE_FIXED,
   MAINTENANCE_PER_COMPONENT,
+  PRODUCT_CREATION_COST,
 } from "@/data/utils/product";
 import { CostBadges } from "@/components/product/CostBadges";
 import { ComponentTypeBadge } from "@/components/component";
@@ -56,6 +57,7 @@ export const NewProductModal: FC<NewProductModalProps> = ({
   const hasMarketStudy = useFounderSkill("market_study");
   const trends = useTrends();
   const time = useAppSelector((s) => s.engine.time);
+  const money = useAppSelector((s) => s.company.money);
   const featureTrend = (id: string) =>
     trends.find((t) => t.kind === "feature" && t.target === id);
   const genreTrend = trends.find(
@@ -91,7 +93,9 @@ export const NewProductModal: FC<NewProductModalProps> = ({
     (acc, f) => acc + featureAppeal(f, genre),
     0,
   );
-  const canCreate = name.trim().length > 0;
+  const creationCost = PRODUCT_CREATION_COST[genre];
+  const affordable = money >= creationCost;
+  const canCreate = name.trim().length > 0 && affordable;
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -177,6 +181,16 @@ export const NewProductModal: FC<NewProductModalProps> = ({
                     </span>
                     <span className="block text-xs font-bold text-base-content/70 tabular-nums">
                       {formatPrice(segmentDemand(g, time))} € / mois
+                    </span>
+                    <span
+                      className={
+                        "block text-xs font-extrabold tabular-nums " +
+                        (money >= PRODUCT_CREATION_COST[g]
+                          ? "text-base-content/70"
+                          : "text-error")
+                      }
+                    >
+                      Création {formatPrice(PRODUCT_CREATION_COST[g])} €
                     </span>
                   </button>
                 );
@@ -291,7 +305,7 @@ export const NewProductModal: FC<NewProductModalProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+        <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
           <button
             type="button"
             className="btn btn-ghost underline underline-offset-4"
@@ -299,13 +313,21 @@ export const NewProductModal: FC<NewProductModalProps> = ({
           >
             Annuler
           </button>
+          {!affordable && (
+            <span className="ml-auto text-right text-xs font-bold whitespace-nowrap text-error sm:text-sm">
+              Il manque {formatPrice(creationCost - money)} €
+            </span>
+          )}
           <button
             type="submit"
-            className="btn btn-primary ml-auto gap-2"
+            className={"btn btn-primary gap-2 " + (affordable ? "ml-auto" : "")}
             disabled={!canCreate}
           >
             <Plus width={16} height={16} strokeWidth={2.6} />
             Créer
+            <span className="hidden sm:inline">
+              · {formatPrice(creationCost)} €
+            </span>
           </button>
         </div>
       </form>

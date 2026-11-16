@@ -2,17 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import { simulate } from "@/sim/simulate";
 
-// La simulation d'équilibre complète (`npm run sim`) joue 40 ans ; ici, une
-// seule année suffit à vérifier que le bot joue une vraie partie et que la
+// La simulation d'équilibre complète (`npm run sim`) joue 40 ans ; ici, deux
+// années suffisent à vérifier que le bot joue une vraie partie et que la
 // graine la rend reproductible — sans quoi ses bilans ne compareraient rien.
 describe("simulation", () => {
-  const run = () => simulate({ seed: 7, years: 1 });
+  const run = () => simulate({ seed: 7, years: 2 });
 
-  it("joue une première année complète : contrats, produit, sans faillite", () => {
+  it("contrats d'abord, premier produit la deuxième année, sans faillite", () => {
     const result = run();
     expect(result.bankruptAt).toBeNull();
-    expect(result.years).toHaveLength(1);
+    expect(result.years).toHaveLength(2);
     expect(result.counters.contractsDelivered).toBeGreaterThan(0);
+    // Les frais de création rendent un produit hors de portée la première
+    // année (cf. PRODUCT_CREATION_COST).
+    expect(result.years[0].launches).toBe(0);
     expect(result.counters.launches).toBeGreaterThan(0);
   });
 

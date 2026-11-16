@@ -115,23 +115,25 @@ describe("étapes des premiers pas", () => {
     ).toBeUndefined();
   });
 
-  it("on recrute à 15 000 €, puis le premier produit vient à 50 000 €", () => {
-    expect(STEP_MONEY).toEqual({ hire: 15_000, product: 50_000 });
+  it("le premier produit vient à 15 000 €, puis on recrute à 25 000 €", () => {
+    expect(STEP_MONEY).toEqual({ product: 15_000, hire: 25_000 });
     const before = ["sign", "deliver", "produce", "treasury"] as const;
-    expect(TUTORIAL_STEPS[TUTORIAL_STEPS.length - 1].id).toBe("product");
+    expect(TUTORIAL_STEPS[TUTORIAL_STEPS.length - 1].id).toBe("hire");
     // Sous 15 000 €, le tutoriel attend sans sauter d'étape.
     expect(currentTutorialStep([...before], { money: 14_999 })).toBeUndefined();
     expect(currentTutorialStep([...before], { money: 15_000 })?.id).toBe(
-      "hire",
-    );
-    // Recrutement fait : le produit attend 50 000 €.
-    const hired = [...before, "hire"] as const;
-    expect(currentTutorialStep([...hired], { money: 49_999 })).toBeUndefined();
-    expect(isTutorialFinished([...hired])).toBe(false);
-    expect(currentTutorialStep([...hired], { money: 50_000 })?.id).toBe(
       "product",
     );
-    expect(isTutorialFinished([...hired, "product"])).toBe(true);
+    // Produit créé : le recrutement attend 25 000 €.
+    const launched = [...before, "product"] as const;
+    expect(
+      currentTutorialStep([...launched], { money: 24_999 }),
+    ).toBeUndefined();
+    expect(isTutorialFinished([...launched])).toBe(false);
+    expect(currentTutorialStep([...launched], { money: 25_000 })?.id).toBe(
+      "hire",
+    );
+    expect(isTutorialFinished([...launched, "hire"])).toBe(true);
   });
 
   it("annonce les seuils qui restent, dans l'ordre", () => {
@@ -139,12 +141,12 @@ describe("étapes des premiers pas", () => {
     expect(
       upcomingTutorialMilestones([...before]).map((m) => [m.step.id, m.money]),
     ).toEqual([
-      ["hire", 15_000],
-      ["product", 50_000],
+      ["product", 15_000],
+      ["hire", 25_000],
     ]);
     expect(
-      upcomingTutorialMilestones([...before, "hire"]).map((m) => m.step.id),
-    ).toEqual(["product"]);
+      upcomingTutorialMilestones([...before, "product"]).map((m) => m.step.id),
+    ).toEqual(["hire"]);
   });
 
   it("au Pôle emploi, éclaire la recherche, puis le dossier, puis les candidats", () => {

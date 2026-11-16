@@ -1,3 +1,4 @@
+import { getTimeAsDate } from "@/data/utils/time";
 import {
   COMPONENT_TYPE_ORDER,
   Component,
@@ -31,7 +32,6 @@ import {
 } from "@/data/redux/componentSlice";
 import {
   addFeature,
-  createProduct,
   investInProduct,
   patchProduct,
   retireProduct,
@@ -63,6 +63,7 @@ import {
 } from "@/data/redux/recruitmentThunks";
 import { deliverContract } from "@/data/utils/task";
 import {
+  createProductThunk,
   launchProductThunk,
   startPromotionThunk,
 } from "@/data/utils/productLifecycle";
@@ -94,6 +95,7 @@ import {
 } from "@/data/utils/feature";
 import {
   PATCH_CODE_PER_BUG,
+  PRODUCT_CREATION_COST,
   computeProductRevenues,
   productFreshness,
   productMaintenance,
@@ -299,6 +301,14 @@ interface UpdateProject {
   featureId: string;
 }
 
+/**
+ * Ce qu'il doit rester une fois les frais de création payés : six mois de
+ * charges, et au moins de quoi voir venir quand le studio tient en une
+ * personne (pas de revenu pendant le développement).
+ */
+const creationReserve = (state: RootState): number =>
+  Math.max(2500, 6 * monthlyBurn(state));
+
 export class Bot {
   readonly counters = emptyCounters();
   /** Revenu des trois derniers mois (produits + contrats), le plus récent en fin. */
@@ -321,6 +331,11 @@ export class Bot {
     private readonly schedulePolicy: SchedulePolicy = "NORMAL",
     /** Le bot achète-t-il des aménagements ? */
     private readonly furnishes = true,
+    /**
+     * Mois de jeu avant le premier projet produit : 0 = dès le début. Simule
+     * un joueur qui vit d'abord des contrats, comme le tutoriel l'y invite.
+     */
+    private readonly productsFromMonth = 0,
   ) {}
 
   private get state(): RootState {
@@ -635,7 +650,8 @@ export class Bot {
     this.applySchedule();
     this.claimProjectComponents();
     this.deliverContracts();
-    this.planProject();
+    const month = getTimeAsDate(this.state.engine.time).diff(getTimeAsDate(0), "month");
+    if (month >= this.productsFromMonth) this.planProject();
     this.acceptContracts();
     this.investInProject();
     this.assignWork();
@@ -1123,9 +1139,14 @@ export class Bot {
     const rivals = state.competitor?.products ?? [];
 
     // 1. Un produit par segment : le plus attrayant de ceux qu'on peut bâtir.
+    // Seulement les segments dont on peut payer la création.
+    const affordable = (g: ProductGenre) =>
+      state.company.money >= PRODUCT_CREATION_COST[g] + creationReserve(state);
     const uncovered = PRODUCT_GENRE_ORDER.filter(
       (g) =>
-        !launched.some((p) => p.genre === g) && GENRES[g].minSize <= buildable,
+        !launched.some((p) => p.genre === g) &&
+        GENRES[g].minSize <= buildable &&
+        affordable(g),
     ).sort((a, b) => {
       const score = (g: ProductGenre) =>
         segmentDemand(g, time, state.product.confidence) /
@@ -1181,16 +1202,20 @@ export class Bot {
   ): number | undefined {
     const size = Math.max(GENRES[genre].minSize, Math.min(buildable, GENRES[genre].minSize * 2.5));
     const features = this.assemble(genre, size, time);
-    const id = this.state.product.nextProductId;
-    this.dispatch(
-      createProduct({
+    // Frais de création payés, il reste de quoi traverser le développement.
+    const cost = PRODUCT_CREATION_COST[genre];
+    if (this.state.company.money < cost + creationReserve(this.state))
+      return undefined;
+    const result = this.dispatch(
+      createProductThunk({
         name: `${genre} ${++this.productSerial}`,
         genre,
         features,
         time,
-      }),
-    );
-    if (this.state.product.nextProductId === id) return undefined;
+      }) as never,
+    ) as unknown as { ok: boolean };
+    if (!result.ok) return undefined;
+    const id = this.state.product.nextProductId - 1;
     this.counters.productsCreated++;
     return id;
   }
@@ -1385,6 +1410,13 @@ export class Bot {
       money > 10 * (burn + salary);
     if (!comfortable) return;
     if (state.employe.employeList.length >= MAX_HEADCOUNT) return;
+    // Jusqu'au premier lancement, on met de côté (frais de création, puis
+    // traversée du développement) plutôt que d'embaucher.
+    if (
+      this.counters.launches === 0 &&
+      money < PRODUCT_CREATION_COST[ProductGenre.OUTIL] + 4 * burn
+    )
+      return;
 
     if (slots <= 0) {
       const building = [...state.company.availableBuildingList]
