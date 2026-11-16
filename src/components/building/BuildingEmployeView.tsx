@@ -10,6 +10,7 @@ import {
   BeachBag,
   CoffeeCup,
   Desk,
+  Filter,
   List,
   NavArrowRight,
   Sofa,
@@ -139,10 +140,13 @@ export const EmployeViewSwitch = ({
         type="button"
         onClick={() => onMode(m)}
         aria-pressed={mode === m}
+        aria-label={label}
+        title={label}
         className="btn join-item btn-sm"
       >
         <Icon width={16} height={16} />
-        {label}
+        {/* Icônes seules sur téléphone : le sélecteur tient à côté du titre. */}
+        <span className="hidden sm:inline">{label}</span>
       </button>
     ))}
   </div>
@@ -202,12 +206,16 @@ export const BuildingEmployeView = ({
     });
   }, [employes, role, assignment, lowMoraleOnly]);
 
-  const payroll = filtered.reduce((sum, e) => sum + e.salary, 0);
   const isFiltered = filtered.length !== employes.length;
 
   // Places libres : affichées seulement sans filtre actif, puisqu'elles
   // décrivent le bâtiment et non une sélection de salariés.
-  const filtersActive = role !== "all" || assignment !== "all" || lowMoraleOnly;
+  const activeFilters =
+    Number(role !== "all") +
+    Number(assignment !== "all") +
+    Number(lowMoraleOnly);
+  const filtersActive = activeFilters > 0;
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const freeSeats = filtersActive
     ? 0
     : Math.max(0, buildingSeats(building) - employes.length);
@@ -217,47 +225,69 @@ export const BuildingEmployeView = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-3">
-      <header className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-bold">{building.name}</h1>
-        {/* Effectif affiché quand un filtre en masque une partie, et masse
-            salariale de la sélection. */}
+      {/* Sur téléphone : titre et sélecteur de vue sur la première ligne,
+          rythme et aménagement sur la seconde. Sur grand écran, le sélecteur
+          repasse en bout de ligne. */}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">
+          {building.name}
+        </h1>
+        {/* Effectif affiché quand un filtre en masque une partie. */}
         {isFiltered && (
           <span className="badge h-7 bg-base-300 px-3">
             {`${filtered.length} / ${employes.length} affichés`}
           </span>
         )}
-        <span className="text-sm font-bold text-base-content/70">
-          {formatPrice(payroll)} / mois
-        </span>
+        {onMode && (
+          <div className="ml-auto sm:order-last">
+            <EmployeViewSwitch mode={mode} onMode={onMode} />
+          </div>
+        )}
         <WorkScheduleSelect building={building} />
         <button
           type="button"
           className="btn btn-sm gap-1.5"
           onClick={() => setAmenityTarget(building)}
+          aria-label="Aménager"
+          title="Aménager"
         >
           <Sofa width={16} height={16} />
-          Aménager
+          <span className="hidden sm:inline">Aménager</span>
         </button>
-        {onMode && (
-          <div className="ml-auto">
-            <EmployeViewSwitch mode={mode} onMode={onMode} />
-          </div>
-        )}
       </header>
 
       {/* Filtres à gauche, répartition par activité à droite : la répartition
           décrit ce qui s'affiche juste en dessous, elle reste collée aux
-          vignettes plutôt qu'à l'en-tête. Sans personne, rien à filtrer. */}
+          vignettes plutôt qu'à l'en-tête. Sans personne, rien à filtrer.
+          Sur téléphone, les filtres se replient derrière un seul bouton. */}
       {employes.length > 0 && (
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <EmployeFilters
-            role={role}
-            onRole={setRole}
-            assignment={assignment}
-            onAssignment={setAssignment}
-            lowMoraleOnly={lowMoraleOnly}
-            onLowMoraleOnly={setLowMoraleOnly}
-          />
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:items-end">
+          <button
+            type="button"
+            className="btn btn-sm gap-1.5 sm:hidden"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((o) => !o)}
+          >
+            <Filter width={16} height={16} />
+            Filtres
+            {activeFilters > 0 && (
+              <span className="badge badge-xs badge-neutral tabular-nums">
+                {activeFilters}
+              </span>
+            )}
+          </button>
+          <div
+            className={`${filtersOpen ? "flex" : "hidden"} order-last w-full sm:order-none sm:flex sm:w-auto`}
+          >
+            <EmployeFilters
+              role={role}
+              onRole={setRole}
+              assignment={assignment}
+              onAssignment={setAssignment}
+              lowMoraleOnly={lowMoraleOnly}
+              onLowMoraleOnly={setLowMoraleOnly}
+            />
+          </div>
           <ActivitySummary employes={filtered} />
         </div>
       )}
@@ -457,7 +487,7 @@ const FreeSeatCard = ({ onClick }: { onClick: () => void }): ReactElement => (
     type="button"
     onClick={onClick}
     aria-label="Place libre — installer un employé"
-    className="flex h-full min-h-40 w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[1.1rem] border-[3px] border-dashed border-base-content/35 text-base-content/70 transition hover:border-ink hover:bg-white hover:text-ink"
+    className="flex h-full min-h-16 w-full cursor-pointer items-center justify-center gap-2 rounded-[1.1rem] sm:min-h-40 sm:flex-col sm:gap-1.5 border-[3px] border-dashed border-base-content/35 text-base-content/70 transition hover:border-ink hover:bg-white hover:text-ink"
   >
     <Desk width={26} height={26} strokeWidth={2} />
     <span className="font-display text-base font-semibold">Place libre</span>
@@ -506,7 +536,7 @@ const CardsView = ({
   return (
     // Marge intérieure compensée : le halo d'une carte en bordure n'est pas
     // rogné par le défilement.
-    <ul className="-m-2 grid min-h-0 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 overflow-y-auto p-2 pb-4">
+    <ul className="-m-2 grid min-h-0 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3 overflow-y-auto p-2 pb-4 sm:gap-4">
       {employes.map((emp) => {
         const activity = employeActivity(emp, production);
         const ratio = progressById.get(emp.id) ?? null;
@@ -523,7 +553,7 @@ const CardsView = ({
               onClick={() => onSelect?.(emp.id)}
               data-tuto={emp.id === 1 ? "founder" : undefined}
               aria-label={`Ouvrir la fiche de ${fullName(emp)} — ${activity.label}`}
-              className={`flex w-full cursor-pointer flex-col gap-3 rounded-[1.1rem] border-[3px] border-ink bg-white p-3.5 text-left shadow-toy transition-transform hover:-translate-y-0.5 ${glowClass}`}
+              className={`flex w-full cursor-pointer flex-col gap-2.5 rounded-[1.1rem] border-[3px] border-ink bg-white p-3 text-left sm:gap-3 sm:p-3.5 shadow-toy transition-transform hover:-translate-y-0.5 ${glowClass}`}
               style={
                 burst
                   ? ({

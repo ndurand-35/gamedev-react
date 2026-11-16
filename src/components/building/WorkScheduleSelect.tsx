@@ -51,8 +51,10 @@ export const WorkScheduleSelect = ({
         title={scheduleEffects(current)}
       >
         <Clock width={16} height={16} />
-        Rythme
+        {/* Sur téléphone, l'horloge suffit à dire de quoi il s'agit. */}
+        <span className="hidden sm:inline">Rythme</span>
         <select
+          aria-label="Rythme de travail"
           className={`select select-sm w-auto ${TONE[current]}`}
           value={current}
           onChange={(e) =>

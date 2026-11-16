@@ -32,6 +32,8 @@ import { COMPONENT_ICON, KindPill } from "@/components/component";
 import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
 import { CodexLink } from "@/components/codex/CodexLink";
 import { SectionTabs } from "@/components/layout/SectionTabs";
+import { Modal } from "@/components/global/Modal";
+import { useMediaQuery } from "@/data/hooks/useMediaQuery";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // L'atelier : une ligne par famille, une colonne par niveau. Chaque tuile donne
@@ -144,22 +146,25 @@ const Tile = ({
   );
 };
 
-const KindDetail = ({
-  kind,
-  producers,
-  time,
-}: {
+interface KindDetailProps {
   kind: ComponentKind;
   producers: ProductionPerson[];
   time: number;
-}): ReactElement => {
+}
+
+/** Fiche d'une pièce : colonne de droite sur grand écran, modale sur téléphone. */
+const KindDetailBody = ({
+  kind,
+  producers,
+  time,
+}: KindDetailProps): ReactElement => {
   const users = COMPONENT_KINDS.filter((k) => k.recipe[kind.id]);
   const skilled = producers.filter(
     (e) => craftBlocker(e, kind.id, time, gateShift(e)) === null,
   );
   const techs = kindTechnologies(kind.id);
   return (
-    <aside className="toy-tile flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <KindPill kind={kind.id} size={34} />
         <div>
@@ -209,8 +214,24 @@ const KindDetail = ({
             : skilled.map((e) => `${e.firstName} ${e.lastName}`).join(", ")}
         </dd>
       </dl>
-    </aside>
+    </div>
   );
+};
+
+const KindDetail = (props: KindDetailProps): ReactElement => (
+  <aside className="toy-tile p-4">
+    <KindDetailBody {...props} />
+  </aside>
+);
+
+const tierLabel = (t: ComponentTier): string =>
+  t > 1 ? `Niveau ${t} · stat ${TIER_GATE[t]}` : `Niveau ${t}`;
+
+/** Onglets de famille de la vue téléphone, à la couleur de chaque famille. */
+const FAMILY_TAB_ACTIVE: Record<ComponentType, string> = {
+  [ComponentType.CODE]: "bg-code/15 text-code",
+  [ComponentType.VISUEL]: "bg-visuel/15 text-visuel",
+  [ComponentType.UX]: "bg-ux/15 text-ux",
 };
 
 export const ComponentPage: React.FC = (): ReactElement => {
@@ -266,6 +287,38 @@ export const ComponentPage: React.FC = (): ReactElement => {
   const selectedKind =
     COMPONENT_KINDS.find((k) => k.id === selected) ?? COMPONENT_KINDS[0];
 
+  // Sur téléphone, la grille 3 × 4 ne tient pas : une famille à la fois, ses
+  // niveaux empilés, et la fiche s'ouvre en modale au toucher. On ouvre sur la
+  // famille du goulot, c'est elle que le joueur vient regarder.
+  const wide = useMediaQuery("(min-width: 48rem)");
+  const [family, setFamily] = useState<ComponentType>(
+    () => bottleneck?.family ?? ComponentType.CODE,
+  );
+  const [detailOpen, setDetailOpen] = useState(false);
+  const familyShort = (f: ComponentType): boolean =>
+    COMPONENT_KINDS.some((k) => k.family === f && (deficits[k.id] ?? 0) > 0);
+
+  const renderTile = (k: ComponentKind): ReactElement => (
+    <Tile
+      key={k.id}
+      kind={k}
+      stock={counts[k.id] ?? 0}
+      reserved={reserved[k.id] ?? 0}
+      deficit={deficits[k.id] ?? 0}
+      workers={workersByKind[k.id] ?? []}
+      invented={isKindAvailable(k.id, time)}
+      skilled={producers.some(
+        (e) => craftBlocker(e, k.id, time, gateShift(e)) === null,
+      )}
+      selected={k.id === selected}
+      time={time}
+      onSelect={() => {
+        setSelected(k.id);
+        if (!wide) setDetailOpen(true);
+      }}
+    />
+  );
+
   return (
     <div className="page-shell">
       <SectionTabs items={productTopMenuItems} ariaLabel="Section Production" />
@@ -294,63 +347,121 @@ export const ComponentPage: React.FC = (): ReactElement => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="overflow-x-auto">
-            <div className="grid min-w-[44rem] grid-cols-[6.5rem_repeat(4,minmax(0,1fr))] gap-2">
-              <span />
-              {TIERS.map((t) => (
-                <span
-                  key={t}
-                  className="text-center text-xs font-extrabold text-base-content/60"
-                >
-                  Niveau {t}
-                  {t > 1 && ` · stat ${TIER_GATE[t]}`}
-                </span>
-              ))}
-              {COMPONENT_TYPE_ORDER.map((family) => {
-                const Icon = COMPONENT_ICON[family];
-                return [
-                  <span
-                    key={`${family}_head`}
-                    className={`flex items-center gap-1.5 font-display text-lg font-bold ${FAMILY_TEXT[family]}`}
+        {!wide ? (
+          <>
+            <div
+              className="grid grid-cols-3 gap-1.5"
+              role="tablist"
+              aria-label="Famille de composants"
+            >
+              {COMPONENT_TYPE_ORDER.map((f) => {
+                const Icon = COMPONENT_ICON[f];
+                const active = f === family;
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setFamily(f)}
+                    className={
+                      "relative flex items-center justify-center gap-1.5 rounded-xl border-2 py-2 font-display text-base font-bold " +
+                      (active
+                        ? `border-ink ${FAMILY_TAB_ACTIVE[f]}`
+                        : "border-base-content/20 text-base-content/60")
+                    }
                   >
-                    <Icon width={18} height={18} strokeWidth={2.2} />
-                    {family}
-                  </span>,
-                  ...TIERS.map((tier) => (
-                    <div
-                      key={`${family}_${tier}`}
-                      className="flex flex-col gap-2"
-                    >
-                      {COMPONENT_KINDS.filter(
-                        (k) => k.family === family && k.tier === tier,
-                      ).map((k) => (
-                        <Tile
-                          key={k.id}
-                          kind={k}
-                          stock={counts[k.id] ?? 0}
-                          reserved={reserved[k.id] ?? 0}
-                          deficit={deficits[k.id] ?? 0}
-                          workers={workersByKind[k.id] ?? []}
-                          invented={isKindAvailable(k.id, time)}
-                          skilled={producers.some(
-                            (e) =>
-                              craftBlocker(e, k.id, time, gateShift(e)) ===
-                              null,
-                          )}
-                          selected={k.id === selected}
-                          time={time}
-                          onSelect={() => setSelected(k.id)}
-                        />
-                      ))}
-                    </div>
-                  )),
-                ];
+                    <Icon width={16} height={16} strokeWidth={2.2} />
+                    {f}
+                    {familyShort(f) && (
+                      <span
+                        aria-label="pièces manquantes"
+                        className="absolute top-1 right-1.5 size-2 rounded-full bg-error"
+                      />
+                    )}
+                  </button>
+                );
               })}
             </div>
+            <div className="flex flex-col gap-4" role="tabpanel">
+              {TIERS.map((tier) => {
+                const kinds = COMPONENT_KINDS.filter(
+                  (k) => k.family === family && k.tier === tier,
+                );
+                if (kinds.length === 0) return null;
+                return (
+                  <section key={tier} className="flex flex-col gap-2">
+                    <h2 className="text-xs font-extrabold text-base-content/60">
+                      {tierLabel(tier)}
+                    </h2>
+                    <div className="grid grid-cols-2 gap-2">
+                      {kinds.map(renderTile)}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+            <Modal
+              open={detailOpen}
+              onClose={() => setDetailOpen(false)}
+              ariaLabel={selectedKind.label}
+              actions={
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setDetailOpen(false)}
+                >
+                  Fermer
+                </button>
+              }
+            >
+              <KindDetailBody
+                kind={selectedKind}
+                producers={producers}
+                time={time}
+              />
+            </Modal>
+          </>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[44rem] grid-cols-[6.5rem_repeat(4,minmax(0,1fr))] gap-2">
+                <span />
+                {TIERS.map((t) => (
+                  <span
+                    key={t}
+                    className="text-center text-xs font-extrabold text-base-content/60"
+                  >
+                    {tierLabel(t)}
+                  </span>
+                ))}
+                {COMPONENT_TYPE_ORDER.map((row) => {
+                  const Icon = COMPONENT_ICON[row];
+                  return [
+                    <span
+                      key={`${row}_head`}
+                      className={`flex items-center gap-1.5 font-display text-lg font-bold ${FAMILY_TEXT[row]}`}
+                    >
+                      <Icon width={18} height={18} strokeWidth={2.2} />
+                      {row}
+                    </span>,
+                    ...TIERS.map((tier) => (
+                      <div
+                        key={`${row}_${tier}`}
+                        className="flex flex-col gap-2"
+                      >
+                        {COMPONENT_KINDS.filter(
+                          (k) => k.family === row && k.tier === tier,
+                        ).map(renderTile)}
+                      </div>
+                    )),
+                  ];
+                })}
+              </div>
+            </div>
+            <KindDetail kind={selectedKind} producers={producers} time={time} />
           </div>
-          <KindDetail kind={selectedKind} producers={producers} time={time} />
-        </div>
+        )}
       </div>
     </div>
   );
