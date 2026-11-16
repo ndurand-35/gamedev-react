@@ -285,7 +285,7 @@ export const netDeficits = (gross: Recipe, supply: Recipe): Recipe => {
  * Part du budget restant d'une famille consacrée à chaque niveau, en partant
  * du plus haut ; ce qui reste en bas part en composants de base.
  */
-const TIER_SHARE = 0.35;
+export const TIER_SHARE = 0.35;
 
 /** Budget minimal, en pièces du niveau le plus haut, pour en garantir une. */
 const TOP_TIER_MARGIN = 1.5;
@@ -294,7 +294,8 @@ const TOP_TIER_MARGIN = 1.5;
  * Compose une liste de pièces qui vaut `units` unités de travail dans une
  * famille, sans dépasser `maxTier`. `pick` choisit la sorte d'un niveau (ou
  * `undefined` s'il n'y en a pas) : au hasard pour un contrat, selon une
- * préférence pour une fonctionnalité.
+ * préférence pour une fonctionnalité. `share` : part du budget restant mise
+ * à chaque niveau (`TIER_SHARE` par défaut).
  */
 export const composeFamily = (
   family: ComponentType,
@@ -304,6 +305,7 @@ export const composeFamily = (
     family: ComponentType,
     tier: ComponentTier,
   ) => ComponentKindId | undefined,
+  share: number = TIER_SHARE,
 ): Recipe => {
   const out: Recipe = {};
   let remaining = Math.max(0, Math.round(units));
@@ -316,7 +318,7 @@ export const composeFamily = (
     // unités) ne tiendrait jamais dans la part d'un contrat.
     const floor =
       tier === maxTier && remaining >= value * TOP_TIER_MARGIN ? 1 : 0;
-    const n = Math.max(floor, Math.floor((remaining * TIER_SHARE) / value));
+    const n = Math.max(floor, Math.floor((remaining * share) / value));
     if (n <= 0) continue;
     out[id] = (out[id] ?? 0) + n;
     remaining -= n * kindValue(id);

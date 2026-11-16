@@ -50,6 +50,7 @@ import { ensureCompetitor } from "@/data/redux/competitorSlice";
 import {
   assignBuilding,
   assignComponentType,
+  setPost,
   setTraining,
 } from "@/data/redux/employeSlice";
 import { TRAINING_COST_PER_LEVEL } from "@/data/utils/training";
@@ -91,6 +92,7 @@ import {
   requirementsToRecipe,
 } from "@/data/utils/recipes";
 import { stockCovers } from "@/data/utils/deliveryAdvisor";
+import { CONFIDENCE_WARNING } from "@/data/utils/marketConfidence";
 import { FOUNDER_ID, isFounderResearching } from "@/data/utils/research";
 import {
   SearchRole,
@@ -131,7 +133,7 @@ import { SimStore, simDispatch, simState } from "@/sim/simStore";
 // l'interface utilise : ce qu'il réussit, un joueur peut le réussir.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Marge prise sur les délais : production irrégulière, moral, qualité. */
+/** Marge prise sur les délais : production irrégulière, moral, absences. */
 const DEADLINE_SAFETY = 1.35;
 /** Un produit doit pouvoir sortir en ~9 mois avec la moitié de l'équipe. */
 const PRODUCT_BUILD_HOURS = 9 * 720;
@@ -250,6 +252,24 @@ const statOf = (e: ProductionPerson, t: ComponentType): number =>
   e[STAT_KEY_BY_TYPE[t]];
 
 const deadlineOf = (c: StartedContract): number => c.startDate + c.time;
+
+/**
+ * Un engagement envers l'atelier : un contrat signé (par échéance), puis le
+ * produit en développement, qui prend ce que les contrats laissent. Sa part
+ * de l'équipe est gardée à la signature (`PRODUCT_SHARE`).
+ */
+interface Commitment {
+  deadline: number;
+  requirements: { kind: ComponentKindId; quantity: number }[];
+  product: boolean;
+}
+
+const recipeToRequirements = (
+  recipe: Recipe,
+): { kind: ComponentKindId; quantity: number }[] =>
+  (Object.entries(recipe) as [ComponentKindId, number][])
+    .filter(([, n]) => n > 0)
+    .map(([kind, quantity]) => ({ kind, quantity }));
 
 /**
  * Prend dans le pool les pièces demandées ; renvoie ce qui manque. Le pool
@@ -419,6 +439,8 @@ export class Bot {
   private teamPoints(
     state: RootState,
     atNormalPace = this.schedulePolicy.startsWith("SMART"),
+    /** Employé à ne pas compter (celui qu'on envisage d'absenter). */
+    without?: number,
   ): TypeCounts {
     const occupancy = this.occupancy(state);
     const productivity = techProductivity(state.engine.time);
@@ -427,6 +449,7 @@ export class Bot {
       : scheduleByBuilding(state.company.buildingList);
     const points = zeroCounts();
     for (const e of this.producers(state)) {
+      if (e.id === without) continue;
       for (const t of COMPONENT_TYPE_ORDER) {
         points[t] += this.pointsPerHour(
           e,
@@ -472,23 +495,63 @@ export class Bot {
 
   /** Un contrat signé manquerait-il son échéance au rythme normal ? */
   private contractsSlipping(state: RootState): boolean {
-    const points = this.teamPoints(state, true);
-    if (this.hasProject(state)) {
-      for (const t of COMPONENT_TYPE_ORDER) points[t] *= 1 - PRODUCT_SHARE;
-    }
-    const pool = countKinds(state.component.stock);
+    return this.wouldSlip(state, this.teamPoints(state, true), 1);
+  }
+
+  /**
+   * Les contrats signés tiendraient-ils sans cet employé (formation,
+   * congés) ? Même marge qu'à la signature : l'absence dure.
+   */
+  private canSpare(state: RootState, employeId: number): boolean {
+    return !this.wouldSlip(
+      state,
+      this.teamPoints(state, undefined, employeId),
+      DEADLINE_SAFETY,
+    );
+  }
+
+  private wouldSlip(
+    state: RootState,
+    points: TypeCounts,
+    safety: number,
+    /** Stock à considérer (par défaut : le stock réel). */
+    stock: Recipe = countKinds(state.component.stock),
+  ): boolean {
+    const pool = { ...stock };
     let missing: Recipe = {};
     const now = state.engine.time;
-    const list = [...state.task.taskList].sort(
-      (a, b) => deadlineOf(a) - deadlineOf(b),
-    );
-    for (const c of list) {
+    for (const c of this.commitments(state)) {
       missing = addRecipes(missing, takeFromPool(pool, c.requirements));
-      if (now + this.workHours(missing, points) + 24 > deadlineOf(c)) {
+      if (c.product) continue;
+      if (now + this.workHours(missing, points) * safety + 24 > c.deadline) {
         return true;
       }
     }
     return false;
+  }
+
+  /** Contrats signés et produit en développement, par échéance. */
+  private commitments(state: RootState, extra?: StartedContract): Commitment[] {
+    const list: Commitment[] = [
+      ...state.task.taskList,
+      ...(extra ? [extra] : []),
+    ].map((c) => ({
+      deadline: deadlineOf(c),
+      requirements: c.requirements,
+      product: false,
+    }));
+    list.sort((a, b) => a.deadline - b.deadline);
+    const product = this.developing(state);
+    if (product) {
+      list.push({
+        deadline: Infinity,
+        requirements: recipeToRequirements(
+          recipeShortfall(product.requirements, product.invested),
+        ),
+        product: true,
+      });
+    }
+    return list;
   }
 
   /**
@@ -513,33 +576,43 @@ export class Bot {
    * Réserve aux contrats, par échéance, les pièces qu'ils demandent ; le
    * reste du stock est libre pour les produits.
    */
-  private reserve(state: RootState): { free: Component[]; deficit: Recipe } {
+  private reserve(state: RootState): {
+    free: Component[];
+    forProduct: Component[];
+    deficit: Recipe;
+  } {
     const pool = countKinds(state.component.stock);
     let deficit: Recipe = {};
-    const contracts = [...state.task.taskList].sort(
-      (a, b) => deadlineOf(a) - deadlineOf(b),
-    );
     const promised: Recipe = {};
-    for (const c of contracts) {
+    const productShare: Recipe = {};
+    for (const c of this.commitments(state)) {
       const before = { ...pool };
-      deficit = addRecipes(deficit, takeFromPool(pool, c.requirements));
+      const missing = takeFromPool(pool, c.requirements);
+      const target = c.product ? productShare : promised;
+      if (!c.product) deficit = addRecipes(deficit, missing);
       for (const r of c.requirements) {
-        promised[r.kind] =
-          (promised[r.kind] ?? 0) + (before[r.kind] ?? 0) - (pool[r.kind] ?? 0);
+        target[r.kind] =
+          (target[r.kind] ?? 0) + (before[r.kind] ?? 0) - (pool[r.kind] ?? 0);
       }
     }
     // Les plus anciennes pièces partent aux contrats (comme à la livraison).
     const left = { ...promised };
-    const free = [...state.component.stock]
-      .sort((a, b) => a.producedAt - b.producedAt)
-      .filter((c) => {
-        if ((left[c.kind] ?? 0) > 0) {
-          left[c.kind]!--;
-          return false;
-        }
-        return true;
-      });
-    return { free, deficit };
+    const forLeft = { ...productShare };
+    const free: Component[] = [];
+    const forProduct: Component[] = [];
+    for (const c of [...state.component.stock].sort(
+      (a, b) => a.producedAt - b.producedAt,
+    )) {
+      if ((left[c.kind] ?? 0) > 0) {
+        left[c.kind]!--;
+      } else if ((forLeft[c.kind] ?? 0) > 0) {
+        forLeft[c.kind]!--;
+        forProduct.push(c);
+      } else {
+        free.push(c);
+      }
+    }
+    return { free, forProduct, deficit };
   }
 
   /** Pièces libres pour ces besoins (partiel si le stock manque). */
@@ -629,16 +702,15 @@ export class Bot {
       }
     }
 
-    const list: StartedContract[] = [
-      ...state.task.taskList,
-      { ...contract, startDate: now },
-    ].sort((a, b) => deadlineOf(a) - deadlineOf(b));
     const pool = { ...stock };
     let missing: Recipe = {};
-    for (const c of list) {
+    for (const c of this.commitments(state, { ...contract, startDate: now })) {
       missing = addRecipes(missing, takeFromPool(pool, c.requirements));
+      // Le produit compte dans la charge, mais son échéance n'est qu'un rang :
+      // la manquer ne rend pas un contrat intenable.
+      if (c.product) continue;
       const hours = this.workHours(missing, points) * DEADLINE_SAFETY;
-      if (now + hours + 24 > deadlineOf(c)) return false;
+      if (now + hours + 24 > c.deadline) return false;
     }
     return true;
   }
@@ -699,7 +771,8 @@ export class Bot {
    */
   private investInProject() {
     const state = this.state;
-    let stock = this.reserve(state).free;
+    const reserved = this.reserve(state);
+    let stock = reserved.free;
 
     if (this.update) {
       const { productId, featureId } = this.update;
@@ -730,10 +803,36 @@ export class Bot {
 
     const product = this.developing(state);
     if (!product) return;
-    const picked = this.pick(
-      stock,
-      recipeShortfall(product.requirements, product.invested),
-    );
+    const shortfall = recipeShortfall(product.requirements, product.invested);
+    const picked = this.pick([...reserved.forProduct, ...stock], shortfall);
+    // Les contrats ont le stock en premier, mais une équipe qui signe dès que
+    // le stock le permet ne laisse jamais de surplus : le produit prend aussi
+    // des pièces promises, une à une, tant que les contrats restent tenables
+    // sans elles (même estimation qu'à la signature).
+    const left = { ...shortfall };
+    for (const c of picked) left[c.kind] = (left[c.kind] ?? 0) - 1;
+    const taken = new Set(picked.map((c) => c.id));
+    const blocked = new Set<ComponentKindId>();
+    const pool = countKinds(state.component.stock);
+    for (const c of picked) pool[c.kind] = (pool[c.kind] ?? 0) - 1;
+    const points = this.teamPoints(state);
+    for (const t of COMPONENT_TYPE_ORDER) points[t] *= 1 - PRODUCT_SHARE;
+    for (const c of [...state.component.stock].sort(
+      (a, b) => b.producedAt - a.producedAt,
+    )) {
+      if (taken.has(c.id) || (left[c.kind] ?? 0) <= 0 || blocked.has(c.kind))
+        continue;
+      const after = { ...pool, [c.kind]: (pool[c.kind] ?? 0) - 1 };
+      if (this.wouldSlip(state, points, DEADLINE_SAFETY, after)) {
+        // Une de plus ferait glisser un contrat : inutile d'en essayer d'autres.
+        blocked.add(c.kind);
+        continue;
+      }
+      pool[c.kind] = after[c.kind];
+      left[c.kind]! -= 1;
+      taken.add(c.id);
+      picked.push(c);
+    }
     if (picked.length > 0) {
       this.dispatch(
         investInProduct({
@@ -769,15 +868,40 @@ export class Bot {
    */
   private assignWork() {
     const state = this.state;
+    // Seul le stock compte : une pièce en cours n'est pas encore là. La
+    // compter faisait réaffecter son employé dès le lendemain ; le moteur
+    // lâchait la pièce (le travail passe à la suivante, dans l'autre
+    // famille), et la dernière pièce d'un contrat ne sortait jamais.
     const supply = countKinds(state.component.stock);
-    for (const job of Object.values(state.component.productionJobs ?? {})) {
-      supply[job.kind] = (supply[job.kind] ?? 0) + 1;
-    }
-    const demand = addRecipes(
-      requirementsToRecipe(state.task.taskList.flatMap((c) => c.requirements)),
-      this.projectTotals(state),
+    const contractDemand = requirementsToRecipe(
+      state.task.taskList.flatMap((c) => c.requirements),
     );
-    const remaining = laborByFamily(netDeficits(demand, supply));
+    const contractLeft = laborByFamily(netDeficits(contractDemand, supply));
+    // Ce que le projet produit demande en plus de ce que les contrats prennent.
+    const allLeft = laborByFamily(
+      netDeficits(
+        addRecipes(contractDemand, this.projectTotals(state)),
+        supply,
+      ),
+    );
+    const projectLeft = zeroCounts();
+    for (const t of COMPONENT_TYPE_ORDER) {
+      projectLeft[t] = Math.max(0, allLeft[t] - contractLeft[t]);
+    }
+    // Contrats : le plus pressé d'abord — ce qui manque au premier contrat
+    // (par échéance) encore incomplet, ceux d'avant compris.
+    const urgent = zeroCounts();
+    let cumulative: Recipe = {};
+    for (const c of [...state.task.taskList].sort(
+      (x, y) => deadlineOf(x) - deadlineOf(y),
+    )) {
+      cumulative = addRecipes(cumulative, requirementsToRecipe(c.requirements));
+      const labor = laborByFamily(netDeficits(cumulative, supply));
+      if (COMPONENT_TYPE_ORDER.some((t) => labor[t] > 0)) {
+        Object.assign(urgent, labor);
+        break;
+      }
+    }
     const freeCount = zeroCounts();
     for (const c of state.component.stock) freeCount[c.type]++;
     const occupancy = this.occupancy(state);
@@ -788,35 +912,94 @@ export class Bot {
     const producers = [...this.producers(state)].sort(
       (a, b) => topStat(b) - topStat(a),
     );
-    const anyNeed = COMPONENT_TYPE_ORDER.some((t) => remaining[t] > 0);
+    const some = (c: TypeCounts) => COMPONENT_TYPE_ORDER.some((t) => c[t] > 0);
+    // Une part de l'équipe (celle gardée à la signature) travaille pour le
+    // projet produit : servis d'abord, les contrats ne lui laissaient rien.
+    // Pièces avancées qui manquent au projet (au-delà du stock) : en Auto,
+    // l'atelier sert d'abord les pièces de base des contrats et ne les
+    // fabrique jamais. Un joueur poste quelqu'un dessus ; le bot aussi.
+    const advanced: Recipe = {};
+    const projectStock = countKinds(state.component.stock);
+    for (const [kind, n] of Object.entries(this.projectTotals(state)) as [
+      ComponentKindId,
+      number,
+    ][]) {
+      if (kindTier(kind) < 2) continue;
+      const missing = n - (projectStock[kind] ?? 0);
+      if (missing > 0) advanced[kind] = missing;
+    }
+    const projectSeats =
+      some(projectLeft) && producers.length >= 2
+        ? Math.max(1, Math.round(producers.length * PRODUCT_SHARE))
+        : 0;
 
-    for (const e of producers) {
+    producers.forEach((e, i) => {
+      const forProject = i >= producers.length - projectSeats;
+      const target = forProject
+        ? some(projectLeft)
+          ? projectLeft
+          : some(urgent)
+            ? urgent
+            : contractLeft
+        : some(urgent)
+          ? urgent
+          : some(contractLeft)
+            ? contractLeft
+            : projectLeft;
+      const anyNeed = some(target);
       let best = COMPONENT_TYPE_ORDER[0];
       let bestScore = -Infinity;
       for (const t of COMPONENT_TYPE_ORDER) {
         const score = anyNeed
-          ? remaining[t] * statOf(e, t)
+          ? target[t] * statOf(e, t)
           : statOf(e, t) / (1 + freeCount[t]);
         if (score > bestScore) {
           bestScore = score;
           best = t;
         }
       }
-      const points = this.pointsPerHour(
-        e,
-        best,
-        productivity,
-        occupancy,
-        schedules,
-      );
       // Ce que cet employé abat en ~20 jours dans cette famille.
-      if (anyNeed) remaining[best] -= (points * 24 * 20) / PRODUCTION_THRESHOLD;
+      if (anyNeed) {
+        const done =
+          (this.pointsPerHour(e, best, productivity, occupancy, schedules) *
+            24 *
+            20) /
+          PRODUCTION_THRESHOLD;
+        target[best] -= done;
+        if (target === urgent) contractLeft[best] -= done;
+      }
       if (e.assignedComponentType !== best) {
         this.dispatch(
           assignComponentType({ employeId: e.id, componentType: best }),
         );
       }
-    }
+      // Poste : une pièce avancée du projet que cet employé sait faire,
+      // sinon Auto.
+      let post: ComponentKindId | null = null;
+      if (forProject) {
+        const kind = (Object.keys(advanced) as ComponentKindId[])
+          .filter(
+            (k) =>
+              (advanced[k] ?? 0) > 0 &&
+              kindFamily(k) === best &&
+              craftBlocker(e, k, state.engine.time, gateShift(e)) === null,
+          )
+          .sort((a, b) => (advanced[b] ?? 0) - (advanced[a] ?? 0))[0];
+        if (kind) {
+          post = kind;
+          advanced[kind]! -= 1;
+        }
+      }
+      const current =
+        (
+          this.state.employe.employeList.find((x) => x.id === e.id) as
+            | ProductionPerson
+            | undefined
+        )?.post ?? null;
+      if (current !== post) {
+        this.dispatch(setPost({ employeId: e.id, post }));
+      }
+    });
 
     // Recrues sans bureau : on les installe là où il reste de la place.
     for (const e of state.employe.employeList) {
@@ -882,6 +1065,8 @@ export class Bot {
         cost += level * TRAINING_COST_PER_LEVEL;
       }
       if (money < cost + 3 * burn) continue;
+      // Pas de formation qui ferait manquer un contrat signé.
+      if (!this.canSpare(this.state, e.id)) continue;
       this.dispatch(setTraining({ employeId: e.id, trainingType: type }));
       this.counters.trainings++;
       money -= cost;
@@ -938,6 +1123,21 @@ export class Bot {
   }
 
   /** Socle + les options les plus rentables qui tiennent dans la taille visée. */
+  /**
+   * Quelqu'un de l'équipe sait-il fabriquer chaque pièce de ce coût,
+   * ingrédients compris ? Un joueur ne choisit pas une fonctionnalité que
+   * personne ne sait produire : le projet resterait en chantier pour toujours.
+   */
+  private teamCanCraft(recipe: Recipe, time: number): boolean {
+    const producers = this.producers(this.state);
+    return (Object.keys(netDeficits(recipe, {})) as ComponentKindId[]).every(
+      (kind) =>
+        producers.some(
+          (e) => craftBlocker(e, kind, time, gateShift(e)) === null,
+        ),
+    );
+  }
+
   private assemble(genre: ProductGenre, size: number, time: number): string[] {
     const core = coreFeature(genre);
     const features = [core.id];
@@ -949,6 +1149,7 @@ export class Bot {
     );
     for (const f of options) {
       if (total + featureCost(f) > size) continue;
+      if (!this.teamCanCraft(f.cost, time)) continue;
       features.push(f.id);
       total += featureCost(f);
     }
@@ -969,11 +1170,13 @@ export class Bot {
       .filter((p) => productFreshness(p, time) < REFRESH_BELOW)
       .sort((a, b) => productFreshness(a, time) - productFreshness(b, time));
     const bestFeature = (p: Product) =>
-      [...availableFeatures(p, time)].sort(
-        (a, b) =>
-          featureAppeal(b, p.genre) / featureCost(b) -
-          featureAppeal(a, p.genre) / featureCost(a),
-      )[0];
+      [...availableFeatures(p, time)]
+        .filter((f) => this.teamCanCraft(f.cost, time))
+        .sort(
+          (a, b) =>
+            featureAppeal(b, p.genre) / featureCost(b) -
+            featureAppeal(a, p.genre) / featureCost(a),
+        )[0];
 
     // Mise à jour : le produit le moins frais qui a encore de quoi grandir.
     if (!this.update) {
@@ -1051,6 +1254,12 @@ export class Bot {
     buildable: number,
     time: number,
   ): number | undefined {
+    if (!this.teamCanCraft(coreFeature(genre).cost, time)) return undefined;
+    // Segment « méfiant » (le jeu le signale) : une sortie de plus
+    // l'enfoncerait ; on attend que la confiance revienne.
+    if ((this.state.product.confidence?.[genre] ?? 1) < CONFIDENCE_WARNING) {
+      return undefined;
+    }
     const size = Math.max(
       GENRES[genre].minSize,
       Math.min(buildable, GENRES[genre].minSize * 2.5),
@@ -1158,8 +1367,9 @@ export class Bot {
         if (ok) {
           this.counters.bonuses++;
           this.counters.bonusSpend += before - this.state.company.money;
-        } else {
-          // Prime impossible (délai, fonds) : une semaine de congés.
+        } else if (this.canSpare(this.state, e.id)) {
+          // Prime impossible (délai, fonds) : une semaine de congés, si les
+          // contrats signés tiennent sans lui.
           this.takeLeave(e.id);
         }
       }

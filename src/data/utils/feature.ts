@@ -103,6 +103,15 @@ const featureMaxTier = (f: FeatureDraft): ComponentTier => {
   return tech && tech.year >= 1984 ? 4 : 3;
 };
 
+/**
+ * Part du travail d'une fonctionnalité mise dans les pièces avancées, niveau
+ * après niveau (contre `TIER_SHARE` pour un contrat) : un produit se bâtit
+ * avec des pièces élaborées, d'où sa finition. Avec la part des contrats,
+ * quatre cinquièmes partaient en pièces de base — finition ~2,2 sur 5, quand
+ * les produits rivaux tournent autour de 3,25.
+ */
+export const FEATURE_TIER_SHARE = 0.7;
+
 /** Coût en pièces d'une fonctionnalité : son travail × `CONSUMPTION_FACTOR`. */
 const composeFeatureCost = (f: FeatureDraft): Recipe => {
   const era = timeOfYear(featureTechnology(f.id)?.year ?? START_YEAR);
@@ -117,7 +126,13 @@ const composeFeatureCost = (f: FeatureDraft): Recipe => {
     if (u <= 0) continue;
     recipe = addRecipes(
       recipe,
-      composeFamily(family, u * CONSUMPTION_FACTOR, featureMaxTier(f), pick),
+      composeFamily(
+        family,
+        u * CONSUMPTION_FACTOR,
+        featureMaxTier(f),
+        pick,
+        FEATURE_TIER_SHARE,
+      ),
     );
   }
   return recipe;

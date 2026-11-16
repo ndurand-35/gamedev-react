@@ -154,12 +154,12 @@ describe("productSlice", () => {
     expect(p.launchTime).toBe(10);
     expect(p.freshAt).toBe(10);
     expect(p.hype).toBe(0.6);
-    // Socle de l'outil : 1 Module (finition 3, valeur 5) et 35 pièces de base
-    // (finition 2) → finition 85/40 ; taille 40/1,3 ≈ 31 sur 2 × 30.
-    expect(productAverageQuality(p)).toBeCloseTo(85 / 40);
+    // Socle de l'outil : 3 Modules (finition 3, valeur 5) et 25 pièces de base
+    // (finition 2) → finition 95/40 ; taille 40/1,3 ≈ 31 sur 2 × 30.
+    expect(productAverageQuality(p)).toBeCloseTo(95 / 40);
     expect(productSize(p)).toBe(31);
-    // 0,7 × 0,425 + 0,3 × 31/60 = 0,4525 → 4,5.
-    expect(p.launchScore).toBe(4.5);
+    // 0,7 × 0,475 + 0,3 × 31/60 = 0,4875 → 4,9.
+    expect(p.launchScore).toBe(4.9);
     expect(state.productsLaunched).toBe(1);
   });
 

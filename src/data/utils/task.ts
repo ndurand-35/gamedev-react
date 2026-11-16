@@ -76,12 +76,18 @@ export const CONTRACT_REPUTATION_PER_MONTH = 1;
 // liée à la difficulté reste modeste : sans quoi, à réputation maximale, un
 // contrat payait ~10× ce que coûte sa production et rendait les produits
 // inutiles (cf. la simulation d'équilibre, `npm run sim`).
-/** Acompte : fixe, puis par composant, puis par point de complexité. */
-export const DEPOSIT_BASE = 150;
+/**
+ * Acompte : fixe, puis par composant, puis par point de complexité. La part
+ * fixe pèse surtout sur les petits contrats, ceux d'une petite équipe : avec
+ * 150 € + 600 €, un employé rapportait ~520 € par mois aux contrats, moins
+ * que son salaire — embaucher pour livrer des contrats faisait perdre de
+ * l'argent.
+ */
+export const DEPOSIT_BASE = 500;
 export const DEPOSIT_PER_COMPONENT: [number, number] = [15, 25];
 export const DEPOSIT_PER_COMPLEXITY: [number, number] = [1, 1.5];
 /** Solde (avant prime de niveau et bonus d'avance) : mêmes trois parts. */
-export const ADDITIONAL_BASE = 600;
+export const ADDITIONAL_BASE = 2000;
 export const ADDITIONAL_PER_COMPONENT: [number, number] = [50, 70];
 export const ADDITIONAL_PER_COMPLEXITY: [number, number] = [2.5, 3.5];
 

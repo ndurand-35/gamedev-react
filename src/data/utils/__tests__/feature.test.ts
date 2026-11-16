@@ -126,12 +126,21 @@ describe("coûts et besoins", () => {
   });
 
   it("exprime le coût d'une fonctionnalité en besoins, famille puis niveau", () => {
-    // Synchronisation cloud : des Bases de données, du Code et de l'UX.
-    expect(FEATURE_BY_ID.cloud_sync.cost).toEqual({ bdd: 2, code: 23, ux: 13 });
+    // Synchronisation cloud : du Réseau et une Base de données, des
+    // Parcours ; la base comble le reste (part avancée : FEATURE_TIER_SHARE).
+    expect(FEATURE_BY_ID.cloud_sync.cost).toEqual({
+      reseau: 1,
+      bdd: 1,
+      code: 9,
+      parcours: 1,
+      ux: 8,
+    });
     expect(featureRequirements(FEATURE_BY_ID.cloud_sync)).toEqual([
-      { kind: "bdd", quantity: 2 },
-      { kind: "code", quantity: 23 },
-      { kind: "ux", quantity: 13 },
+      { kind: "reseau", quantity: 1 },
+      { kind: "bdd", quantity: 1 },
+      { kind: "code", quantity: 9 },
+      { kind: "parcours", quantity: 1 },
+      { kind: "ux", quantity: 8 },
     ]);
   });
 
