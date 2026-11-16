@@ -66,6 +66,13 @@
   --color-role-prod: #9ccbff;
   --color-role-qa: #b9e4a8;
   --color-role-marketing: #ffc2d6;
+  /* Pastilles d'avatar par métier de production : la couleur du composant,
+     éclaircie (≈ 45 % mêlée de blanc) pour garder l'encre lisible dessus.
+     Le polyvalent, qui touche à tout, prend un lilas neutre. */
+  --color-code-soft: #9fb9e8;
+  --color-visuel-soft: #e3a3bc;
+  --color-ux-soft: #dcb68c;
+  --color-role-fullstack: #cdb8f0;
   --shadow-toy: 0 5px 0 var(--color-ink);
   --shadow-toy-sm: 0 3px 0 var(--color-ink);
 }
