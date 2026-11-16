@@ -21,6 +21,18 @@ describe("formatPrice", () => {
   it("laisse les petits nombres intacts", () => {
     expect(formatPrice(42)).toBe("42");
   });
+
+  it("arrondit à l'euro (pas de décimales flottantes)", () => {
+    expect(formatPrice(1234.5600000001)).toBe("1 235");
+    expect(formatPrice(0.1 + 0.2)).toBe("0");
+    expect(formatPrice(-4999.7)).toBe("-5 000");
+    expect(formatPrice(-0.3)).toBe("0");
+  });
+
+  it("gère les valeurs non finies", () => {
+    expect(formatPrice(NaN)).toBe("—");
+    expect(formatPrice(Infinity)).toBe("—");
+  });
 });
 
 describe("randomIntFromInterval", () => {

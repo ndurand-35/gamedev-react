@@ -26,6 +26,13 @@ export function randomIntFromInterval(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
+/**
+ * Montant arrondi à l'euro, milliers séparés par une espace.
+ * L'arrondi évite les résidus flottants (1234.5600000001) des calculs
+ * de prorata, intérêts ou parts de marché.
+ */
 export function formatPrice(price: number): string {
-  return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  if (!Number.isFinite(price)) return "—";
+  const rounded = Math.round(price) || 0; // évite "-0"
+  return rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
