@@ -307,7 +307,7 @@ const PauseMenu: FC = () => {
       ) : (
         <div
           className={
-            "game-menu-panel flex max-h-[85vh] w-full flex-col " +
+            "game-menu-panel flex max-h-[85dvh] w-full flex-col " +
             (screen === "codex" ? "max-w-5xl" : "max-w-2xl") +
             " toy-frame overflow-hidden"
           }

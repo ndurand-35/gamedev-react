@@ -100,7 +100,7 @@ export const SeatAssignModal: FC<SeatAssignModalProps> = ({
           </Link>
         </p>
       ) : (
-        <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+        <div className="max-h-[60dvh] space-y-3 overflow-y-auto">
           {unhoused.length > 0 && (
             <section>
               <h4 className="px-3 pb-1 text-xs font-semibold uppercase opacity-60">

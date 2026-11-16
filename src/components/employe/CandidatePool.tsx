@@ -205,7 +205,7 @@ export const CandidatePool = ({
         <div
           role="toolbar"
           aria-label="Actions sur la sélection"
-          className="fixed bottom-24 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full border-[3px] border-ink bg-white py-1.5 pr-1.5 pl-5 whitespace-nowrap shadow-toy"
+          className="fixed bottom-[calc(var(--dock-h)+1rem)] left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full border-[3px] border-ink bg-white py-1.5 pr-1.5 pl-5 whitespace-nowrap shadow-toy"
         >
           <span className="mr-2 font-display text-base font-semibold">
             {selected.length} sélectionné{selected.length > 1 ? "s" : ""}

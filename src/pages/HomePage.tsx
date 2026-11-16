@@ -39,7 +39,7 @@ export const HomePage: React.FC = (): ReactElement => {
   return (
     <div
       className={
-        "fixed inset-x-0 top-14 bottom-20 grid grid-cols-1 gap-4 overflow-hidden px-2 pt-3 pb-2 sm:px-4 " +
+        "fixed inset-x-0 top-(--hud-h) bottom-(--dock-h) grid grid-cols-1 gap-4 overflow-hidden px-2 pt-3 pb-2 sm:px-4 " +
         (multi
           ? "md:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_21rem]"
           : "lg:grid-cols-[minmax(0,1fr)_21rem]")

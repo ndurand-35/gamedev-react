@@ -153,7 +153,7 @@ export const InterviewOverlay: FC = () => {
       aria-label={`Entretien avec ${name}`}
       className="fixed inset-0 z-[44] flex items-center justify-center bg-ink/60 p-4"
     >
-      <div className="toy-frame w-full max-w-lg overflow-hidden rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
+      <div className="toy-frame w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
         <header className="flex items-center gap-4 border-b-[3px] border-ink bg-white px-6 py-4">
           <Clock time={smooth} />
           <div className="min-w-0 flex-1 flex flex-col gap-1">

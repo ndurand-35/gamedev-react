@@ -298,7 +298,7 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
           </div>
 
           {/* Pied : fermer à gauche, les actions sur le produit à droite */}
-          <div className="flex flex-wrap items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+          <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
             <button
               type="button"
               className="btn btn-ghost underline underline-offset-4"

@@ -78,6 +78,7 @@ export const BuildingTable = () => {
       }),
       columnHelper.display({
         header: "Action",
+        meta: { stack: "actions" },
         cell: (props) => {
           const b = props.row.original;
           const occupants = getBuildingEmploye(employeList, b).length;

@@ -30,7 +30,7 @@ import {
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
-import { createProduct, retireProduct } from "@/data/redux/productSlice";
+import { retireProduct } from "@/data/redux/productSlice";
 import { formatPrice } from "@/data/utils";
 import { affinityLabel, featureCost } from "@/data/utils/feature";
 import {
@@ -56,6 +56,7 @@ import {
 } from "@/data/utils/product";
 import {
   addFeatureThunk,
+  createProductThunk,
   investProductThunk,
   launchProductThunk,
   patchProductThunk,
@@ -812,7 +813,10 @@ export const ProductPage: React.FC = (): ReactElement => {
     genre: ProductGenre,
     features: string[],
   ) => {
-    dispatch(createProduct({ name, genre, features, time }));
+    const result = dispatch(
+      createProductThunk({ name, genre, features, time }),
+    );
+    if (!result.ok) return;
     // Le nouveau produit (dernier de la liste) s'ouvre aussitôt.
     setSelectedId(null);
     setOpenNewest(true);

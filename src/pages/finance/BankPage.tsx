@@ -187,7 +187,7 @@ const SimulationModal: FC<{
       </div>
 
       {/* Pied */}
-      <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+      <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
         <form method="dialog">
           {/* Focus par défaut + Échap : « Annuler » (action non destructive). */}
           <button

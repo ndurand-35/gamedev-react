@@ -552,7 +552,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
           </div>
 
           {/* Pied */}
-          <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+          <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
             {hardRefused ? (
               <button
                 type="button"

@@ -28,7 +28,7 @@ export const DecisionModal = () => {
       aria-label={pending.title}
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
     >
-      <div className="toy-frame w-full max-w-md overflow-hidden rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
+      <div className="toy-frame w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
         <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-6 py-4">
           <span
             className={

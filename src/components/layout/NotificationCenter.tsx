@@ -185,7 +185,7 @@ export const NotificationCenter = () => {
         <div
           role="dialog"
           aria-label="Centre de notifications"
-          className="toy-frame fixed inset-x-2 top-14 flex max-h-[70dvh] flex-col overflow-hidden sm:absolute sm:inset-x-auto sm:top-full sm:left-1/2 sm:mt-3 sm:w-80 sm:-translate-x-1/2"
+          className="toy-frame fixed inset-x-2 top-(--hud-h) flex max-h-[70dvh] flex-col overflow-hidden sm:absolute sm:inset-x-auto sm:top-full sm:left-1/2 sm:mt-3 sm:w-80 sm:-translate-x-1/2"
         >
           <div className="flex flex-row items-center justify-between px-3 py-2 border-b border-base-content/10">
             <span className="font-display text-base font-semibold">

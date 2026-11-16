@@ -26,7 +26,7 @@ export const SettingsPanel: FC = () => {
       aria-label="Paramètres"
       onClose={() => setSession((s) => s + 1)}
     >
-      <div className="modal-box flex max-h-[85vh] max-w-xl flex-col overflow-hidden p-0">
+      <div className="modal-box flex max-h-[85dvh] max-w-xl flex-col overflow-hidden p-0">
         <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-6 py-4">
           <span className="flex size-9 items-center justify-center rounded-full border-[2.5px] border-ink bg-sun">
             <Settings width={17} height={17} strokeWidth={2.4} />

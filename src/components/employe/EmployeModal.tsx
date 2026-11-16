@@ -645,7 +645,7 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
               )}
             </div>
 
-            <div className="border-t-[3px] border-ink bg-white px-6 py-4">
+            <div className="sticky bottom-0 z-10 border-t-[3px] border-ink bg-white px-6 py-4">
               {actions}
             </div>
           </>

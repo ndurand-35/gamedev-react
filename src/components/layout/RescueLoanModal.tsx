@@ -59,7 +59,7 @@ export const RescueLoanModal = () => {
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4"
     >
       {/* Pas de <dialog> natif : Échap ne doit pas pouvoir écarter le choix. */}
-      <div className="toy-frame w-full max-w-md overflow-hidden rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
+      <div className="toy-frame w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
         <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-6 py-4">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-[2.5px] border-ink bg-[#f2b37a]">
             <WarningTriangle width={17} height={17} strokeWidth={2.4} />
@@ -114,7 +114,7 @@ export const RescueLoanModal = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+        <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
           <button
             type="button"
             className="btn btn-ghost text-error underline underline-offset-4"

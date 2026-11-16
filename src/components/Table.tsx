@@ -25,6 +25,7 @@ import {
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFacetedMinMaxValues,
+  RowData,
 } from "@tanstack/react-table";
 import {
   FilterAlt,
@@ -34,6 +35,29 @@ import {
   SortUp,
 } from "iconoir-react";
 import { rankItem } from "@tanstack/match-sorter-utils";
+
+/**
+ * Rôle d'une colonne dans le tableau empilé du téléphone (`table-stack`) :
+ * `title` en tête de carte, `actions` en pied, `select` dans le coin. Sans
+ * rôle, la cellule devient une ligne « libellé … valeur ».
+ */
+export type StackRole = "title" | "actions" | "select";
+
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    /** Libellé sur téléphone, quand l'en-tête n'est pas un simple texte. */
+    label?: string;
+    stack?: StackRole;
+  }
+}
+
+/** Libellé d'une colonne : `meta.label`, sinon son en-tête s'il est un texte. */
+const columnLabel = <T,>(column: Column<T, unknown>): string | undefined =>
+  column.columnDef.meta?.label ??
+  (typeof column.columnDef.header === "string"
+    ? column.columnDef.header
+    : undefined);
 
 interface TableProps<T> {
   title: string;
@@ -72,6 +96,7 @@ export function MyTable<T>({
     return [
       {
         id: "select",
+        meta: { stack: "select" },
         header: (props: any) => (
           <IndeterminateCheckbox
             {...{
@@ -112,6 +137,19 @@ export function MyTable<T>({
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
     filterFns: { fuzzy: fuzzyFilter },
     globalFilterFn: fuzzyFilter,
+  });
+
+  // Tableau empilé : la première colonne de données fait le titre de la
+  // carte, sauf si une colonne le revendique.
+  const leafColumns = table.getAllLeafColumns();
+  const titleColumnId = leafColumns.some(
+    (c) => c.columnDef.meta?.stack === "title",
+  )
+    ? undefined
+    : leafColumns.find((c) => !c.columnDef.meta?.stack)?.id;
+  const sortOptions = leafColumns.flatMap((c) => {
+    const label = columnLabel(c);
+    return c.getCanSort() && label ? [{ id: c.id, label }] : [];
   });
 
   return (
@@ -163,8 +201,35 @@ export function MyTable<T>({
         </div>
       </div>
       {toolbar}
+      {/* Téléphone : l'en-tête est masqué (lignes en cartes), le tri passe
+          par ce menu. */}
+      {sortOptions.length > 0 && (
+        <label className="flex items-center gap-2 text-sm font-bold sm:hidden">
+          Trier par
+          <select
+            className="select select-sm w-auto rounded-full border-0 bg-white [--input-color:transparent]"
+            value={
+              sorting[0]
+                ? `${sorting[0].id}:${sorting[0].desc ? "desc" : "asc"}`
+                : ""
+            }
+            onChange={(e) => {
+              const [id, dir] = e.target.value.split(":");
+              setSorting(id ? [{ id, desc: dir === "desc" }] : []);
+            }}
+          >
+            <option value="">Ordre par défaut</option>
+            {sortOptions.map(({ id, label }) => (
+              <optgroup key={id} label={label}>
+                <option value={`${id}:asc`}>{label} ↑</option>
+                <option value={`${id}:desc`}>{label} ↓</option>
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="overflow-x-auto">
-        <table className="table">
+        <table className="table table-stack">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -205,7 +270,14 @@ export function MyTable<T>({
                 onClick={() => row.toggleSelected()}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id}>
+                  <td
+                    key={cell.id}
+                    data-label={columnLabel(cell.column)}
+                    data-stack={
+                      cell.column.columnDef.meta?.stack ??
+                      (cell.column.id === titleColumnId ? "title" : undefined)
+                    }
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

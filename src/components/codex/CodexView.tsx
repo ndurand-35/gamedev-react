@@ -107,7 +107,7 @@ export const CodexView: FC = () => {
   );
 
   return (
-    <div className="flex h-[70vh] min-h-0">
+    <div className="flex h-[70dvh] min-h-0">
       <aside className="flex w-60 shrink-0 flex-col border-r-2 border-base-300">
         <label className="input input-sm m-3 w-auto">
           <Search width={14} height={14} className="opacity-50" />

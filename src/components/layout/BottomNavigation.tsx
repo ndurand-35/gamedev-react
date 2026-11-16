@@ -186,7 +186,7 @@ export const BottomNavigation = () => {
   return (
     <div
       ref={dockRef}
-      className="group fixed bottom-0 left-0 z-40 flex h-20 w-full items-center gap-1.5 px-2 sm:gap-0 sm:px-4"
+      className="group bar-paper fixed bottom-0 left-0 z-40 flex h-(--dock-h) w-full items-center gap-1.5 px-2 pb-(--safe-bottom) sm:gap-0 sm:px-4"
       onMouseLeave={() => {
         cancelSwitch();
         setHoveredTo(null);

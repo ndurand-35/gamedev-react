@@ -88,7 +88,13 @@ export const Modal = ({
           </h3>
         )}
         {children}
-        {actions && <div className="modal-action">{actions}</div>}
+        {/* Les boutons restent en vue quand le contenu défile (téléphone). Le
+            pied mange la marge basse du cadre (`p-6`) pour s'y coller. */}
+        {actions && (
+          <div className="modal-action sticky bottom-0 z-10 -mx-6 -mb-6 bg-base-100 px-6 pt-3 pb-6">
+            {actions}
+          </div>
+        )}
       </div>
       {dismissable && (
         <form method="dialog" className="modal-backdrop">

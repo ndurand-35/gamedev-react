@@ -129,11 +129,47 @@
   border-radius: 1.1rem;
   box-shadow: none;
 }
+/* Hauteurs du HUD (haut) et du dock (bas), zones sûres comprises : encoche et
+   barre d'accueil des téléphones (`viewport-fit=cover` dans index.html). Tout
+   ce qui se cale contre ces barres passe par ces variables. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --hud-h: calc(3.5rem + var(--safe-top));
+  --dock-h: calc(5rem + var(--safe-bottom));
+}
+/* Fond des barres fixes (HUD, dock) : le même papier que la page, pois et
+   ciel de nuit compris, calé sur la fenêtre. Le contenu qui défile passe
+   dessous au lieu d'apparaître entre les touches. */
+@utility bar-paper {
+  isolation: isolate;
+  background-color: var(--color-base-200);
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--color-ink) 13%, transparent) 1.3px,
+    transparent 1.3px
+  );
+  background-size: 22px 22px;
+  background-attachment: fixed;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: rgb(var(--night-sky-rgb) / 0.9);
+    background-image: var(--night-stars);
+    background-size: var(--night-stars-size);
+    background-position: var(--night-stars-pos);
+    background-attachment: fixed;
+    opacity: var(--night, 0);
+    transition: opacity 1.5s ease;
+  }
+}
 /* Gabarit d'une page de section : sous le HUD, au-dessus du dock. Marges
    resserrées sur téléphone, où chaque pixel de largeur compte. */
 @utility page-shell {
-  margin-top: 3.5rem;
-  margin-bottom: 5rem;
+  margin-top: var(--hud-h);
+  margin-bottom: var(--dock-h);
   padding: 0.75rem 0.75rem 1rem;
   @variant sm {
     padding-inline: 1.5rem;
@@ -439,6 +475,14 @@ body::before {
       border: 3px solid var(--color-ink);
       border-radius: 1.75rem;
       box-shadow: 0 8px 0 var(--color-ink);
+      /* daisyUI borne à `100vh`, plus haut que l'écran visible sur téléphone
+         (barres du navigateur) : le bas de la modale, et ses boutons,
+         passaient dessous. On borne à la hauteur visible, avec une marge et
+         les zones sûres. */
+      max-height: calc(100vh - 2rem);
+      max-height: calc(
+        100dvh - 2rem - var(--safe-top) - var(--safe-bottom) - 8px
+      );
     }
 
     /* Tableaux en « lignes en tuiles » : chaque ligne est une tuile blanche
@@ -545,6 +589,88 @@ body::before {
     }
     .table :where(tbody tr:hover, tbody tr:focus-within) .row-action {
       opacity: 1;
+    }
+
+    /* Tableau empilé (`table-stack`), sur téléphone : chaque ligne devient
+       une carte, chaque cellule une ligne « libellé … valeur » ; le libellé
+       vient de `data-label`. Rôles par `data-stack` : `title` (en tête de
+       carte, sans libellé), `select` (case dans le coin), `actions` (pied de
+       carte). L'en-tête du tableau reste lu par les lecteurs d'écran ; le tri
+       passe par un menu au-dessus. */
+    @media (width < 40rem) {
+      .table.table-stack,
+      .table.table-stack :where(tbody) {
+        display: block;
+      }
+      .table.table-stack :where(thead) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      .table.table-stack tbody tr {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0.5rem;
+        padding: 0.6rem 0.85rem;
+        background-color: #fff;
+        border-radius: var(--tile-radius);
+        box-shadow: inset 0 0 0 1px var(--tile-ring);
+      }
+      .table.table-stack tbody tr[data-selected="true"] {
+        background-color: #fff0c2;
+        box-shadow: inset 0 0 0 2px var(--color-ink);
+      }
+      .table.table-stack tbody tr > :is(td, th) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        min-width: 0;
+        padding: 0.3rem 0;
+        text-align: right;
+        background-color: transparent;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .table.table-stack tbody tr > :is(td, th)[data-label]::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: color-mix(in oklab, var(--color-ink) 72%, transparent);
+      }
+      .table.table-stack tbody tr > :is(td, th):empty {
+        display: none;
+      }
+      .table.table-stack tbody tr > :is(td, th)[data-stack="title"] {
+        justify-content: flex-start;
+        text-align: left;
+        padding-right: 2.25rem;
+      }
+      .table.table-stack tbody tr > :is(td, th)[data-stack="title"]::before {
+        content: none;
+      }
+      .table.table-stack tbody tr > :is(td, th)[data-stack="select"] {
+        position: absolute;
+        top: 0.85rem;
+        right: 0.85rem;
+        padding: 0;
+      }
+      .table.table-stack tbody tr > :is(td, th)[data-stack="actions"] {
+        justify-content: flex-end;
+        margin-top: 0.25rem;
+        padding-top: 0.5rem;
+        border-top: 1px dashed var(--tile-ring);
+      }
+      .table.table-stack tbody tr > :is(td, th)[data-stack="actions"]::before {
+        content: none;
+      }
     }
 
     /* Menus et onglets : l'élément actif prend le jaune. */

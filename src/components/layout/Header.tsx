@@ -201,7 +201,7 @@ export const Header = () => {
   return (
     <nav
       aria-label="Ressources du studio"
-      className="fixed top-0 left-0 z-20 flex h-14 w-full items-center gap-1 px-2 sm:gap-3 sm:px-4"
+      className="bar-paper fixed top-0 left-0 z-20 flex h-(--hud-h) w-full items-center gap-1 px-2 pt-(--safe-top) sm:gap-3 sm:px-4"
     >
       {studioName && (
         <span className="hidden max-w-48 -rotate-2 truncate rounded-xl bg-ink px-3 py-1 font-display text-lg font-bold text-base-100 min-[1400px]:block">

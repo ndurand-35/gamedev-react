@@ -72,8 +72,10 @@ export const ToastContainer = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed top-16 right-2 left-2 z-50 flex flex-col gap-2 sm:right-4 sm:left-auto sm:w-full sm:max-w-sm">
-      <div className="flex flex-col gap-2 pointer-events-auto">
+    <div className="pointer-events-none fixed top-[calc(var(--hud-h)+0.5rem)] right-2 left-2 z-50 flex flex-col gap-2 sm:right-4 sm:left-auto sm:w-full sm:max-w-sm">
+      {/* Sur téléphone, la pile couvrirait la moitié de l'écran : seuls les
+          deux derniers s'affichent, les autres restent dans le journal. */}
+      <div className="pointer-events-auto flex flex-col gap-2 max-sm:[&>*:nth-last-child(n+3)]:hidden">
         {toasts.map((n) => (
           <Toast key={n.id} notification={n} />
         ))}

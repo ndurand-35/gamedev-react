@@ -38,6 +38,14 @@ const initials = (name: string): string =>
     .join("")
     .toUpperCase();
 
+/** Tris proposés dans le menu du téléphone (mêmes clés que les en-têtes). */
+const MOBILE_SORTS: { key: CompetitorSortKey; label: string }[] = [
+  { key: "name", label: "Studio" },
+  { key: "relation", label: "Relation" },
+  { key: "delivered", label: "Contrats livrés" },
+  { key: "lastSeen", label: "Dernier contact" },
+];
+
 const plural = (n: number, word: string): string =>
   `${n} ${word}${n > 1 ? "s" : ""}`;
 
@@ -49,7 +57,7 @@ const StandingRow: FC<{
   const lost = client?.lost ?? false;
   return (
     <tr className={lost ? "opacity-50" : ""}>
-      <td>
+      <td data-stack="title">
         <div className="flex items-center gap-3">
           <span
             aria-hidden="true"
@@ -62,7 +70,7 @@ const StandingRow: FC<{
           </span>
         </div>
       </td>
-      <td>
+      <td data-label="Relation">
         <div className="flex items-center gap-2">
           <span className={`badge badge-sm ${CLIENT_TIER_BADGE_CLASS[tier]}`}>
             {tier}
@@ -74,7 +82,7 @@ const StandingRow: FC<{
           )}
         </div>
       </td>
-      <td className="tabular-nums">
+      <td className="tabular-nums" data-label="Contrats livrés">
         {client ? (
           <>
             {client.delivered}
@@ -89,7 +97,7 @@ const StandingRow: FC<{
           <span className="text-base-content/40">—</span>
         )}
       </td>
-      <td className="text-right tabular-nums">
+      <td className="text-right tabular-nums" data-label="Prime sur ses prix">
         {bonus > 0 ? (
           <span className="font-extrabold text-success">
             +{Math.round(bonus * 100)} %
@@ -98,14 +106,14 @@ const StandingRow: FC<{
           <span className="text-base-content/40">—</span>
         )}
       </td>
-      <td className="tabular-nums">
+      <td className="tabular-nums" data-label="Dernier contact">
         {client ? (
           getTimeAsDate(client.lastSeen).format("DD/MM/YYYY")
         ) : (
           <span className="text-base-content/60">Jamais</span>
         )}
       </td>
-      <td>
+      <td data-label="Produits">
         {products.length === 0 ? (
           <span className="text-base-content/40">—</span>
         ) : (
@@ -166,8 +174,36 @@ export const CompetitorTable: FC = () => {
         {worked > 0 && ` · ${worked} avec qui vous avez travaillé`}
         {lost > 0 && ` · ${plural(lost, "rompu")}`}. <CodexLink id="clients" />
       </p>
+      {/* Téléphone : lignes en cartes, l'en-tête est masqué ; le tri passe
+          par ce menu. */}
+      <label className="flex items-center gap-2 text-sm font-bold sm:hidden">
+        Trier par
+        <select
+          className="select select-sm w-auto rounded-full border-0 bg-white [--input-color:transparent]"
+          value={sort ? `${sort.key}:${sort.direction}` : ""}
+          onChange={(e) => {
+            const [key, direction] = e.target.value.split(":");
+            setSort(
+              key
+                ? {
+                    key: key as CompetitorSortKey,
+                    direction: direction as CompetitorSort["direction"],
+                  }
+                : null,
+            );
+          }}
+        >
+          <option value="">Ordre par défaut</option>
+          {MOBILE_SORTS.map(({ key, label }) => (
+            <optgroup key={key} label={label}>
+              <option value={`${key}:asc`}>{label} ↑</option>
+              <option value={`${key}:desc`}>{label} ↓</option>
+            </optgroup>
+          ))}
+        </select>
+      </label>
       <div className="overflow-x-auto">
-        <table className="table">
+        <table className="table table-stack">
           <thead>
             <tr>
               <SortableHeader label="Studio" sortKey="name" {...headerProps} />

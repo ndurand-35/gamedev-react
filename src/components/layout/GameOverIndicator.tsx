@@ -60,7 +60,7 @@ export const GameOverIndicator = () => {
       aria-label="Bilan de la partie"
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4"
     >
-      <div className="toy-frame w-full max-w-lg overflow-hidden rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
+      <div className="toy-frame w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[1.75rem] shadow-[0_8px_0_var(--color-ink)]">
         <div className="flex items-center gap-2.5 border-b-[3px] border-ink bg-white px-6 py-4">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-[2.5px] border-ink bg-[#f4a3a8]">
             <WarningTriangle width={17} height={17} strokeWidth={2.4} />
@@ -163,7 +163,7 @@ export const GameOverIndicator = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
+        <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t-[3px] border-ink bg-white px-6 py-4">
           <Link
             to="/"
             className="btn btn-ghost gap-1.5 underline underline-offset-4"

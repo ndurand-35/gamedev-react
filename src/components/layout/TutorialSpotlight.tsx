@@ -90,8 +90,10 @@ const useTargetBox = (target: string | null): Box | null => {
           : null;
       if (el && next && scrolled.current !== target) {
         scrolled.current = target;
+        // Caché sous le HUD (56 px) ou sous le dock (80 px), zones sûres
+        // non comprises.
         const offscreen =
-          rect!.top < 56 || rect!.bottom > window.innerHeight - 56;
+          rect!.top < 56 || rect!.bottom > window.innerHeight - 80;
         if (offscreen) el.scrollIntoView({ block: "center" });
       }
       setBox((prev) => (sameBox(prev, next) ? prev : next));
@@ -198,7 +200,7 @@ export const TutorialSpotlight = () => {
     return (
       <div
         aria-label="Prochaines étapes du tutoriel"
-        className="toy-frame fixed bottom-24 left-3 z-30 w-72 max-w-[calc(100vw-1.5rem)] p-3"
+        className="toy-frame fixed bottom-[calc(var(--dock-h)+1rem)] left-3 z-30 w-72 max-w-[calc(100vw-1.5rem)] p-3"
       >
         <div className="flex items-center gap-2">
           <Compass width={16} height={16} className="text-base-content" />
@@ -252,7 +254,7 @@ export const TutorialSpotlight = () => {
       <button
         type="button"
         onClick={() => dispatch(setTutorialCollapsed(false))}
-        className="btn btn-sm fixed bottom-24 left-3 z-30 gap-2"
+        className="btn btn-sm fixed bottom-[calc(var(--dock-h)+1rem)] left-3 z-30 gap-2"
       >
         <Compass width={16} height={16} className="text-base-content" />
         Reprendre le tutoriel
@@ -310,7 +312,7 @@ export const TutorialSpotlight = () => {
       <div
         role="dialog"
         aria-label="Tutoriel terminé"
-        className="toy-frame fixed bottom-24 left-1/2 z-[46] w-80 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 p-4"
+        className="toy-frame fixed bottom-[calc(var(--dock-h)+1rem)] left-1/2 z-[46] w-80 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 p-4"
       >
         <NarratorLine line={TUTORIAL_OUTRO} />
         <div className="mt-3 flex justify-end">
@@ -332,7 +334,7 @@ export const TutorialSpotlight = () => {
       aria-label={`Tutoriel, étape ${position} sur ${total}`}
       className={
         "toy-frame fixed z-[46] max-w-[calc(100vw-1.5rem)] p-4 " +
-        (box ? "" : "bottom-24 left-3")
+        (box ? "" : "bottom-[calc(var(--dock-h)+1rem)] left-3")
       }
       style={{ width: BUBBLE_W, ...(box ? bubbleStyle(box) : {}) }}
     >
