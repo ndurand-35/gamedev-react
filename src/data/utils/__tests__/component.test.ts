@@ -198,7 +198,8 @@ describe("produceComponents — coup de génie", () => {
 
   const stateAboutToProduce = () =>
     ({
-      engine: { time: 0 },
+      // Jeudi 10 h : heures de bureau.
+      engine: { time: 10 },
       research: { acquired: [], current: null },
       company: { buildingList: [] },
       employe: { employeList: [producer] },

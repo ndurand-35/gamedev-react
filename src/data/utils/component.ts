@@ -31,6 +31,7 @@ import {
   scheduleByBuilding,
   scheduleOutput,
   scheduleQuality,
+  workHourFactor,
 } from "@/data/utils/workSchedule";
 
 export const isProductionPerson = (p: Person): p is ProductionPerson =>
@@ -179,7 +180,11 @@ export const produceComponents = (dispatch: AppDispatch, state: RootState) => {
       occupantsByBuilding[employe.buildingId] ?? 1,
     );
     const schedule = schedules.get(employe.buildingId) ?? "NORMAL";
+    // Hors horaires (nuit, week-end, midi) : l'avancement attend le matin.
+    const hourFactor = workHourFactor(schedule, time);
+    if (hourFactor === 0) continue;
     const effectiveStat =
+      hourFactor *
       stat *
       productionSpeedMultiplier(employe) *
       moraleProductivityMultiplier(employe.morale) *

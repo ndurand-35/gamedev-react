@@ -38,11 +38,21 @@ const trainee = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
   ...over,
 });
 
-const stateWith = (employeList: ProductionPerson[], money = 5000): RootState =>
+// Jeudi 1er janvier 1970, 10 h : heures de bureau au rythme Normal (40 h), où
+// chaque heure travaillée compte 168 / 40 heures moyennes.
+const OFFICE_HOUR = 10;
+const NIGHT_HOUR = 2;
+const NORMAL_FACTOR = 168 / 40;
+
+const stateWith = (
+  employeList: ProductionPerson[],
+  money = 5000,
+  time = OFFICE_HOUR,
+): RootState =>
   ({
     employe: { employeList },
-    company: { money, reputation: 0 },
-    engine: { time: 0 },
+    company: { money, reputation: 0, buildingList: [] },
+    engine: { time },
   }) as unknown as RootState;
 
 const employeState = (employeList: ProductionPerson[]): EmployeState => ({
@@ -97,9 +107,9 @@ describe("coût de la formation", () => {
       3 * trainingPointCost(novice, ComponentType.CODE),
     );
     // Facturé à l'heure, sur la durée d'un point.
-    expect(trainingCostPerTick(expert, ComponentType.CODE) * TRAINING_THRESHOLD).toBe(
-      trainingPointCost(expert, ComponentType.CODE),
-    );
+    expect(
+      trainingCostPerTick(expert, ComponentType.CODE) * TRAINING_THRESHOLD,
+    ).toBe(trainingPointCost(expert, ComponentType.CODE));
   });
 });
 
@@ -166,7 +176,10 @@ describe("processTrainingTick — plafond atteint", () => {
     processTrainingTick(dispatch as never, state);
 
     expect(dispatch).toHaveBeenCalledWith(
-      setMoney(5000 - trainingCostPerTick(trainee(), ComponentType.CODE)),
+      setMoney(
+        5000 -
+          trainingCostPerTick(trainee(), ComponentType.CODE) * NORMAL_FACTOR,
+      ),
     );
     const tick = dispatch.mock.calls.find(
       ([a]) => a.type === applyTrainingTick.type,
@@ -175,7 +188,7 @@ describe("processTrainingTick — plafond atteint", () => {
       {
         employeId: 2,
         progressDelta: 0,
-        completed: { statKey: "codeStat", newValue: 250 },
+        completed: { statKey: "codeStat", newValue: 250, remainder: 0 },
         finished: true,
       },
     ]);
@@ -205,10 +218,36 @@ describe("processTrainingTick — plafond atteint", () => {
       ([a]) => a.type === applyTrainingTick.type,
     )![0];
     expect(tick.payload[0].finished).toBe(false);
-    expect(tick.payload[0].completed).toEqual({
+    expect(tick.payload[0].completed).toMatchObject({
       statKey: "codeStat",
       newValue: 201,
     });
+    // 9 + 4,2 : le point tombe et le surplus reste acquis pour le suivant.
+    expect(tick.payload[0].completed.remainder).toBeCloseTo(NORMAL_FACTOR - 1);
+    const next = employeReducer(
+      employeState([trainee({ codeStat: 200 })]),
+      tick,
+    );
+    expect(
+      (next.employeList[0] as ProductionPerson).trainingProgress,
+    ).toBeCloseTo(NORMAL_FACTOR - 1);
+  });
+
+  it("peut gagner plusieurs points d'une heure de bureau, sans dépasser le plafond", () => {
+    const gain = (codeStat: number) => {
+      const dispatch = vi.fn();
+      processTrainingTick(
+        dispatch as never,
+        stateWith([
+          trainee({ codeStat, trainingProgress: 2 * TRAINING_THRESHOLD - 1 }),
+        ]),
+      );
+      return dispatch.mock.calls.find(
+        ([a]) => a.type === applyTrainingTick.type,
+      )![0].payload[0].completed.newValue;
+    };
+    expect(gain(200)).toBe(202);
+    expect(gain(249)).toBe(250);
   });
 
   it("rend immédiatement à la production un employé déjà au plafond, sans facturer", () => {
@@ -229,5 +268,38 @@ describe("processTrainingTick — plafond atteint", () => {
     expect(tick.payload).toEqual([
       { employeId: 2, progressDelta: 0, finished: true },
     ]);
+  });
+});
+
+describe("processTrainingTick — horaires de bureau", () => {
+  it("ne forme personne la nuit, et ne facture rien", () => {
+    const dispatch = vi.fn();
+    processTrainingTick(
+      dispatch as never,
+      stateWith([trainee({ codeStat: 100 })], 5000, NIGHT_HOUR),
+    );
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("sur une semaine, forme et facture autant qu'avant (24 h/24)", () => {
+    let progress = 0;
+    let cost = 0;
+    for (let t = 0; t < 168; t++) {
+      const dispatch = vi.fn();
+      const e = trainee({ codeStat: 100, trainingProgress: 0 });
+      processTrainingTick(dispatch as never, stateWith([e], 1e9, t));
+      const tick = dispatch.mock.calls.find(
+        ([a]) => a.type === applyTrainingTick.type,
+      )?.[0];
+      if (tick) progress += tick.payload[0].progressDelta;
+      const money = dispatch.mock.calls.find(
+        ([a]) => a.type === setMoney.type,
+      )?.[0];
+      if (money) cost += 1e9 - money.payload;
+    }
+    expect(progress).toBeCloseTo(168);
+    expect(cost).toBeCloseTo(
+      168 * trainingCostPerTick(trainee({ codeStat: 100 }), ComponentType.CODE),
+    );
   });
 });

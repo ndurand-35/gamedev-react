@@ -15,6 +15,10 @@ import { FOUNDER_ID } from "@/data/utils/research";
 import { techSalaryIndex } from "@/data/utils/technology";
 import { formatPrice } from "@/data/utils";
 import { trainingSpeedMultiplier } from "@/data/utils/traits";
+import {
+  employeWorkHourFactor,
+  scheduleByBuilding,
+} from "@/data/utils/workSchedule";
 
 // Heures de formation par point de compétence : 10 h, soit 100 h pour 10
 // points (STAT_SCALE), comme sur l'ancienne échelle 0..20.
@@ -83,6 +87,8 @@ export interface TrainingUpdate {
     newValue: number;
     /** Nouveau salaire attendu, s'il augmente. */
     expectedSalary?: number;
+    /** Avancement déjà acquis vers le point suivant (0 par défaut). */
+    remainder?: number;
   };
   /**
    * Plafond atteint : la formation s'arrête et l'employé repasse en
@@ -96,6 +102,7 @@ export const processTrainingTick = (
   state: RootState,
 ) => {
   const updates: TrainingUpdate[] = [];
+  const schedules = scheduleByBuilding(state.company.buildingList);
 
   let totalCost = 0;
 
@@ -122,10 +129,16 @@ export const processTrainingTick = (
 
     if (e.buildingId == null) continue; // pas de formation hors bâtiment
 
-    totalCost += trainingCostPerTick(e, e.trainingType);
+    // On se forme aux heures de bureau du studio, pas la nuit : l'heure
+    // travaillée compte (et coûte) d'autant plus, la semaine reste la même.
+    const hourFactor = employeWorkHourFactor(e, schedules, state.engine.time);
+    if (hourFactor === 0) continue;
+
+    totalCost += trainingCostPerTick(e, e.trainingType) * hourFactor;
     // Autodidacte, ou mentor dans le bâtiment : l'heure payée avance plus.
     const step =
       TRAINING_PROGRESS_PER_TICK *
+      hourFactor *
       trainingSpeedMultiplier(
         e,
         state.employe.employeList,
@@ -141,8 +154,13 @@ export const processTrainingTick = (
       continue;
     }
 
-    const newValue = e[statKey] + 1;
+    // Une heure de bureau peut valoir plus d'un point : on les compte tous et
+    // on garde le reste pour le suivant, plutôt que de le perdre.
+    const gained = Math.floor(next / TRAINING_THRESHOLD);
+    const oldValue = e[statKey];
+    const newValue = Math.min(oldValue + gained, e[maxKey]);
     const maxed = newValue >= e[maxKey];
+    const remainder = maxed ? 0 : next - gained * TRAINING_THRESHOLD;
     const expectedSalary = trainedExpectedSalary(
       e,
       statKey,
@@ -154,13 +172,15 @@ export const processTrainingTick = (
     updates.push({
       employeId: e.id,
       progressDelta: 0,
-      completed: { statKey, newValue, expectedSalary },
+      completed: { statKey, newValue, expectedSalary, remainder },
       finished: maxed,
     });
 
     // Un point tombe toutes les 10 h : on n'annonce que les paliers (70, 80…)
     // et le plafond, pour ne pas noyer le journal.
-    if (!maxed && newValue % STAT_SCALE !== 0) continue;
+    const crossedMilestone =
+      Math.floor(newValue / STAT_SCALE) > Math.floor(oldValue / STAT_SCALE);
+    if (!maxed && !crossedMilestone) continue;
 
     const expectation =
       expectedSalary !== undefined

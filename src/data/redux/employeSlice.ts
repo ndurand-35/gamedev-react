@@ -314,6 +314,7 @@ export const employeSlice = createSlice({
             statKey: keyof ProductionPerson;
             newValue: number;
             expectedSalary?: number;
+            remainder?: number;
           };
           finished?: boolean;
         }>
@@ -328,7 +329,7 @@ export const employeSlice = createSlice({
         if (update.completed) {
           (employe[update.completed.statKey] as number) =
             update.completed.newValue;
-          employe.trainingProgress = 0;
+          employe.trainingProgress = update.completed.remainder ?? 0;
           // Mieux formé, il se sait plus cher sur le marché.
           if (update.completed.expectedSalary !== undefined) {
             employe.expectedSalary = update.completed.expectedSalary;

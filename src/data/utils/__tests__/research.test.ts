@@ -186,7 +186,9 @@ const founder = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
 describe("produceComponents pendant une formation du fondateur", () => {
   it("ne fait pas avancer le fondateur, mais les autres si", () => {
     const dispatch = vi.fn();
+    // Jeudi 10 h : heures de bureau (la nuit, personne ne produit).
     const state = stateWith({
+      time: 10,
       current: { skillId: "delivery_advisor", startedAt: 0 },
       employeList: [founder(), founder({ id: 2 })],
     });
@@ -206,7 +208,7 @@ describe("produceComponents pendant une formation du fondateur", () => {
     const dispatch = vi.fn();
     produceComponents(
       dispatch as never,
-      stateWith({ employeList: [founder()] }),
+      stateWith({ time: 10, employeList: [founder()] }),
     );
     const call = dispatch.mock.calls.find(
       ([a]) => a.type === applyProductionTick.type,
