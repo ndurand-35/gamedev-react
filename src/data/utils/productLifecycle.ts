@@ -20,7 +20,12 @@ import {
   stopPromotion,
 } from "@/data/redux/productSlice";
 import { AppDispatch, RootState } from "@/data/redux/store";
-import { selectBestComponents } from "@/data/utils/component";
+import { requirementsLabel, selectComponents } from "@/data/utils/component";
+import {
+  countKinds,
+  recipeShortfall,
+  recipeToRequirements,
+} from "@/data/utils/recipes";
 import {
   aggregateQaDetection,
   campaignEffectiveness,
@@ -51,13 +56,7 @@ import {
 } from "@/data/utils/product";
 import { getTimeAsDate } from "@/data/utils/time";
 import { formatPrice } from "@/data/utils";
-import {
-  COMPONENT_TYPE_ORDER,
-  ComponentType,
-  Marketing,
-  PersonType,
-  QA,
-} from "@/data/interface";
+import { Marketing, PersonType, QA } from "@/data/interface";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Effets de la vie d'un produit : lancement (note, réputation, hype), mise à
@@ -101,9 +100,9 @@ export const createProductThunk =
   };
 
 /**
- * Développement : verse dans le produit les meilleurs composants du stock qui
- * manquent encore, type par type. Partiel si le stock ne suit pas — ce qui
- * est là part, le reste attendra la prochaine production.
+ * Développement : verse dans le produit les pièces du stock qui lui manquent
+ * encore. Partiel si le stock ne suit pas — ce qui est là part, le reste
+ * attendra la prochaine production.
  */
 export const investProductThunk =
   (productId: number) => (dispatch: AppDispatch, getState: () => RootState) => {
@@ -112,14 +111,13 @@ export const investProductThunk =
     if (!product || product.status !== ProductStatus.DEVELOPING) return;
 
     const stock = state.component.stock;
-    const requirements = COMPONENT_TYPE_ORDER.map((t) => ({
-      type: t,
-      quantity: Math.min(
-        Math.max(0, product.requirements[t] - product.invested[t]),
-        stock.filter((c) => c.type === t).length,
-      ),
-    })).filter((r) => r.quantity > 0);
-    const selection = selectBestComponents(stock, requirements);
+    const have = countKinds(stock);
+    const requirements = recipeToRequirements(
+      recipeShortfall(product.requirements, product.invested),
+    )
+      .map((r) => ({ ...r, quantity: Math.min(r.quantity, have[r.kind] ?? 0) }))
+      .filter((r) => r.quantity > 0);
+    const selection = selectComponents(stock, requirements);
     if (selection.consumed.length === 0) {
       dispatch(
         pushNotification({
@@ -190,13 +188,11 @@ export const launchProductThunk =
     );
   };
 
-const missingLabel = (
-  missing: { type: ComponentType; quantity: number }[],
-): string => missing.map((m) => `${m.quantity} ${m.type}`).join(", ");
+const missingLabel = requirementsLabel;
 
 /**
  * Ajoute une fonctionnalité à un produit lancé. Son coût est prélevé d'un
- * coup sur les meilleurs composants du stock — pas de fonctionnalité à
+ * coup sur le stock — pas de fonctionnalité à
  * moitié livrée : s'il manque quelque chose, rien n'est consommé.
  */
 export const addFeatureThunk =
@@ -215,7 +211,7 @@ export const addFeatureThunk =
       return;
     }
 
-    const selection = selectBestComponents(
+    const selection = selectComponents(
       state.component.stock,
       featureRequirements(feature),
     );
@@ -264,8 +260,8 @@ export const patchProductThunk =
     const bugs = product.bugs ?? 0;
     if (bugs === 0) return;
 
-    const selection = selectBestComponents(state.component.stock, [
-      { type: ComponentType.CODE, quantity: bugs * PATCH_CODE_PER_BUG },
+    const selection = selectComponents(state.component.stock, [
+      { kind: "code", quantity: bugs * PATCH_CODE_PER_BUG },
     ]);
     if (selection.missing.length > 0) {
       dispatch(

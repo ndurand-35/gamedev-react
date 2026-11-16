@@ -2,7 +2,6 @@ import { FC, ReactNode, useMemo } from "react";
 import { WarningTriangle } from "iconoir-react";
 
 import {
-  COMPONENT_TYPE_ORDER,
   ProductStatus,
   productAverageQuality,
   productSize,
@@ -28,11 +27,12 @@ import {
   segmentReports,
 } from "@/data/utils/product";
 import { getTimeAsDate } from "@/data/utils/time";
-import { ComponentTypeBadge } from "@/components/component";
 import { CostBadges } from "@/components/product/CostBadges";
 import { ProductActions } from "@/components/product/ProductActions";
 import { formatScore, pct } from "@/components/product/productView";
 import { Modal } from "@/components/global/Modal";
+import { KindPill } from "@/components/component";
+import { kindLabel, recipeToRequirements } from "@/data/utils/recipes";
 
 export interface ProductModalProps {
   /** Produit affiché, ou null quand la fiche est fermée. */
@@ -146,7 +146,7 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
                 <Metric label="Attractivité">
                   {productBaseAppeal(p).toFixed(0)}
                 </Metric>
-                <Metric label="Qualité">
+                <Metric label="Finition">
                   {productAverageQuality(p).toFixed(1)} / 5
                 </Metric>
                 <Metric label="Taille">{productSize(p)} composants</Metric>
@@ -179,26 +179,29 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
 
             {developing && (
               <div className="toy-tile flex flex-col gap-2 px-4 py-3">
-                {COMPONENT_TYPE_ORDER.map((t) => {
-                  const have = p.invested[t];
-                  const need = p.requirements[t];
-                  if (need === 0) return null;
-                  return (
-                    <div key={`${p.id}_${t}`}>
-                      <div className="flex flex-row items-center justify-between text-xs font-bold">
-                        <ComponentTypeBadge type={t} size={12} />
-                        <span className="tabular-nums">
-                          {have}/{need}
-                        </span>
+                {recipeToRequirements(p.requirements).map(
+                  ({ kind: t, quantity: need }) => {
+                    const have = p.invested[t] ?? 0;
+                    return (
+                      <div key={`${p.id}_${t}`}>
+                        <div className="flex flex-row items-center justify-between text-xs font-bold">
+                          <span className="inline-flex items-center gap-1">
+                            <KindPill kind={t} size={14} />
+                            {kindLabel(t)}
+                          </span>
+                          <span className="tabular-nums">
+                            {have}/{need}
+                          </span>
+                        </div>
+                        <progress
+                          className="progress h-2 w-full"
+                          value={Math.min(1, have / need) * 100}
+                          max={100}
+                        />
                       </div>
-                      <progress
-                        className="progress h-2 w-full"
-                        value={Math.min(1, have / need) * 100}
-                        max={100}
-                      />
-                    </div>
-                  );
-                })}
+                    );
+                  },
+                )}
               </div>
             )}
 

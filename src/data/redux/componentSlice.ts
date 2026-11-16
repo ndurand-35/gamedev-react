@@ -1,37 +1,27 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import {
-  COMPONENT_GRAIN,
-  Component,
-  ComponentDecayUpdate,
-  ComponentQuality,
-  ComponentType,
-  STAT_SCALE,
-} from "@/data/interface";
+import { COMPONENT_GRAIN, Component, STAT_SCALE } from "@/data/interface";
 import { DEFAULT_COMPONENT_STATE } from "@/data/utils/constant";
-
-export interface PendingComponent {
-  type: ComponentType;
-  quality: ComponentQuality;
-  producedBy: number;
-  producedAt: number;
-  /** Coup de génie (bonus rare) : mis en scène à l'écran. */
-  lucky?: boolean;
-}
+import type { ProductionJob, ProductionWorld } from "@/data/utils/production";
+import type { Recipe } from "@/data/utils/recipes";
 
 export interface ComponentState {
   stock: Component[];
+  /** Points de travail accumulés sur la pièce en cours, par employé. */
   productionProgress: Record<number, number>;
+  /** Pièce en cours de chaque employé, avec ses ingrédients réservés. */
+  productionJobs: Record<number, ProductionJob>;
+  /** Employés à l'arrêt, et ce qui manque à la pièce de leur poste. */
+  productionWaiting: Record<number, Recipe>;
   nextComponentId: number;
 }
 
 const initialState: ComponentState = DEFAULT_COMPONENT_STATE;
 
-// Points de travail nécessaires à un composant. Un spécialiste (stat ~170, moral
-// correct → ~140 points/h) met donc ~22 h de jeu, un peu moins d'une journée, à
-// sortir un composant (cf. `COMPONENT_GRAIN`). Les délais des contrats sont
-// calés dessus : un contrat de difficulté moyenne (~65 composants) représente
-// environ deux mois de travail pour un développeur seul.
+// Points de travail d'un composant de base. Un spécialiste (stat ~170, moral
+// correct → ~140 points/h) met donc ~22 h de jeu, un peu moins d'une journée,
+// à en sortir un (cf. `COMPONENT_GRAIN`). Une pièce avancée demande son
+// travail propre en plus de ses ingrédients (cf. `TIER_LABOR`).
 export const PRODUCTION_THRESHOLD = (1600 * STAT_SCALE) / COMPONENT_GRAIN;
 
 export const componentSlice = createSlice({
@@ -41,34 +31,30 @@ export const componentSlice = createSlice({
     initializeComponentState(state) {
       state.stock = DEFAULT_COMPONENT_STATE.stock;
       state.productionProgress = DEFAULT_COMPONENT_STATE.productionProgress;
+      state.productionJobs = DEFAULT_COMPONENT_STATE.productionJobs;
+      state.productionWaiting = DEFAULT_COMPONENT_STATE.productionWaiting;
       state.nextComponentId = DEFAULT_COMPONENT_STATE.nextComponentId;
     },
-    applyProductionTick(
-      state,
-      action: PayloadAction<{
-        progress: Record<number, number>;
-        produced: PendingComponent[];
-      }>,
-    ) {
-      state.productionProgress = action.payload.progress;
-      for (const c of action.payload.produced) {
-        state.stock.push({
-          ...c,
-          id: state.nextComponentId++,
-        });
-      }
+    /** Une heure de production : le moteur rend l'état complet de l'atelier. */
+    applyProductionTick(state, action: PayloadAction<ProductionWorld>) {
+      const w = action.payload;
+      state.stock = w.stock;
+      state.productionProgress = w.progress;
+      state.productionJobs = w.jobs;
+      state.productionWaiting = w.waiting;
+      state.nextComponentId = w.nextId;
     },
-    applyDecayTick(state, action: PayloadAction<ComponentDecayUpdate[]>) {
-      const byId = new Map(action.payload.map((u) => [u.id, u]));
-      for (const c of state.stock) {
-        const update = byId.get(c.id);
-        if (!update) continue;
-        c.quality = update.quality;
-        c.lastDecayAt = update.lastDecayAt;
-      }
-    },
+    /**
+     * Abandon de la pièce en cours d'un employé (réaffecté, licencié…) : ses
+     * ingrédients réservés reviennent au stock.
+     */
     clearEmployeProgress(state, action: PayloadAction<number>) {
-      delete state.productionProgress[action.payload];
+      const id = action.payload;
+      const job = state.productionJobs?.[id];
+      if (job) state.stock.push(...job.reserved);
+      delete state.productionProgress[id];
+      if (state.productionJobs) delete state.productionJobs[id];
+      if (state.productionWaiting) delete state.productionWaiting[id];
     },
     removeComponents(state, action: PayloadAction<number[]>) {
       const ids = new Set(action.payload);
@@ -80,7 +66,6 @@ export const componentSlice = createSlice({
 export const {
   initializeComponentState,
   applyProductionTick,
-  applyDecayTick,
   clearEmployeProgress,
   removeComponents,
 } = componentSlice.actions;

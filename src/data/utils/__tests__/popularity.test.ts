@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  ComponentQuality,
-  ComponentType,
   PersonType,
+  TIER_FINISH,
   Product,
   ProductGenre,
   ProductStatus,
@@ -47,18 +46,12 @@ const launched = (over: Partial<Product> = {}): Product => ({
   status: ProductStatus.LAUNCHED,
   genre: ProductGenre.OUTIL,
   features: ["core_tool"],
-  requirements: {
-    [ComponentType.CODE]: 4,
-    [ComponentType.VISUEL]: 1,
-    [ComponentType.UX]: 1,
-  },
-  invested: {
-    [ComponentType.CODE]: 4,
-    [ComponentType.VISUEL]: 1,
-    [ComponentType.UX]: 1,
-  },
-  qualitySum: 6 * ComponentQuality.BON,
-  qualityCount: 6,
+  // 8 pièces de base : taille 6 (8 / 1,3).
+  requirements: { code: 6, visuel: 1, ux: 1 },
+  invested: { code: 6, visuel: 1, ux: 1 },
+  // Finition 3 : celle d'un produit fait de pièces de niveau 2.
+  qualitySum: 8 * TIER_FINISH[2],
+  qualityCount: 8,
   launchTime: 0,
   freshAt: 0,
   bugs: 0,
@@ -99,12 +92,13 @@ describe("règles de popularité", () => {
     expect(fromZero).toBeLessThan(62);
     // Partir de plus haut rapporte moins de points.
     const gainLow = fromZero - 0;
-    const gainHigh = popularityAfterPromotion(60, 1, PROMOTION_DURATION_HOURS) - 60;
+    const gainHigh =
+      popularityAfterPromotion(60, 1, PROMOTION_DURATION_HOURS) - 60;
     expect(gainHigh).toBeLessThan(gainLow);
     // Un marketeur moins efficace fait moins.
-    expect(popularityAfterPromotion(0, 0.25, PROMOTION_DURATION_HOURS)).toBeLessThan(
-      fromZero / 2,
-    );
+    expect(
+      popularityAfterPromotion(0, 0.25, PROMOTION_DURATION_HOURS),
+    ).toBeLessThan(fromZero / 2);
     expect(popularityAfterPromotion(99, 1, 10_000)).toBeLessThanOrEqual(100);
   });
 
@@ -159,7 +153,9 @@ describe("règles de popularité", () => {
     );
     expect([...busy].sort()).toEqual([7, 8]);
     // Campagnes terminées : plus personne n'est occupé.
-    expect(busyMarketerIds([launched({ promotion: promo })], undefined, 100).size).toBe(0);
+    expect(
+      busyMarketerIds([launched({ promotion: promo })], undefined, 100).size,
+    ).toBe(0);
   });
 });
 
@@ -178,7 +174,9 @@ describe("bouche-à-oreille", () => {
 
   it("chaque mois, la popularité se rapproche du niveau naturel, dans les deux sens", () => {
     const drift = POPULARITY_PROFILES[ProductGenre.OUTIL].drift;
-    expect(driftedPopularity(0, 50, ProductGenre.OUTIL)).toBeCloseTo(50 * drift);
+    expect(driftedPopularity(0, 50, ProductGenre.OUTIL)).toBeCloseTo(
+      50 * drift,
+    );
     expect(driftedPopularity(80, 50, ProductGenre.OUTIL)).toBeCloseTo(
       80 - 30 * drift,
     );
@@ -226,7 +224,12 @@ describe("promotions dans le slice produit", () => {
     let state = promote();
     state = productReducer(
       state,
-      startPromotion({ productId: 1, marketerId: 9, effectiveness: 0.5, time: 10 }),
+      startPromotion({
+        productId: 1,
+        marketerId: 9,
+        effectiveness: 0.5,
+        time: 10,
+      }),
     );
     expect(state.products[0].promotion?.marketerId).toBe(7);
   });
@@ -234,15 +237,26 @@ describe("promotions dans le slice produit", () => {
   it("le bouche-à-oreille épargne un produit promu", () => {
     let state = productReducer(
       created(),
-      startPromotion({ productId: 1, marketerId: 7, effectiveness: 1, time: 0 }),
+      startPromotion({
+        productId: 1,
+        marketerId: 7,
+        effectiveness: 1,
+        time: 0,
+      }),
     );
     state = { ...state, products: [{ ...state.products[0], popularity: 50 }] };
-    const held = productReducer(state, applyProductLifecycle({ time: 10, bugged: [] }));
+    const held = productReducer(
+      state,
+      applyProductLifecycle({ time: 10, bugged: [] }),
+    );
     expect(held.products[0].popularity).toBe(50);
 
     // Sans promotion, un produit pas encore sorti retombe vers 0.
     const stopped = productReducer(state, stopPromotion(1));
-    const eroded = productReducer(stopped, applyProductLifecycle({ time: 10, bugged: [] }));
+    const eroded = productReducer(
+      stopped,
+      applyProductLifecycle({ time: 10, bugged: [] }),
+    );
     expect(eroded.products[0].popularity).toBeCloseTo(
       50 * (1 - POPULARITY_PROFILES[ProductGenre.OUTIL].drift),
     );
@@ -253,7 +267,10 @@ describe("promotions dans le slice produit", () => {
       ...created(),
       products: [launched({ popularity: 0 })],
     };
-    const next = productReducer(state, applyProductLifecycle({ time: 10, bugged: [] }));
+    const next = productReducer(
+      state,
+      applyProductLifecycle({ time: 10, bugged: [] }),
+    );
     expect(next.products[0].popularity).toBeGreaterThan(0);
   });
 
@@ -287,27 +304,45 @@ describe("startPromotionThunk / processPromotionTick", () => {
 
   it("débite le coût et démarre la promotion avec l'efficacité du marketeur", () => {
     const dispatch = vi.fn();
-    const ok = startPromotionThunk(1, 7)(dispatch as never, () => stateWith({}));
+    const ok = startPromotionThunk(1, 7)(dispatch as never, () =>
+      stateWith({}),
+    );
     expect(ok).toBe(true);
     expect(dispatch).toHaveBeenCalledWith(setMoney(10_000 - PROMOTION_COST));
     expect(dispatch).toHaveBeenCalledWith(
-      startPromotion({ productId: 1, marketerId: 7, effectiveness: 1, time: 0 }),
+      startPromotion({
+        productId: 1,
+        marketerId: 7,
+        effectiveness: 1,
+        time: 0,
+      }),
     );
   });
 
   it("refuse sans fonds, sans marketeur, ou avec un marketeur déjà occupé", () => {
     const noMoney = vi.fn();
     expect(
-      startPromotionThunk(1, 7)(noMoney as never, () => stateWith({ money: 100 })),
+      startPromotionThunk(1, 7)(noMoney as never, () =>
+        stateWith({ money: 100 }),
+      ),
     ).toBe(false);
-    expect(noMoney).not.toHaveBeenCalledWith(expect.objectContaining({ type: "company/setMoney" }));
+    expect(noMoney).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "company/setMoney" }),
+    );
 
     const unknown = vi.fn();
-    expect(startPromotionThunk(1, 99)(unknown as never, () => stateWith({}))).toBe(false);
+    expect(
+      startPromotionThunk(1, 99)(unknown as never, () => stateWith({})),
+    ).toBe(false);
     expect(unknown).not.toHaveBeenCalled();
 
     const busy = vi.fn();
-    const promo = { marketerId: 7, effectiveness: 1, startTime: 0, endTime: 500 };
+    const promo = {
+      marketerId: 7,
+      effectiveness: 1,
+      startTime: 0,
+      endTime: 500,
+    };
     expect(
       startPromotionThunk(2, 7)(busy as never, () =>
         stateWith({
@@ -329,7 +364,12 @@ describe("startPromotionThunk / processPromotionTick", () => {
 
   it("interrompt la promotion d'un marketeur parti", () => {
     const dispatch = vi.fn();
-    const promo = { marketerId: 7, effectiveness: 1, startTime: 0, endTime: 500 };
+    const promo = {
+      marketerId: 7,
+      effectiveness: 1,
+      startTime: 0,
+      endTime: 500,
+    };
     processPromotionTick(
       dispatch as never,
       stateWith({ products: [launched({ promotion: promo })], marketers: [] }),

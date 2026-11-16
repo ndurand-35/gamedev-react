@@ -7,8 +7,11 @@ import {
   Employe,
   PersonType,
   ProductionPerson,
+  ComponentKindId,
 } from "@/data/interface";
 import { ROLE_BADGE } from "@/components/employe/RoleBadge";
+import { kindLabel } from "@/data/utils/recipes";
+import { useAppSelector } from "@/data/redux/hooks";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // « Que fait cet employé, là, maintenant ? »
@@ -96,7 +99,17 @@ const LEAVE_ACTIVITY: EmployeActivity = {
  * formation, puis rôle (QA / Marketing, qui n'ont pas d'affectation), sinon
  * inactif. Un seul point de vérité pour les trois vues de l'Accueil.
  */
-export const employeActivity = (emp: Employe): EmployeActivity => {
+export interface ProductionStatus {
+  /** Pièces en cours, par employé. */
+  jobs?: Record<number, { kind: ComponentKindId }>;
+  /** Employés à l'arrêt faute d'ingrédients. */
+  waiting?: Record<number, unknown>;
+}
+
+export const employeActivity = (
+  emp: Employe,
+  production: ProductionStatus = {},
+): EmployeActivity => {
   if (emp.leaveUntil != null) return LEAVE_ACTIVITY;
 
   const prod =
@@ -104,9 +117,12 @@ export const employeActivity = (emp: Employe): EmployeActivity => {
 
   const assigned = prod?.assignedComponentType ?? null;
   if (assigned) {
+    const job = production.jobs?.[emp.id];
+    const waiting = production.waiting?.[emp.id] !== undefined;
     return {
       kind: "work",
-      label: assigned,
+      // La pièce en cours, ou l'attente d'un ingrédient ; la famille à défaut.
+      label: waiting ? "En attente" : job ? kindLabel(job.kind) : assigned,
       Icon: COMPONENT_ICON[assigned],
       textClass: COMPONENT_TEXT_CLASS[assigned],
       softClass: COMPONENT_SOFT_CLASS[assigned],
@@ -181,7 +197,9 @@ export const ActivityBadge: FC<ActivityBadgeProps> = ({
   employe,
   variant = "chip",
 }) => {
-  const activity = employeActivity(employe);
+  const jobs = useAppSelector((s) => s.component.productionJobs);
+  const waiting = useAppSelector((s) => s.component.productionWaiting);
+  const activity = employeActivity(employe, { jobs, waiting });
   const { Icon, label, textClass, softClass } = activity;
 
   if (variant === "text") {

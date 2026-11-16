@@ -17,6 +17,7 @@ import { gameReducers } from "@/data/redux/reducers";
 import { gameLoopMiddleware } from "@/data/redux/gameLoopMiddleware";
 import { rescaleStateStats } from "@/data/utils/statScale";
 import { rescaleStateGrain } from "@/data/utils/componentGrain";
+import { migrateToComponentKinds } from "@/data/utils/componentKinds";
 
 const reducers = combineReducers(gameReducers);
 
@@ -27,7 +28,8 @@ const persistConfig = {
   // lot prêts (MYL-12) → on incrémente à 10 pour obtenir bien la purge.
   // 11 : stats de métier sur 0..200 — une partie en v10 est migrée, pas purgée.
   // 12 : composants au grain fin — une partie en v10 ou v11 est migrée.
-  version: 12,
+  // 13 : composants à recettes, sans qualité — v10 à v12 sont migrées.
+  version: 13,
   storage,
   // `events` n'est pas persisté : une décision en attente ne doit pas survivre à
   // un rechargement (sinon modal figé à speed 0 sans moyen de reprendre).
@@ -40,11 +42,18 @@ const persistConfig = {
   // saves antérieures au lieu de les recharger telles quelles.
   migrate: (_state: any, currentVersion: number) => {
     const storedVersion = _state?._persist?.version;
-    if (storedVersion === 10 && currentVersion === 12) {
-      return Promise.resolve(rescaleStateGrain(rescaleStateStats(_state)));
+    if (storedVersion === 10 && currentVersion === 13) {
+      return Promise.resolve(
+        migrateToComponentKinds(rescaleStateGrain(rescaleStateStats(_state))),
+      );
     }
-    if (storedVersion === 11 && currentVersion === 12) {
-      return Promise.resolve(rescaleStateGrain(_state));
+    if (storedVersion === 11 && currentVersion === 13) {
+      return Promise.resolve(
+        migrateToComponentKinds(rescaleStateGrain(_state)),
+      );
+    }
+    if (storedVersion === 12 && currentVersion === 13) {
+      return Promise.resolve(migrateToComponentKinds(_state));
     }
     if (storedVersion !== currentVersion) {
       return Promise.resolve(undefined);

@@ -19,8 +19,6 @@ export interface WorkScheduleDef {
   output: number;
   /** Variation mensuelle du moral, en plus de la paie. */
   morale: number;
-  /** Crans de qualité ajoutés (ou retirés) à chaque composant. */
-  quality: number;
   /** Effet en une phrase. */
   description: string;
 }
@@ -42,7 +40,6 @@ export const WORK_SCHEDULES: Record<WorkSchedule, WorkScheduleDef> = {
     weeklyHours: 32,
     output: 0.8,
     morale: 2,
-    quality: 0,
     description: "Semaine de quatre jours : on produit moins, on récupère.",
   },
   NORMAL: {
@@ -50,7 +47,6 @@ export const WORK_SCHEDULES: Record<WorkSchedule, WorkScheduleDef> = {
     weeklyHours: 40,
     output: 1,
     morale: 0,
-    quality: 0,
     description: "Le rythme de référence, tenable indéfiniment.",
   },
   SOUTENU: {
@@ -58,7 +54,6 @@ export const WORK_SCHEDULES: Record<WorkSchedule, WorkScheduleDef> = {
     weeklyHours: 50,
     output: 1.2,
     morale: -2,
-    quality: 0,
     description:
       "Des soirées en plus : plus de production, une équipe qui s'use.",
   },
@@ -67,9 +62,8 @@ export const WORK_SCHEDULES: Record<WorkSchedule, WorkScheduleDef> = {
     weeklyHours: 65,
     output: 1.4,
     morale: -8,
-    quality: -0.5,
     description:
-      "Nuits et week-ends : un sprint pour une échéance, pas un mode de vie. La fatigue abîme la qualité.",
+      "Nuits et week-ends : un sprint pour une échéance, pas un mode de vie.",
   },
 };
 
@@ -96,9 +90,6 @@ export const scheduleOutput = (s: WorkSchedule): number =>
 
 export const scheduleMorale = (s: WorkSchedule): number =>
   WORK_SCHEDULES[s].morale;
-
-export const scheduleQuality = (s: WorkSchedule): number =>
-  WORK_SCHEDULES[s].quality;
 
 // ── Heures de présence ──────────────────────────────────────────────────────
 // Chaque rythme a de vraies plages horaires : hors de celles-ci, personne ne

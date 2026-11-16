@@ -4,25 +4,36 @@ import {
   CONTRACT_DEADLINE_MAX_MARGIN,
   CONTRACT_DEADLINE_MIN_MARGIN,
   CONTRACT_HOURS_PER_COMPONENT,
+  TIER_PRICE_PREMIUM,
   contractDeadlineHours,
   generateNewContract,
+  maxTierForDifficulty,
   nextContractSort,
+  requirementsForType,
   sortContracts,
 } from "@/data/utils/task";
-import { totalRequirementQuantity } from "@/data/utils/component";
 import {
   COMPONENT_GRAIN as G,
+  CONSUMPTION_FACTOR,
+  ComponentRequirement,
   ComponentType,
   Contract,
   ContractType,
 } from "@/data/interface";
+import {
+  isKindAvailable,
+  kindFamily,
+  requirementUnits,
+  requirementsMaxTier,
+} from "@/data/utils/recipes";
+import { timeOfYear } from "@/data/utils/technology";
 
 // Couvre la balance des contrats (MYL-11) : depuis le rééquilibrage, chaque
 // contrat demande au moins deux types de composants et garantit un gain
 // plancher utile dès le early game (forfaits 150 / 600 sur les prix).
 describe("balance des contrats — generateNewContract", () => {
-  const typesOf = (req: { type: ComponentType }[]) =>
-    new Set(req.map((r) => r.type));
+  const typesOf = (req: ComponentRequirement[]) =>
+    new Set(req.map((r) => kindFamily(r.kind)));
 
   it("génère le bon nombre de contrats selon la réputation", () => {
     expect(generateNewContract(0)).toHaveLength(8);
@@ -32,7 +43,7 @@ describe("balance des contrats — generateNewContract", () => {
     expect(generateNewContract(100)).toHaveLength(15);
   });
 
-  it("demande toujours au moins deux types de composants", () => {
+  it("demande toujours au moins deux familles de composants", () => {
     // On échantillonne large pour couvrir l'aléatoire de type/difficulté.
     for (let rep = 0; rep <= 100; rep += 10) {
       for (const c of generateNewContract(rep)) {
@@ -41,7 +52,7 @@ describe("balance des contrats — generateNewContract", () => {
     }
   });
 
-  it("respecte la composition de types par type de contrat", () => {
+  it("respecte la composition de familles par type de contrat", () => {
     const byType = (rep: number) => {
       const map: Record<ContractType, Set<ComponentType>[]> = {
         [ContractType.DEV]: [],
@@ -92,15 +103,16 @@ describe("balance des contrats — generateNewContract", () => {
     }
   });
 
-  it("cale le délai sur la charge réelle du contrat", () => {
-    // ~110 h de travail par unité d'effort (G composants) pour un développeur
-    // seul, plus la marge du client, arrondi au jour plein.
+  it("cale le délai sur la charge réelle du contrat, pièces avancées comprises", () => {
+    // ~110 h de travail par unité d'effort (G unités de travail) pour un
+    // développeur seul, plus la marge du client, arrondi au jour plein.
     expect(contractDeadlineHours(10 * G, 100)).toBe(1104); // 1100 h → 46 j
     expect(contractDeadlineHours(1 * G, 120)).toBe(144); // 132 h → 6 j pleins
 
     for (let rep = 0; rep <= 100; rep += 10) {
       for (const c of generateNewContract(rep)) {
-        const qty = totalRequirementQuantity(c.requirements);
+        // Un Module compte pour 5 unités, pas pour une pièce.
+        const qty = requirementUnits(c.requirements);
         const solo = qty * CONTRACT_HOURS_PER_COMPONENT;
         expect(c.time).toBeGreaterThanOrEqual(
           Math.round((solo * CONTRACT_DEADLINE_MIN_MARGIN) / 100 / 24) * 24 -
@@ -135,7 +147,7 @@ describe("balance des contrats — generateNewContract", () => {
         0,
       );
       const qty = lot.reduce(
-        (acc, c) => acc + c.requirements.reduce((s, r) => s + r.quantity, 0),
+        (acc, c) => acc + requirementUnits(c.requirements),
         0,
       );
       // Prix d'une unité d'effort (G composants), l'échelle d'origine.
@@ -162,6 +174,90 @@ describe("balance des contrats — generateNewContract", () => {
   });
 });
 
+describe("pièces demandées — requirementsForType", () => {
+  const LATE = timeOfYear(2010);
+
+  it("le niveau le plus haut demandé suit la difficulté", () => {
+    expect(maxTierForDifficulty(10)).toBe(1);
+    expect(maxTierForDifficulty(29)).toBe(1);
+    expect(maxTierForDifficulty(30)).toBe(2);
+    expect(maxTierForDifficulty(55)).toBe(3);
+    expect(maxTierForDifficulty(80)).toBe(4);
+    expect(maxTierForDifficulty(100)).toBe(4);
+  });
+
+  it("ne dépasse jamais le niveau permis par la difficulté", () => {
+    for (const difficulty of [5, 29, 40, 70, 100]) {
+      for (const type of Object.values(ContractType)) {
+        for (let i = 0; i < 10; i++) {
+          const reqs = requirementsForType(type, difficulty, LATE);
+          expect(requirementsMaxTier(reqs)).toBeLessThanOrEqual(
+            maxTierForDifficulty(difficulty),
+          );
+        }
+      }
+    }
+  });
+
+  it("un contrat facile se fait en composants de base", () => {
+    for (const r of requirementsForType(ContractType.FULL_STACK, 10, LATE)) {
+      expect(["code", "visuel", "ux"]).toContain(r.kind);
+    }
+  });
+
+  it("un contrat difficile demande des pièces avancées", () => {
+    const reqs = requirementsForType(ContractType.DEV, 100, LATE, () => 0);
+    expect(requirementsMaxTier(reqs)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("au plus difficile, une fois la technologie là, demande du niveau 4", () => {
+    // Le budget d'une famille couvre largement une pièce de 56 unités : le
+    // niveau le plus haut permis en reçoit au moins une.
+    const reqs = requirementsForType(ContractType.DEV, 100, LATE, () => 0);
+    expect(requirementsMaxTier(reqs)).toBe(4);
+  });
+
+  it("ne demande que des pièces déjà inventées", () => {
+    for (let i = 0; i < 30; i++) {
+      for (const r of requirementsForType(ContractType.FULL_STACK, 100, 0)) {
+        expect(isKindAvailable(r.kind, 0), r.kind).toBe(true);
+      }
+    }
+  });
+
+  it("le volume de chaque famille suit la difficulté, × le facteur de consommation", () => {
+    // Difficulté 50, Dev : Code ≈ (7 + 1..3) × G × 1,3, UX ≈ (2 + 1..3) × G × 1,3.
+    const units = requirementUnits(
+      requirementsForType(ContractType.DEV, 50, LATE),
+    );
+    expect(units).toBeGreaterThanOrEqual(
+      Math.round((7 + 1) * G * CONSUMPTION_FACTOR) +
+        Math.round((2 + 1) * G * CONSUMPTION_FACTOR) -
+        1,
+    );
+    expect(units).toBeLessThanOrEqual(
+      Math.round((7 + 3) * G * CONSUMPTION_FACTOR) +
+        Math.round((2 + 3) * G * CONSUMPTION_FACTOR) +
+        1,
+    );
+  });
+
+  it("generateNewContract n'émet que des pièces inventées à l'heure donnée", () => {
+    for (const c of generateNewContract(100, {}, [], 0)) {
+      for (const r of c.requirements) {
+        expect(isKindAvailable(r.kind, 0)).toBe(true);
+      }
+    }
+  });
+
+  it("majore le solde des contrats de niveau 3 et 4", () => {
+    expect(TIER_PRICE_PREMIUM[1]).toBe(1);
+    expect(TIER_PRICE_PREMIUM[2]).toBe(1);
+    expect(TIER_PRICE_PREMIUM[3]).toBeGreaterThan(1);
+    expect(TIER_PRICE_PREMIUM[4]).toBeGreaterThan(TIER_PRICE_PREMIUM[3]);
+  });
+});
+
 describe("tri des contrats disponibles — sortContracts", () => {
   const makeContract = (over: Partial<Contract> = {}): Contract => ({
     id: 1,
@@ -176,7 +272,7 @@ describe("tri des contrats disponibles — sortContracts", () => {
     priceMalus: 300,
     type: ContractType.DEV,
     taskDifficulty: 10,
-    requirements: [{ type: ComponentType.CODE, quantity: 2 }],
+    requirements: [{ kind: "code", quantity: 2 }],
     ...over,
   });
 
@@ -225,23 +321,28 @@ describe("tri des contrats disponibles — sortContracts", () => {
     ).toEqual([2, 3, 1]);
   });
 
-  it("trie les composants demandés sur la quantité totale", () => {
+  it("trie les composants demandés sur le travail total, en unités", () => {
     const list = [
       makeContract({
         id: 1,
         requirements: [
-          { type: ComponentType.CODE, quantity: 3 },
-          { type: ComponentType.UX, quantity: 3 },
+          { kind: "code", quantity: 3 },
+          { kind: "ux", quantity: 3 },
         ],
       }),
       makeContract({
         id: 2,
-        requirements: [{ type: ComponentType.VISUEL, quantity: 1 }],
+        requirements: [{ kind: "visuel", quantity: 1 }],
+      }),
+      // Une seule pièce, mais un Moteur vaut 19 unités.
+      makeContract({
+        id: 3,
+        requirements: [{ kind: "moteur", quantity: 1 }],
       }),
     ];
     expect(
       ids(sortContracts(list, { key: "requirements", direction: "asc" })),
-    ).toEqual([2, 1]);
+    ).toEqual([2, 1, 3]);
   });
 
   it("cycle croissant → décroissant → ordre d'arrivée sur une même colonne", () => {

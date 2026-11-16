@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ComponentQuality,
-  ComponentType,
   PRODUCT_GENRE_ORDER,
+  TIER_FINISH,
   Product,
   ProductGenre,
   ProductStatus,
@@ -36,18 +35,12 @@ const product = (over: Partial<Product> = {}): Product => ({
   status: ProductStatus.LAUNCHED,
   genre: ProductGenre.JEU,
   features: ["core_game", "multiplayer"],
-  requirements: {
-    [ComponentType.CODE]: 12,
-    [ComponentType.VISUEL]: 7,
-    [ComponentType.UX]: 3,
-  },
-  invested: {
-    [ComponentType.CODE]: 12,
-    [ComponentType.VISUEL]: 7,
-    [ComponentType.UX]: 3,
-  },
-  qualitySum: 22 * ComponentQuality.BON,
-  qualityCount: 22,
+  // 29 pièces de base : taille 22 (29 / 1,3).
+  requirements: { code: 16, visuel: 9, ux: 4 },
+  invested: { code: 16, visuel: 9, ux: 4 },
+  // Finition 3 : celle d'un produit fait de pièces de niveau 2.
+  qualitySum: 29 * TIER_FINISH[2],
+  qualityCount: 29,
   launchTime: 0,
   freshAt: 0,
   bugs: 0,
@@ -106,14 +99,18 @@ describe("tendances : correspondance et effets", () => {
 
   it("modifie la portée d'une promotion", () => {
     expect(trendReachFactor(product(), [trend()])).toBeGreaterThan(1);
-    expect(trendReachFactor(product(), [trend({ direction: "down" })])).toBeLessThan(1);
+    expect(
+      trendReachFactor(product(), [trend({ direction: "down" })]),
+    ).toBeLessThan(1);
     expect(trendReachFactor(product(), [])).toBe(1);
   });
 
   it("dit la tendance en une phrase", () => {
     expect(trendLabel(trend())).toBe("« Multijoueur » est à la mode");
     expect(
-      trendLabel(trend({ kind: "genre", target: ProductGenre.JEU, direction: "down" })),
+      trendLabel(
+        trend({ kind: "genre", target: ProductGenre.JEU, direction: "down" }),
+      ),
     ).toBe("Le segment Jeu s'essouffle");
   });
 
@@ -141,7 +138,11 @@ describe("rollTrends", () => {
     // engouement oui, fonctionnalité, première cible libre, à la hausse, 3 mois.
     const roll = rollTrends([], 0, 7, sequence(0, 0, 0, 0, 0));
     expect(roll.started).toHaveLength(1);
-    expect(roll.started[0]).toMatchObject({ id: 7, kind: "feature", direction: "up" });
+    expect(roll.started[0]).toMatchObject({
+      id: 7,
+      kind: "feature",
+      direction: "up",
+    });
     expect(roll.started[0].endTime).toBe(3 * 30 * 24);
     expect(isTrendActive(roll.started[0], 0)).toBe(true);
     expect(roll.nextId).toBe(8);
@@ -217,7 +218,10 @@ describe("tendances dans le slice produit", () => {
       applyProductLifecycle({ time: 10, bugged: [] }),
     );
     const trendy = productReducer(
-      productReducer(withProduct(), setTrends({ trends: [trend()], nextTrendId: 2 })),
+      productReducer(
+        withProduct(),
+        setTrends({ trends: [trend()], nextTrendId: 2 }),
+      ),
       applyProductLifecycle({ time: 10, bugged: [] }),
     );
     expect(trendy.products[0].popularity!).toBeGreaterThan(
@@ -227,12 +231,21 @@ describe("tendances dans le slice produit", () => {
 
   it("une promotion à la mode monte plus vite", () => {
     const promo = (trends: MarketTrend[]) => {
-      let state = productReducer(withProduct(), setTrends({ trends, nextTrendId: 2 }));
+      let state = productReducer(
+        withProduct(),
+        setTrends({ trends, nextTrendId: 2 }),
+      );
       state = productReducer(
         state,
-        startPromotion({ productId: 1, marketerId: 7, effectiveness: 1, time: 0 }),
+        startPromotion({
+          productId: 1,
+          marketerId: 7,
+          effectiveness: 1,
+          time: 0,
+        }),
       );
-      for (let h = 1; h <= 48; h++) state = productReducer(state, advancePromotions(h));
+      for (let h = 1; h <= 48; h++)
+        state = productReducer(state, advancePromotions(h));
       return state.products[0].popularity!;
     };
     expect(promo([trend()])).toBeGreaterThan(promo([]));

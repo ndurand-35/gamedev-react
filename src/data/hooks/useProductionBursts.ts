@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { ComponentQuality, ComponentType } from "@/data/interface";
+import { ComponentKindId, ComponentType } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
 
 /** Composant qui vient de sortir, le temps de le mettre en scène. */
@@ -8,7 +8,7 @@ export interface ProductionBurst {
   /** Identifiant du composant : sert de `key` pour relancer l'animation. */
   id: number;
   type: ComponentType;
-  quality: ComponentQuality;
+  kind: ComponentKindId;
   lucky: boolean;
 }
 
@@ -62,7 +62,7 @@ export const useProductionBursts = (): Record<number, ProductionBurst> => {
         next[c.producedBy] = {
           id: c.id,
           type: c.type,
-          quality: c.quality,
+          kind: c.kind,
           lucky: c.lucky === true,
         };
       }

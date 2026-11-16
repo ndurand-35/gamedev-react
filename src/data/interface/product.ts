@@ -1,4 +1,10 @@
-import { COMPONENT_GRAIN, ComponentType } from "@/data/interface/component";
+import {
+  COMPONENT_GRAIN,
+  CONSUMPTION_FACTOR,
+  Recipe,
+  recipeEntries,
+  recipeValue,
+} from "@/data/interface/component";
 import type { ProductPromotion } from "@/data/utils/popularity";
 
 export enum ProductStatus {
@@ -83,17 +89,21 @@ export const PRODUCT_GENRE_ORDER: ProductGenre[] = [
 ];
 
 /**
- * Une fonctionnalité : la brique dont on assemble un produit. Elle coûte des
- * composants (Code / Visuel / UX) — c'est la somme de ces coûts qui fait les
- * besoins du produit — et n'a sa place que sur certains segments, où elle
- * vaut plus ou moins : un multijoueur fait vendre un jeu, et n'est même pas
- * proposé pour un outil.
+ * Une fonctionnalité : la brique dont on assemble un produit. Elle a une
+ * taille (son poids commercial, en unités de travail d'avant la refonte) et
+ * coûte des pièces — c'est la somme de ces coûts qui fait les besoins du
+ * produit. Elle n'a sa place que sur certains segments, où elle vaut plus ou
+ * moins : un multijoueur fait vendre un jeu, et n'est même pas proposé pour
+ * un outil.
  */
 export interface ProductFeature {
   id: string;
   label: string;
   description: string;
-  cost: Record<ComponentType, number>;
+  /** Taille : attractivité apportée et taille du produit. */
+  size: number;
+  /** Pièces consommées pour l'ajouter. */
+  cost: Recipe;
   /** Genre dont elle est le socle : obligatoire et présélectionnée. */
   coreOf?: ProductGenre;
   /**
@@ -110,9 +120,14 @@ export interface Product {
   genre: ProductGenre;
   /** Fonctionnalités assemblées (ids du catalogue), socle du genre compris. */
   features: string[];
-  /** Composants requis : somme des coûts des fonctionnalités. */
-  requirements: Record<ComponentType, number>;
-  invested: Record<ComponentType, number>;
+  /** Pièces requises : somme des coûts des fonctionnalités. */
+  requirements: Recipe;
+  /** Pièces déjà versées. */
+  invested: Recipe;
+  /**
+   * Finition : somme des notes de finition des pièces versées, pondérées par
+   * leur valeur (cf. `TIER_FINISH`), et somme de ces valeurs.
+   */
   qualitySum: number;
   qualityCount: number;
   launchTime?: number;
@@ -140,16 +155,18 @@ export interface Product {
   promotion?: ProductPromotion;
 }
 
+/** Finition d'un produit (0 à 5) : la moyenne des pièces qui le composent. */
 export const productAverageQuality = (p: Product): number =>
   p.qualityCount === 0 ? 0 : p.qualitySum / p.qualityCount;
 
-/** Taille d'un produit : composants effectivement investis. */
+/**
+ * Taille d'un produit : le travail effectivement investi, ramené à l'échelle
+ * d'avant la refonte (les produits consomment `CONSUMPTION_FACTOR` fois plus).
+ */
 export const productSize = (p: Product): number =>
-  Object.values(p.invested).reduce((acc, n) => acc + n, 0);
+  Math.round(recipeValue(p.invested) / CONSUMPTION_FACTOR);
 
-export const isProductReady = (p: Product): boolean => {
-  for (const t of Object.values(ComponentType)) {
-    if (p.invested[t] < p.requirements[t]) return false;
-  }
-  return true;
-};
+export const isProductReady = (p: Product): boolean =>
+  recipeEntries(p.requirements).every(
+    ([kind, q]) => (p.invested[kind] ?? 0) >= q,
+  );

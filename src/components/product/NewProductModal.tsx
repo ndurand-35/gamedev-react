@@ -1,12 +1,7 @@
 import { FC, FormEvent, useEffect, useState } from "react";
 import { Check, Lock, Plus } from "iconoir-react";
 
-import {
-  COMPONENT_TYPE_ORDER,
-  GENRES,
-  PRODUCT_GENRE_ORDER,
-  ProductGenre,
-} from "@/data/interface";
+import { GENRES, PRODUCT_GENRE_ORDER, ProductGenre } from "@/data/interface";
 import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 import { formatPrice } from "@/data/utils";
 import {
@@ -22,13 +17,18 @@ import {
   PRODUCT_CREATION_COST,
 } from "@/data/utils/product";
 import { CostBadges } from "@/components/product/CostBadges";
-import { ComponentTypeBadge } from "@/components/component";
 import { TrendBadge } from "@/components/product/Trends";
 import { CodexLink } from "@/components/codex/CodexLink";
 import { Modal } from "@/components/global/Modal";
 import { useTrends } from "@/data/hooks/useTrends";
 import { useAppSelector } from "@/data/redux/hooks";
 import { segmentDemand } from "@/data/utils/marketDemand";
+import { KindPill } from "@/components/component";
+import {
+  kindLabel,
+  recipeCount,
+  recipeToRequirements,
+} from "@/data/utils/recipes";
 
 export interface NewProductModalProps {
   open: boolean;
@@ -85,10 +85,7 @@ export const NewProductModal: FC<NewProductModalProps> = ({
   const options = unlockedOptionalFeatures(genre, time);
   const features = [core.id, ...picked];
   const requirements = featuresRequirements(features);
-  const size = COMPONENT_TYPE_ORDER.reduce(
-    (acc, t) => acc + requirements[t],
-    0,
-  );
+  const size = recipeCount(requirements);
   const appeal = [core, ...options.filter((f) => picked.has(f.id))].reduce(
     (acc, f) => acc + featureAppeal(f, genre),
     0,
@@ -287,10 +284,14 @@ export const NewProductModal: FC<NewProductModalProps> = ({
               composants
             </span>
             <span className="flex items-center gap-3 tabular-nums">
-              {COMPONENT_TYPE_ORDER.map((t) => (
-                <span key={t} className="inline-flex items-center gap-1">
-                  {requirements[t]}
-                  <ComponentTypeBadge type={t} variant="icon" size={14} />
+              {recipeToRequirements(requirements).map(({ kind, quantity }) => (
+                <span
+                  key={kind}
+                  className="inline-flex items-center gap-1"
+                  title={kindLabel(kind)}
+                >
+                  {quantity}
+                  <KindPill kind={kind} size={14} />
                 </span>
               ))}
             </span>

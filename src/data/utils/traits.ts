@@ -31,14 +31,16 @@ export interface TraitDef {
 export const TRAITS: Record<TraitId, TraitDef> = {
   perfectionniste: {
     label: "Perfectionniste",
-    description: "Composants de meilleure qualité, mais produits plus lentement.",
+    description:
+      "Maîtrise les pièces avancées un point plus tôt, mais produit plus lentement.",
     productionOnly: true,
     opposite: "rapide",
     tone: "mixed",
   },
   rapide: {
     label: "Rapide",
-    description: "Produit plus vite, au prix d'une qualité un peu moindre.",
+    description:
+      "Produit plus vite, mais n'aborde les pièces avancées qu'un point plus tard.",
     productionOnly: true,
     opposite: "perfectionniste",
     tone: "mixed",
@@ -88,10 +90,11 @@ export const TRAITS: Record<TraitId, TraitDef> = {
 export const TRAIT_IDS = Object.keys(TRAITS) as TraitId[];
 
 // ── Effets (constantes d'équilibrage) ───────────────────────────────────────
-export const PERFECTIONIST_QUALITY_BONUS = 0.5; // crans de qualité
+/** Décalage des seuils de compétence, en points de stat affichés. */
+export const PERFECTIONIST_GATE_SHIFT = -1;
 export const PERFECTIONIST_SPEED = 0.85;
 export const FAST_SPEED = 1.2;
-export const FAST_QUALITY_MALUS = -0.5;
+export const FAST_GATE_SHIFT = 1;
 export const SELF_TAUGHT_TRAINING_SPEED = 1.5;
 /** Bonus de vitesse de formation apporté par un mentor (non cumulable). */
 export const MENTOR_TRAINING_BOOST = 0.5;
@@ -112,10 +115,13 @@ export const productionSpeedMultiplier = (p: Person): number =>
   (hasTrait(p, "perfectionniste") ? PERFECTIONIST_SPEED : 1) *
   (hasTrait(p, "rapide") ? FAST_SPEED : 1);
 
-/** Crans de qualité ajoutés (ou retirés) à chaque composant produit. */
-export const qualityBonus = (p: Person): number =>
-  (hasTrait(p, "perfectionniste") ? PERFECTIONIST_QUALITY_BONUS : 0) +
-  (hasTrait(p, "rapide") ? FAST_QUALITY_MALUS : 0);
+/**
+ * Décalage des seuils de compétence (points affichés) : le perfectionniste
+ * aborde les pièces avancées un point plus tôt, le rapide un point plus tard.
+ */
+export const gateShift = (p: Person): number =>
+  (hasTrait(p, "perfectionniste") ? PERFECTIONIST_GATE_SHIFT : 0) +
+  (hasTrait(p, "rapide") ? FAST_GATE_SHIFT : 0);
 
 /**
  * Multiplicateur de la vitesse de formation : autodidacte pour soi, mentor
@@ -135,9 +141,7 @@ export const trainingSpeedMultiplier = (
     p.buildingId != null &&
     colleagues.some(
       (c) =>
-        c.id !== p.id &&
-        c.buildingId === p.buildingId &&
-        hasTrait(c, "mentor"),
+        c.id !== p.id && c.buildingId === p.buildingId && hasTrait(c, "mentor"),
     );
   return (
     (hasTrait(p, "autodidacte") ? SELF_TAUGHT_TRAINING_SPEED : 1) *
@@ -185,8 +189,6 @@ export const rollTraits = (
   const pick = (from: TraitId[]) => from[Math.floor(rand() * from.length)];
   const first = pick(pool);
   if (rand() >= SECOND_TRAIT_CHANCE) return [first];
-  const rest = pool.filter(
-    (t) => t !== first && t !== TRAITS[first].opposite,
-  );
+  const rest = pool.filter((t) => t !== first && t !== TRAITS[first].opposite);
   return rest.length > 0 ? [first, pick(rest)] : [first];
 };

@@ -2,7 +2,6 @@ import {
   COMPONENT_GRAIN,
   Client,
   Competitor,
-  ComponentQuality,
   ComponentRequirement,
   ComponentType,
   Contract,
@@ -12,11 +11,20 @@ import {
 } from "@/data/interface";
 import { faker } from "@faker-js/faker/locale/en";
 import { capitalize, randomIntFromInterval } from "@/data/utils";
+import { selectComponents } from "@/data/utils/component";
 import {
-  computeAverageQuality,
-  selectBestComponents,
-  totalRequirementQuantity,
-} from "@/data/utils/component";
+  CONSUMPTION_FACTOR,
+  ComponentTier,
+  Recipe,
+  addRecipes,
+  composeFamily,
+  kindFamily,
+  kindValue,
+  kindsAt,
+  recipeToRequirements,
+  requirementUnits,
+  requirementsMaxTier,
+} from "@/data/utils/recipes";
 import { AppDispatch, RootState } from "@/data/redux/store";
 import { pushNotification } from "@/data/redux/notificationSlice";
 import { removeComponents } from "@/data/redux/componentSlice";
@@ -72,7 +80,7 @@ export const CONTRACT_REPUTATION_PER_MONTH = 1;
 export const DEPOSIT_BASE = 150;
 export const DEPOSIT_PER_COMPONENT: [number, number] = [15, 25];
 export const DEPOSIT_PER_COMPLEXITY: [number, number] = [1, 1.5];
-/** Solde (avant qualité et bonus d'avance) : mêmes trois parts. */
+/** Solde (avant prime de niveau et bonus d'avance) : mêmes trois parts. */
 export const ADDITIONAL_BASE = 600;
 export const ADDITIONAL_PER_COMPONENT: [number, number] = [50, 70];
 export const ADDITIONAL_PER_COMPLEXITY: [number, number] = [2.5, 3.5];
@@ -119,46 +127,79 @@ export const contractDeadlineHours = (
     (totalQty * CONTRACT_HOURS_PER_COMPONENT * marginPercent) / 100 / 24,
   ) * 24;
 
-const minQualityForDifficulty = (
-  difficulty: number,
-): ComponentQuality | undefined => {
-  if (difficulty < 30) return undefined;
-  if (difficulty < 55) return ComponentQuality.MEDIOCRE;
-  if (difficulty < 75) return ComponentQuality.CORRECT;
-  if (difficulty < 90) return ComponentQuality.BON;
-  return ComponentQuality.TRES_BON;
+/**
+ * Niveau le plus haut qu'un client demande, selon la difficulté : un contrat
+ * facile se fait en composants de base, un contrat difficile exige des pièces
+ * que seuls des seniors savent fabriquer.
+ */
+export const maxTierForDifficulty = (difficulty: number): ComponentTier => {
+  if (difficulty < 30) return 1;
+  if (difficulty < 55) return 2;
+  if (difficulty < 80) return 3;
+  return 4;
 };
 
-const requirementsForType = (
+/** Prime de solde selon le niveau le plus haut demandé (salaires des seniors). */
+export const TIER_PRICE_PREMIUM: Record<ComponentTier, number> = {
+  1: 1,
+  2: 1,
+  3: 1.15,
+  4: 1.3,
+};
+
+/** Part du travail de chaque famille, par type de contrat. */
+const FAMILY_WEIGHTS: Record<
+  ContractType,
+  Partial<Record<ComponentType, number>>
+> = {
+  [ContractType.DEV]: {
+    [ComponentType.CODE]: 1.4,
+    [ComponentType.UX]: 0.4,
+  },
+  [ContractType.DESIGN]: {
+    [ComponentType.VISUEL]: 1,
+    [ComponentType.UX]: 0.7,
+    [ComponentType.CODE]: 0.3,
+  },
+  [ContractType.FULL_STACK]: {
+    [ComponentType.CODE]: 1,
+    [ComponentType.VISUEL]: 0.8,
+    [ComponentType.UX]: 0.6,
+  },
+};
+
+/**
+ * Pièces demandées par un contrat. Le volume de chaque famille suit la
+ * difficulté (en unités de travail, × `CONSUMPTION_FACTOR`), puis se répartit
+ * en pièces jusqu'au niveau permis, parmi celles déjà inventées.
+ */
+export const requirementsForType = (
   contractType: ContractType,
   difficulty: number,
+  time: number = 0,
+  random: () => number = Math.random,
 ): ComponentRequirement[] => {
-  const qty = (multiplier: number) =>
-    Math.max(
-      1,
-      Math.round((difficulty / 10) * multiplier) + randomIntFromInterval(1, 3),
-    ) * COMPONENT_GRAIN;
-  const minQuality = minQualityForDifficulty(difficulty);
-
-  switch (contractType) {
-    case ContractType.DEV:
-      return [
-        { type: ComponentType.CODE, quantity: qty(1.4), minQuality },
-        { type: ComponentType.UX, quantity: qty(0.4), minQuality },
-      ];
-    case ContractType.DESIGN:
-      return [
-        { type: ComponentType.VISUEL, quantity: qty(1), minQuality },
-        { type: ComponentType.UX, quantity: qty(0.7), minQuality },
-        { type: ComponentType.CODE, quantity: qty(0.3), minQuality },
-      ];
-    case ContractType.FULL_STACK:
-      return [
-        { type: ComponentType.CODE, quantity: qty(1), minQuality },
-        { type: ComponentType.VISUEL, quantity: qty(0.8), minQuality },
-        { type: ComponentType.UX, quantity: qty(0.6), minQuality },
-      ];
+  const maxTier = maxTierForDifficulty(difficulty);
+  const pick = (family: ComponentType, tier: ComponentTier) => {
+    const kinds = kindsAt(family, tier, time);
+    return kinds.length > 0
+      ? kinds[Math.floor(random() * kinds.length)].id
+      : undefined;
+  };
+  let recipe: Recipe = {};
+  for (const [family, weight] of Object.entries(
+    FAMILY_WEIGHTS[contractType],
+  ) as [ComponentType, number][]) {
+    const units =
+      Math.max(
+        1,
+        Math.round((difficulty / 10) * weight) + randomIntFromInterval(1, 3),
+      ) *
+      COMPONENT_GRAIN *
+      CONSUMPTION_FACTOR;
+    recipe = addRecipes(recipe, composeFamily(family, units, maxTier, pick));
   }
+  return recipeToRequirements(recipe);
 };
 
 /**
@@ -175,6 +216,8 @@ export const generateNewContract = (
   reputation: number,
   clients: Record<string, Client> = {},
   competitors: Competitor[] = [],
+  /** Heure de jeu : seules les pièces déjà inventées sont demandées. */
+  now: number = 0,
 ): Contract[] => {
   let nbGenerated = 8;
   let contractDifficulty = 2;
@@ -200,9 +243,10 @@ export const generateNewContract = (
     let taskDifficulty = randomIntFromInterval(1, contractDifficulty);
     let taskType = randomContractType();
 
-    let requirements = requirementsForType(taskType, taskDifficulty);
-    let totalQty = totalRequirementQuantity(requirements);
-    // Prix calés sur l'effort (unités de travail), pas sur le grain.
+    let requirements = requirementsForType(taskType, taskDifficulty, now);
+    // Le délai et le prix suivent le travail réel (unités de travail, pièces
+    // avancées comprises), pas le nombre de pièces.
+    let totalQty = requirementUnits(requirements);
     const workUnits = totalQty / COMPONENT_GRAIN;
     let complexity = workUnits * taskDifficulty;
     // Le délai suit la charge réelle du contrat plutôt qu'un tirage 1-8
@@ -219,10 +263,12 @@ export const generateNewContract = (
       DEPOSIT_BASE +
       priceShare(workUnits, DEPOSIT_PER_COMPONENT) +
       priceShare(complexity, DEPOSIT_PER_COMPLEXITY);
-    let priceAdditional =
-      ADDITIONAL_BASE +
-      priceShare(workUnits, ADDITIONAL_PER_COMPONENT) +
-      priceShare(complexity, ADDITIONAL_PER_COMPLEXITY);
+    let priceAdditional = Math.round(
+      (ADDITIONAL_BASE +
+        priceShare(workUnits, ADDITIONAL_PER_COMPONENT) +
+        priceShare(complexity, ADDITIONAL_PER_COMPLEXITY)) *
+        TIER_PRICE_PREMIUM[requirementsMaxTier(requirements)],
+    );
     let priceMalus = randomIntFromInterval(priceDeposit * 2, priceDeposit * 3);
 
     const returning =
@@ -266,50 +312,46 @@ export const generateNewContract = (
   return generated;
 };
 
-export const qualityMultiplier = (avgQuality: number): number => {
-  return 0.5 + avgQuality * 0.2;
-};
-
-export const reputationGainForQuality = (avgQuality: number): number => {
-  return Math.round(avgQuality) - 1;
-};
+/**
+ * Réputation qu'une livraison peut rapporter : un point, plus un si le
+ * contrat demandait des pièces de niveau 3 ou plus (dans la limite du mois,
+ * cf. `CONTRACT_REPUTATION_PER_MONTH`).
+ */
+export const contractReputationGain = (contract: Contract): number =>
+  1 + (requirementsMaxTier(contract.requirements) >= 3 ? 1 : 0);
 
 export interface ContractPayout {
   /** Solde versé par le client, arrondi. */
   reward: number;
   /** Vrai si la livraison intervient avant `EARLY_DELIVERY_RATIO` du délai. */
   early: boolean;
-  /** Réputation gagnée (négative sur du stock bâclé). */
+  /** Réputation gagnée, avant le plafond mensuel. */
   reputationGain: number;
 }
 
 /**
- * Valorise une livraison : le solde dépend de la qualité moyenne des composants
- * effectivement consommés — arbitrée au moment de livrer, plus à la signature —
- * et d'une prime si le contrat part en avance.
+ * Valorise une livraison : le solde convenu, majoré d'une prime si le contrat
+ * part en avance.
  */
 export const computeContractPayout = (
   contract: StartedContract,
-  averageQuality: number,
   time: number,
 ): ContractPayout => {
   const elapsed = time - contract.startDate;
   const early = elapsed < contract.time * EARLY_DELIVERY_RATIO;
   const reward = Math.round(
-    contract.priceAdditional *
-      qualityMultiplier(averageQuality) *
-      (early ? EARLY_DELIVERY_BONUS : 1),
+    contract.priceAdditional * (early ? EARLY_DELIVERY_BONUS : 1),
   );
   return {
     reward,
     early,
-    reputationGain: reputationGainForQuality(averageQuality),
+    reputationGain: contractReputationGain(contract),
   };
 };
 
 /**
- * Livraison déclenchée par le joueur : consomme les meilleurs composants du
- * stock au moment du clic, verse le solde et retire le contrat. Sans stock
+ * Livraison déclenchée par le joueur : consomme les pièces demandées (les plus
+ * anciennes d'abord), verse le solde et retire le contrat. Sans stock
  * suffisant l'action est refusée sans rien consommer, et le contrat reste
  * ouvert jusqu'à sa deadline.
  */
@@ -322,7 +364,7 @@ export const deliverContract =
     );
     if (!contract) return;
 
-    const selection = selectBestComponents(
+    const selection = selectComponents(
       state.component.stock,
       contract.requirements,
     );
@@ -337,30 +379,28 @@ export const deliverContract =
     }
 
     const consumed = selection.consumed;
-    const averageQuality = computeAverageQuality(consumed);
     const { reward, early, reputationGain } = computeContractPayout(
       contract,
-      averageQuality,
       state.engine.time,
     );
 
-    // Un travail bâclé coûte toujours sa réputation ; un bon travail n'en
-    // rapporte que dans la limite du mois (cf. CONTRACT_REPUTATION_PER_MONTH).
+    // La réputation ne vient que dans la limite du mois (cf.
+    // CONTRACT_REPUTATION_PER_MONTH).
     const time = state.engine.time;
-    const applied =
-      reputationGain > 0
-        ? Math.min(
-            reputationGain,
-            contractReputationAllowance(state.company.contractReputation, time),
-          )
-        : reputationGain;
+    const applied = Math.min(
+      reputationGain,
+      contractReputationAllowance(state.company.contractReputation, time),
+    );
 
     dispatch(removeComponents(consumed.map((c) => c.id)));
     dispatch(setMoney(state.company.money + reward));
     if (applied !== 0) dispatch(addReputation(applied));
     if (applied > 0) {
       dispatch(
-        recordContractReputation({ month: gameMonthKey(time), gained: applied }),
+        recordContractReputation({
+          month: gameMonthKey(time),
+          gained: applied,
+        }),
       );
     }
 
@@ -370,8 +410,9 @@ export const deliverContract =
         [ComponentType.VISUEL]: 0,
         [ComponentType.UX]: 0,
       };
-      for (const c of consumed) counts[c.type]++;
-      const total = consumed.length;
+      // Chaque famille reçoit sa part, au prorata du travail livré.
+      for (const c of consumed) counts[kindFamily(c.kind)] += kindValue(c.kind);
+      const total = Object.values(counts).reduce((a, b) => a + b, 0);
       for (const t of Object.values(ComponentType)) {
         if (counts[t] === 0) continue;
         const share = Math.max(1, Math.round((applied * counts[t]) / total));
@@ -380,10 +421,10 @@ export const deliverContract =
     }
 
     // Le client se souvient : livrer vite le fait revenir avec un meilleur
-    // contrat, livrer du bâclé refroidit la relation.
+    // contrat.
     if (contract.clientId) {
       const client = state.task.clients?.[contract.clientId];
-      const delta = clientRelationDelta(early, reputationGain < 0);
+      const delta = clientRelationDelta(early, false);
       dispatch(
         recordClientDelivery({
           clientId: contract.clientId,
@@ -416,12 +457,7 @@ export const deliverContract =
     }
 
     dispatch(removeTask(contractId));
-    const reputationNote =
-      applied > 0
-        ? ` +${applied} réputation.`
-        : applied < 0
-          ? ` ${applied} réputation (travail bâclé).`
-          : "";
+    const reputationNote = applied > 0 ? ` +${applied} réputation.` : "";
     dispatch(
       pushNotification({
         message:
@@ -501,7 +537,7 @@ export const CONTRACT_SORT_ACCESSORS = {
   deposit: (c: Contract) => c.priceDeposit,
   additional: (c: Contract) => c.priceAdditional,
   malus: (c: Contract) => c.priceMalus,
-  requirements: (c: Contract) => totalRequirementQuantity(c.requirements),
+  requirements: (c: Contract) => requirementUnits(c.requirements),
 } satisfies Record<string, (c: Contract) => string | number>;
 
 export type ContractSortKey = keyof typeof CONTRACT_SORT_ACCESSORS;

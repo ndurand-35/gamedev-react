@@ -25,12 +25,18 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         type: "table",
         head: ["Colonne", "Signification"],
         rows: [
-          ["Difficulté", "Exigence du contrat : volume et qualité demandés."],
+          [
+            "Difficulté",
+            "Exigence du contrat : volume et niveau des composants demandés.",
+          ],
           ["Délai", "Durée accordée, comptée à partir de la signature."],
           ["Acompte", "Versé immédiatement à la signature."],
           ["Solde", "Montant de base versé à la livraison."],
           ["Malus", "Pénalité débitée si la deadline est dépassée."],
-          ["Composants demandés", "Quantité par type, comparée au stock actuel."],
+          [
+            "Composants demandés",
+            "Quantité par composant, comparée au stock actuel.",
+          ],
         ],
       },
       {
@@ -52,15 +58,15 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
     category: "contrats",
     title: "Composants demandés",
     summary:
-      "Chaque contrat exige des composants Code, Visuel ou UX en quantité donnée, parfois avec une qualité minimale.",
+      "Chaque contrat exige des composants précis, jusqu'à un niveau qui monte avec la difficulté.",
     body: [
       {
         type: "p",
-        text: "Le **type de contrat** fixe le mélange de composants demandés. Les quantités croissent avec la **difficulté**.",
+        text: "Le **type de contrat** fixe le mélange de familles demandées. Le volume de travail croît avec la **difficulté**.",
       },
       {
         type: "table",
-        head: ["Type de contrat", "Composants demandés"],
+        head: ["Type de contrat", "Familles demandées"],
         rows: [
           ["Développement", "Code, UX"],
           ["Design", "Visuel, UX, Code"],
@@ -69,14 +75,18 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "Les contrats faciles acceptent **toute qualité**. Au-delà, une **qualité minimale** s'applique à tous les composants du contrat (« ≥ Médiocre », « ≥ Bon »…), de plus en plus élevée avec la difficulté. Un composant sous ce seuil ne compte pas.",
+        text: "La difficulté fixe aussi le **niveau** le plus haut demandé : composants de base sous 30, jusqu'au niveau 2 sous 55, au niveau 3 sous 80, au niveau 4 au-delà (si sa technologie existe). Un contrat demandant des composants de niveau 3 ou plus paie un solde majoré.",
       },
       {
         type: "p",
-        text: "Chaque type affiche un compteur **en stock / demandé** : vert quand le stock couvre l'exigence, rouge sinon.",
+        text: "Une pastille **⚠** signale un composant que personne au studio ne sait encore fabriquer : signer ce contrat suppose de former ou de recruter.",
+      },
+      {
+        type: "p",
+        text: "Chaque composant affiche un compteur **en stock / demandé** : vert quand le stock couvre l'exigence, rouge sinon.",
       },
     ],
-    related: ["contrats", "composants", "stock", "production"],
+    related: ["contrats", "composants", "recettes", "stock", "production"],
   },
   {
     id: "deadline",
@@ -107,34 +117,40 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         text: "L'acompte déjà encaissé n'est pas restitué : le malus s'ajoute à la perte du solde.",
       },
     ],
-    related: ["contrats", "livraison", "clients", "reputation", "moral", "tresorerie"],
+    related: [
+      "contrats",
+      "livraison",
+      "clients",
+      "reputation",
+      "moral",
+      "tresorerie",
+    ],
   },
   {
     id: "livraison",
     category: "contrats",
     title: "Livraison",
     summary:
-      "Livrer consomme les meilleurs composants du stock ; le solde dépend de leur qualité moyenne et d'une prime d'avance.",
+      "Livrer consomme les composants demandés ; le solde convenu est majoré d'une prime d'avance.",
     body: [
       {
         type: "p",
-        text: "La livraison est déclenchée par le bouton **Livrer** d'un contrat en cours. Elle n'est possible que si le stock couvre **toutes** les exigences (type, quantité, qualité minimale). Le moment de livrer reste au choix du joueur, jusqu'à la deadline.",
+        text: "La livraison est déclenchée par le bouton **Livrer** d'un contrat en cours. Elle n'est possible que si le stock couvre **toutes** les exigences (composant et quantité). Le moment de livrer reste au choix du joueur, jusqu'à la deadline.",
       },
       {
         type: "p",
-        text: "Pour chaque exigence, la livraison prélève les composants **de meilleure qualité** disponibles. Le stock est commun à tous les contrats : un composant livré n'est plus disponible ailleurs.",
+        text: "Pour chaque exigence, la livraison prélève les composants demandés, **les plus anciens d'abord**. Le stock est commun à tous les contrats : un composant livré n'est plus disponible ailleurs.",
       },
       {
         type: "list",
         items: [
-          "**Qualité** : le solde affiché est une base ; une qualité moyenne élevée le majore, une qualité faible le minore.",
           "**Prime d'avance** : +20 % sur le solde tant que moins de 70 % du délai est écoulé. Le badge « bonus livraison anticipée » signale cette fenêtre.",
-          "**Réputation** : une livraison de bonne qualité rapporte de la réputation, dans une limite mensuelle ; une livraison bâclée en fait perdre.",
+          "**Réputation** : une livraison rapporte de la réputation, davantage pour un contrat de niveau 3 ou plus, dans une limite mensuelle.",
         ],
       },
       {
         type: "p",
-        text: "La livraison renforce aussi la relation avec le client (voir **Clients**). Un fondateur formé à l'**Arbitrage de livraison** dispose d'une analyse chiffrée du meilleur moment pour livrer.",
+        text: "La livraison renforce aussi la relation avec le client (voir **Clients**). Un fondateur formé à l'**Arbitrage de livraison** voit quand chaque contrat deviendra livrable.",
       },
     ],
     related: [
@@ -159,13 +175,17 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         head: ["Montant", "Moment", "Règle"],
         rows: [
           ["Acompte", "Signature", "Acquis, même en cas d'échec."],
-          ["Solde", "Livraison", "Modulé par la qualité livrée et la prime d'avance."],
+          [
+            "Solde",
+            "Livraison",
+            "Convenu à la signature, majoré de la prime d'avance.",
+          ],
           ["Malus", "Deadline dépassée", "Débité tel qu'affiché."],
         ],
       },
       {
         type: "p",
-        text: "Les montants croissent avec le **volume** de composants demandés et, dans une moindre mesure, avec la **difficulté**.",
+        text: "Les montants croissent avec le **travail** demandé (composants avancés compris) et, dans une moindre mesure, avec la **difficulté**. Un contrat de niveau 3 ou 4 paie un solde majoré.",
       },
       {
         type: "p",
@@ -191,7 +211,6 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         rows: [
           ["Dans les temps", "+1"],
           ["En avance (prime d'avance)", "+2"],
-          ["Bâclée (réputation perdue)", "−1, même en avance"],
           ["Deadline dépassée", "Rupture définitive"],
         ],
       },
@@ -215,7 +234,13 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         text: "Le palier de chaque client s'affiche à côté de son nom sur les contrats ; le détail de la relation se lit sur la page des concurrents.",
       },
     ],
-    related: ["contrats", "livraison", "deadline", "paiement-contrat", "concurrents"],
+    related: [
+      "contrats",
+      "livraison",
+      "deadline",
+      "paiement-contrat",
+      "concurrents",
+    ],
   },
   {
     id: "premier-contrat",
@@ -231,7 +256,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
       {
         type: "list",
         items: [
-          "10 composants Code et 5 UX, de toute qualité ;",
+          "10 composants Code et 5 UX, tous de base ;",
           "un délai de 30 jours ;",
           "acompte 250 €, solde 900 €, malus 600 €.",
         ],
@@ -248,27 +273,33 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
     category: "contrats",
     title: "Arbitrage de livraison",
     summary:
-      "Analyse qui chiffre, sur chaque contrat en cours, « livrer maintenant » contre « attendre ».",
+      "Prévision qui indique, sur chaque contrat en cours, quand il deviendra livrable.",
     requiresSkill: "delivery_advisor",
     body: [
       {
         type: "p",
-        text: "Une fois la compétence acquise, chaque contrat en cours affiche un encadré **Arbitrage de livraison** comparant deux scénarios, avec la qualité moyenne et le solde attendus.",
+        text: "Une fois la compétence acquise, chaque contrat en cours affiche un encadré **Prévision de livraison** : l'atelier y est rejoué sur l'avenir, recettes comprises.",
       },
       {
         type: "list",
         items: [
-          "**Livrer maintenant** : solde avec le stock actuel, et temps restant pour la prime d'avance.",
-          "**Attendre** : solde après une attente donnée, avec les composants que l'équipe produira, ceux qui se seront démodés et la prime d'avance éventuellement perdue.",
-          "**Non livrable avant la deadline** : les composants qui manqueront à l'effectif actuel, et le coût d'un échec.",
+          "**Livrable maintenant** : solde attendu, et temps restant pour la prime d'avance.",
+          "**Livrable dans N jours** : solde attendu à ce moment, et ce qui manque encore.",
+          "**Non livrable avant la deadline** : ce qui manque, et le coût d'un échec.",
         ],
       },
       {
         type: "p",
-        text: "La projection suppose l'effectif et les affectations inchangés ; un fondateur en formation n'y produit pas. La qualité future est une **espérance**, pas une promesse.",
+        text: "La projection suppose l'effectif et les affectations inchangés ; un fondateur en formation n'y produit pas. Les autres contrats signés passent avant ou après selon leur échéance. C'est une **espérance**, pas une promesse.",
       },
     ],
-    related: ["livraison", "deadline", "stock", "affectation", "competences-fondateur"],
+    related: [
+      "livraison",
+      "deadline",
+      "stock",
+      "affectation",
+      "competences-fondateur",
+    ],
   },
   {
     id: "estimation-delai",
@@ -287,8 +318,14 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         head: ["Affichage", "Signification"],
         rows: [
           ["stock prêt", "Le stock couvre déjà le contrat."],
-          ["~N jours, en vert", "Composants réunis dans la fenêtre de prime d'avance."],
-          ["~N jours, en orange", "Composants réunis après la fenêtre de prime d'avance."],
+          [
+            "~N jours, en vert",
+            "Composants réunis dans la fenêtre de prime d'avance.",
+          ],
+          [
+            "~N jours, en orange",
+            "Composants réunis après la fenêtre de prime d'avance.",
+          ],
           ["hors délai", "Composants non réunis avant la deadline."],
         ],
       },
@@ -297,6 +334,11 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         text: "L'estimation tient compte du stock et de l'effectif du moment ; un fondateur en formation n'y produit pas.",
       },
     ],
-    related: ["contrats", "exigences-contrat", "deadline", "competences-fondateur"],
+    related: [
+      "contrats",
+      "exigences-contrat",
+      "deadline",
+      "competences-fondateur",
+    ],
   },
 ];

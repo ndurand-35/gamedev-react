@@ -5,6 +5,7 @@ import { StartedContract } from "@/data/interface";
 import { ClientBadge } from "@/components/contract/ClientBadge";
 import { DeliveryAdvisor } from "@/components/contract/DeliveryAdvisor";
 import { RequirementList } from "@/components/contract/RequirementList";
+import { requirementsToRecipe } from "@/data/utils/recipes";
 import { useAppSelector } from "@/data/redux/hooks";
 import {
   deadlineLabel,
@@ -17,17 +18,16 @@ interface ContractDeliveryProps {
 }
 
 /**
- * Carte d'un contrat signé, en attente de livraison. Le joueur y arbitre le
- * moment de livrer : le stock du moment détermine la qualité moyenne — donc le
- * solde — et la prime d'anticipation s'éteint passé 70 % du délai. Le
- * `DeliveryAdvisor` chiffre les deux branches, mais seulement une fois la
+ * Carte d'un contrat signé, en attente de livraison : délai, stock couvert,
+ * prime d'anticipation (éteinte passé 70 % du délai) et bouton Livrer. Le
+ * `DeliveryAdvisor` dit quand le contrat sera livrable, une fois la
  * compétence « Arbitrage de livraison » apprise par le fondateur : par défaut
- * le joueur arbitre seul, avec les faits (délai, stock, prime).
+ * le joueur juge seul, avec les faits (délai, stock, prime).
  */
 export const ContractDelivery: FC<ContractDeliveryProps> = ({
   contract,
 }): ReactElement => {
-  const { deliverable, heldByType, hoursLeft, daysLeft, early, deliver } =
+  const { deliverable, heldByKind, hoursLeft, daysLeft, early, deliver } =
     useContractDelivery(contract);
   const time = useAppSelector((state) => state.engine.time);
   const stock = useAppSelector((state) => state.component.stock);
@@ -36,6 +36,10 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
   const productionProgress = useAppSelector(
     (state) => state.component.productionProgress,
   );
+  const productionJobs = useAppSelector(
+    (state) => state.component.productionJobs,
+  );
+  const signed = useAppSelector((state) => state.task.taskList);
   const acquiredSkills = useAppSelector((state) => state.research.acquired);
   const founderResearching = useAppSelector(
     (state) => state.research.current !== null,
@@ -60,19 +64,29 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
             stock,
             employes: producing,
             productionProgress,
+            productionJobs,
             time,
             buildings,
+            // Les autres contrats signés passent avant ou après celui-ci,
+            // selon leur échéance : les postes en Auto servent l'urgent.
+            ...(() => {
+              const others = signed
+                .filter((c) => c.id !== contract.id)
+                .sort((a, b) => a.startDate + a.time - (b.startDate + b.time));
+              return {
+                demand: others.map((c) => requirementsToRecipe(c.requirements)),
+                priority: others.filter(
+                  (c) =>
+                    c.startDate + c.time < contract.startDate + contract.time,
+                ).length,
+              };
+            })(),
           })
         : null,
-    [
-      hasAdvisor,
-      contract,
-      stock,
-      producing,
-      productionProgress,
-      time,
-      buildings,
-    ],
+    // La prévision rejoue l'atelier sur des semaines : recalculée quand le
+    // stock ou l'effectif bougent, pas à chaque heure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasAdvisor, contract, stock, producing, productionJobs, buildings, signed],
   );
 
   const deadlineChip =
@@ -115,7 +129,7 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RequirementList
           requirements={contract.requirements}
-          heldByType={heldByType}
+          heldByKind={heldByKind}
         />
         <button
           type="button"
@@ -130,7 +144,11 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
       </div>
 
       {advice && (
-        <DeliveryAdvisor advice={advice} priceMalus={contract.priceMalus} />
+        <DeliveryAdvisor
+          advice={advice}
+          time={time}
+          priceMalus={contract.priceMalus}
+        />
       )}
     </article>
   );

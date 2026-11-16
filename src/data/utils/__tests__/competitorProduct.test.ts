@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   Client,
-  ComponentType,
+  CONSUMPTION_FACTOR,
   CompetitorProduct,
   GENRES,
   PRODUCT_GENRE_ORDER,
   Product,
   ProductGenre,
   ProductStatus,
+  Recipe,
 } from "@/data/interface";
 import {
   RIVAL_LAUNCH_BASE_CHANCE,
@@ -35,10 +36,9 @@ import {
 import { addMonthsToTime } from "@/data/utils/time";
 import { segmentDemand } from "@/data/utils/marketDemand";
 
-const mix = (code: number): Record<ComponentType, number> => ({
-  [ComponentType.CODE]: code,
-  [ComponentType.VISUEL]: 0,
-  [ComponentType.UX]: 0,
+/** Pièces de base qui font cette taille (les produits consomment ×1,3). */
+const mix = (size: number): Recipe => ({
+  code: Math.round(size * CONSUMPTION_FACTOR),
 });
 
 /** Concurrence diffuse du segment Outil. */

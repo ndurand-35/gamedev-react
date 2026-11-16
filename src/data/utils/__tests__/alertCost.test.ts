@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   Building,
   Component,
-  ComponentQuality,
   ComponentType,
   ContractType,
   DEFAULT_MORALE,
@@ -82,7 +81,9 @@ const makeBuilding = (over: Partial<Building> = {}): Building => ({
   ...over,
 });
 
-const makeContract = (over: Partial<StartedContract> = {}): StartedContract => ({
+const makeContract = (
+  over: Partial<StartedContract> = {},
+): StartedContract => ({
   id: 1,
   name: "Contrat test",
   time: 240,
@@ -96,14 +97,14 @@ const makeContract = (over: Partial<StartedContract> = {}): StartedContract => (
   priceMalus: 3000,
   type: ContractType.DEV,
   taskDifficulty: 10,
-  requirements: [{ type: ComponentType.CODE, quantity: 2 }],
+  requirements: [{ kind: "code", quantity: 2 }],
   ...over,
 });
 
 const makeComponent = (over: Partial<Component> = {}): Component => ({
   id: 1,
+  kind: "code",
   type: ComponentType.CODE,
-  quality: ComponentQuality.BON,
   producedBy: 1,
   producedAt: 0,
   ...over,
@@ -164,7 +165,10 @@ describe("moral et productivité", () => {
   });
 
   it("un moral sous le seuil bas coûte déjà une fraction visible du salaire", () => {
-    const employe = makeProd({ salary: 2000, morale: LOW_MORALE_THRESHOLD - 1 });
+    const employe = makeProd({
+      salary: 2000,
+      morale: LOW_MORALE_THRESHOLD - 1,
+    });
     expect(moraleProductivityLoss([employe])).toBeGreaterThan(2000 * 0.3);
   });
 });
@@ -186,7 +190,9 @@ describe("risque de démission", () => {
   });
 
   it("mappe chaque profil sur le poste que le pôle emploi facture", () => {
-    expect(searchRoleOf(makeProd({ specialty: "FULLSTACK" }))).toBe("FULLSTACK");
+    expect(searchRoleOf(makeProd({ specialty: "FULLSTACK" }))).toBe(
+      "FULLSTACK",
+    );
     expect(searchRoleOf(makeProd({ specialty: ComponentType.UX }))).toBe(
       ComponentType.UX,
     );
@@ -221,10 +227,7 @@ describe("malus contractuel exposé", () => {
   const now = 230; // deadline dans 10 h
 
   it("ne facture rien tant que le stock permet de livrer", () => {
-    const stock = [
-      makeComponent({ id: 1 }),
-      makeComponent({ id: 2 }),
-    ];
+    const stock = [makeComponent({ id: 1 }), makeComponent({ id: 2 })];
     expect(
       contractMalusExposure({
         contracts: [dueSoon],
@@ -249,8 +252,26 @@ describe("malus contractuel exposé", () => {
   });
 
   it("ne facture pas un manque que la production comblera avant l'échéance", () => {
-    // Une affectation en cours, à un point du seuil : le composant manquant
-    // tombe à l'heure suivante, bien avant la deadline.
+    // Jeudi 10 h, deadline à 20 h. Une affectation en cours, à un point du
+    // seuil : le composant manquant tombe à l'heure suivante.
+    const thursday = makeContract({ time: 20, startDate: 0 });
+    const employe = makeProd({ id: 2, codeStat: 200, morale: MAX_MORALE });
+    const input = {
+      contracts: [thursday],
+      stock: [makeComponent({ id: 1 })],
+      employes: [employe],
+      productionProgress: { 2: PRODUCTION_THRESHOLD - 1 },
+      time: 10,
+    };
+    expect(contractMalusExposure(input)).toBe(0);
+    // Sans personne pour produire, le même manque coûte le malus.
+    expect(contractMalusExposure({ ...input, employes: [] })).toBe(
+      thursday.priceMalus,
+    );
+  });
+
+  it("facture un manque que le week-end empêche de combler", () => {
+    // Samedi 14 h, deadline dans 10 h : personne au bureau d'ici là.
     const employe = makeProd({ id: 2, codeStat: 200, morale: MAX_MORALE });
     expect(
       contractMalusExposure({
@@ -260,7 +281,7 @@ describe("malus contractuel exposé", () => {
         productionProgress: { 2: PRODUCTION_THRESHOLD - 1 },
         time: now,
       }),
-    ).toBe(0);
+    ).toBe(dueSoon.priceMalus);
   });
 });
 

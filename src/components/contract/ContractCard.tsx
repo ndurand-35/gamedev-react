@@ -1,6 +1,8 @@
 import { FC, ReactElement, memo, useMemo } from "react";
 
-import { ComponentType, Contract, StartedContract } from "@/data/interface";
+import { Contract, Recipe, StartedContract } from "@/data/interface";
+import { countKinds } from "@/data/utils/recipes";
+import { useUncraftableKinds } from "@/components/contract/useUncraftableKinds";
 import { ClientBadge } from "@/components/contract/ClientBadge";
 import { RequirementList } from "@/components/contract/RequirementList";
 import { setMoney } from "@/data/redux/companySlice";
@@ -57,23 +59,11 @@ const useContractOffer = (contract: Contract) => {
   const time = useAppSelector((state) => state.engine.time);
   const stock = useAppSelector((state) => state.component.stock);
 
-  // Stock couvrant chaque exigence (quantité au-dessus de la qualité
-  // minimale demandée), indexé par type pour le rendu à position fixe.
-  const heldByType = useMemo(() => {
-    const held: Record<ComponentType, number> = {
-      [ComponentType.CODE]: 0,
-      [ComponentType.VISUEL]: 0,
-      [ComponentType.UX]: 0,
-    };
-    for (const req of contract.requirements) {
-      held[req.type] = stock.filter(
-        (c) =>
-          c.type === req.type &&
-          (req.minQuality == null || c.quality >= req.minQuality),
-      ).length;
-    }
-    return held;
-  }, [stock, contract.requirements]);
+  // Stock couvrant chaque exigence, par pièce.
+  const heldByKind = useMemo<Recipe>(() => countKinds(stock), [stock]);
+  // Pièces que personne au studio ne sait encore fabriquer : l'information
+  // décisive avant de signer.
+  const uncraftable = useUncraftableKinds();
 
   const weeks = Number(hourToWeek(contract.time));
 
@@ -95,7 +85,7 @@ const useContractOffer = (contract: Contract) => {
     );
   };
 
-  return { heldByType, weeks, submit };
+  return { heldByKind, uncraftable, weeks, submit };
 };
 
 /**
@@ -106,7 +96,8 @@ const useContractOffer = (contract: Contract) => {
  */
 export const ContractCard: FC<ContractCardProps> = memo(
   ({ contract, leadTimeHours }): ReactElement => {
-    const { heldByType, weeks, submit } = useContractOffer(contract);
+    const { heldByKind, uncraftable, weeks, submit } =
+      useContractOffer(contract);
 
     return (
       <tr>
@@ -146,7 +137,8 @@ export const ContractCard: FC<ContractCardProps> = memo(
         <td>
           <RequirementList
             requirements={contract.requirements}
-            heldByType={heldByType}
+            heldByKind={heldByKind}
+            uncraftable={uncraftable}
           />
         </td>
         <td>
@@ -169,7 +161,8 @@ export const ContractCard: FC<ContractCardProps> = memo(
  */
 export const ContractTile: FC<ContractCardProps> = memo(
   ({ contract, leadTimeHours }): ReactElement => {
-    const { heldByType, weeks, submit } = useContractOffer(contract);
+    const { heldByKind, uncraftable, weeks, submit } =
+      useContractOffer(contract);
 
     return (
       <article className="toy-tile flex flex-col gap-3 p-3.5">
@@ -242,7 +235,8 @@ export const ContractTile: FC<ContractCardProps> = memo(
         <div className="flex flex-wrap items-center justify-between gap-2">
           <RequirementList
             requirements={contract.requirements}
-            heldByType={heldByType}
+            heldByKind={heldByKind}
+            uncraftable={uncraftable}
           />
           <button
             onClick={submit}

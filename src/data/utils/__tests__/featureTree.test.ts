@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { COMPONENT_GRAIN as G } from "@/data/interface";
 import {
+  COMPONENT_KIND_BY_ID,
   Component,
-  ComponentQuality,
   ComponentType,
   Product,
   ProductGenre,
   ProductStatus,
+  Recipe,
+  recipeEntries,
 } from "@/data/interface";
 import {
   FEATURE_BY_ID,
@@ -45,15 +46,15 @@ const product = (
   };
 };
 
-const stockOf = (counts: Partial<Record<ComponentType, number>>): Component[] => {
+const stockOf = (counts: Recipe): Component[] => {
   const out: Component[] = [];
   let id = 1;
-  for (const [type, n] of Object.entries(counts)) {
-    for (let i = 0; i < (n ?? 0); i++) {
+  for (const [kind, n] of recipeEntries(counts)) {
+    for (let i = 0; i < n; i++) {
       out.push({
         id: id++,
-        type: type as ComponentType,
-        quality: ComponentQuality.BON,
+        kind,
+        type: COMPONENT_KIND_BY_ID[kind].family,
         producedBy: 1,
         producedAt: 0,
       });
@@ -73,7 +74,7 @@ describe("featureBranch", () => {
   });
 
   it("départage une égalité dans l'ordre Code → Visuel → UX", () => {
-    // Tableaux de bord : 3 / 3 / 3.
+    // Tableaux de bord : 20 unités dans chaque famille.
     expect(featureBranch(FEATURE_BY_ID.analytics)).toBe(ComponentType.CODE);
   });
 });
@@ -106,8 +107,9 @@ describe("buildFeatureTree", () => {
   it("sur un produit lancé : possédé, disponible ou en manque selon le stock", () => {
     const tree = buildFeatureTree(
       product(ProductGenre.JEU, ["multiplayer"]),
-      // Bande-son : 6 Visuel + 1 UX — couverte. Mode histoire : 3/5/3 — non.
-      stockOf({ [ComponentType.VISUEL]: 6 * G, [ComponentType.UX]: 1 * G }),
+      // Juste de quoi faire la bande-son ; le mode histoire veut aussi du
+      // Code et un Module.
+      stockOf(FEATURE_BY_ID.soundtrack.cost),
     );
     expect(tree.root.state).toBe("owned");
     expect(nodeOf(tree, "multiplayer").state).toBe("owned");
@@ -115,15 +117,32 @@ describe("buildFeatureTree", () => {
     const story = nodeOf(tree, "story_mode");
     expect(story.state).toBe("short");
     expect(story.missing).toEqual(
-      expect.arrayContaining([{ type: ComponentType.CODE, quantity: 3 * G }]),
+      expect.arrayContaining([
+        { kind: "module", quantity: FEATURE_BY_ID.story_mode.cost.module },
+        { kind: "code", quantity: FEATURE_BY_ID.story_mode.cost.code },
+      ]),
     );
     expect(tree.acquired).toBe(1);
+  });
+
+  it("ne remplace pas une pièce demandée par des pièces de base de même valeur", () => {
+    const cost = FEATURE_BY_ID.soundtrack.cost;
+    const tree = buildFeatureTree(
+      product(ProductGenre.JEU, []),
+      // Les Illustrations remplacées par autant de Visuels qu'elles en valent.
+      stockOf({ ...cost, illustration: 0, visuel: cost.visuel! + 50 }),
+    );
+    const soundtrack = nodeOf(tree, "soundtrack");
+    expect(soundtrack.state).toBe("short");
+    expect(soundtrack.missing).toEqual([
+      { kind: "illustration", quantity: cost.illustration },
+    ]);
   });
 
   it("en développement : la composition est en chantier, le reste attend le lancement", () => {
     const tree = buildFeatureTree(
       product(ProductGenre.JEU, ["multiplayer"], ProductStatus.DEVELOPING),
-      stockOf({ [ComponentType.VISUEL]: 50 }),
+      stockOf({ visuel: 50 }),
     );
     expect(tree.root.state).toBe("building");
     expect(nodeOf(tree, "multiplayer").state).toBe("building");
@@ -134,7 +153,7 @@ describe("buildFeatureTree", () => {
   it("retiré : plus rien ne s'ajoute", () => {
     const tree = buildFeatureTree(
       product(ProductGenre.JEU, ["multiplayer"], ProductStatus.RETIRED),
-      stockOf({ [ComponentType.VISUEL]: 50 }),
+      stockOf({ visuel: 50 }),
     );
     expect(nodeOf(tree, "multiplayer").state).toBe("owned");
     expect(nodeOf(tree, "soundtrack").state).toBe("locked");

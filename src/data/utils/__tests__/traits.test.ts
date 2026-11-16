@@ -3,23 +3,26 @@ import { describe, expect, it } from "vitest";
 import {
   ComponentType,
   PersonType,
+  STAT_SCALE,
   type Building,
   type Person,
   type TraitId,
 } from "@/data/interface";
-import { rollComponent } from "@/data/utils/component";
+import { craftBlocker } from "@/data/utils/recipes";
 import { computeMonthlyMoraleDrift } from "@/data/utils/morale";
 import { poachChance } from "@/data/utils/poaching";
 import {
+  FAST_GATE_SHIFT,
   FAST_SPEED,
   MORALE_AURA_CAP,
   MORALE_AURA_PER_COLLEAGUE,
+  PERFECTIONIST_GATE_SHIFT,
   PERFECTIONIST_SPEED,
   TRAITS,
   TRAIT_IDS,
+  gateShift,
   moraleAura,
   productionSpeedMultiplier,
-  qualityBonus,
   resignationMultiplier,
   rollTraits,
   trainingSpeedMultiplier,
@@ -66,32 +69,51 @@ describe("rollTraits", () => {
 
   it("couvre tous les traits de production avec des tirages variés", () => {
     const seen = new Set<TraitId>();
-    for (let i = 0; i < 500; i++) rollTraits(PersonType.PROD).forEach((t) => seen.add(t));
+    for (let i = 0; i < 500; i++)
+      rollTraits(PersonType.PROD).forEach((t) => seen.add(t));
     expect([...seen].sort()).toEqual([...TRAIT_IDS].sort());
   });
 });
 
-describe("production et qualité", () => {
-  it("le perfectionniste produit moins vite mais mieux, le rapide l'inverse", () => {
+describe("production et seuils de compétence", () => {
+  it("le perfectionniste produit moins vite, le rapide plus vite", () => {
     expect(productionSpeedMultiplier(person(2, ["perfectionniste"]))).toBe(
       PERFECTIONIST_SPEED,
     );
     expect(productionSpeedMultiplier(person(2, ["rapide"]))).toBe(FAST_SPEED);
-    expect(qualityBonus(person(2, ["perfectionniste"]))).toBeGreaterThan(0);
-    expect(qualityBonus(person(2, ["rapide"]))).toBeLessThan(0);
     expect(productionSpeedMultiplier(person(2, ["mentor"]))).toBe(1);
   });
 
-  it("le bonus de qualité décale le tirage d'un composant", () => {
-    const realRandom = Math.random;
-    // Variance nulle, pas de bonus rare.
-    Math.random = () => 0.5;
-    try {
-      expect(rollComponent(125).quality).toBe(3); // 2,5 arrondi
-      expect(rollComponent(125, -0.5).quality).toBe(2);
-    } finally {
-      Math.random = realRandom;
-    }
+  it("le perfectionniste aborde les pièces avancées un point plus tôt, le rapide un plus tard", () => {
+    expect(gateShift(person(2))).toBe(0);
+    expect(gateShift(person(2, ["perfectionniste"]))).toBe(
+      PERFECTIONIST_GATE_SHIFT,
+    );
+    expect(PERFECTIONIST_GATE_SHIFT).toBe(-1);
+    expect(gateShift(person(2, ["rapide"]))).toBe(FAST_GATE_SHIFT);
+    expect(FAST_GATE_SHIFT).toBe(1);
+    expect(gateShift(person(2, ["mentor", "fidele"]))).toBe(0);
+  });
+
+  it("le décalage s'applique au seuil d'une pièce de niveau 2 (6 points)", () => {
+    const stats = {
+      codeStat: 5 * STAT_SCALE + 5,
+      visualStat: 0,
+      uxStat: 0,
+    };
+    const perfectionist = person(2, ["perfectionniste"]);
+    const fast = person(3, ["rapide"]);
+    // 5,5 points : sous le seuil, sauf pour le perfectionniste (5).
+    expect(craftBlocker(stats, "module", 0, gateShift(person(1)))).toBe(
+      "skill",
+    );
+    expect(
+      craftBlocker(stats, "module", 0, gateShift(perfectionist)),
+    ).toBeNull();
+    // 6 points : au seuil, sauf pour le rapide (7).
+    const six = { ...stats, codeStat: 6 * STAT_SCALE };
+    expect(craftBlocker(six, "module", 0, gateShift(fast))).toBe("skill");
+    expect(craftBlocker(six, "module", 0, gateShift(person(1)))).toBeNull();
   });
 });
 
@@ -128,9 +150,16 @@ describe("ambiance du bâtiment", () => {
 
   it("entre dans la dérive mensuelle du moral, avec sa cause", () => {
     const building = { id: 1, place: 10 } as Building;
-    const me = person(2, [], { assignedComponentType: ComponentType.CODE } as Partial<Person>);
+    const me = person(2, [], {
+      assignedComponentType: ComponentType.CODE,
+    } as Partial<Person>);
     const drift = computeMonthlyMoraleDrift(
-      [me, person(3, ["rabatJoie"], { assignedComponentType: ComponentType.CODE } as Partial<Person>)],
+      [
+        me,
+        person(3, ["rabatJoie"], {
+          assignedComponentType: ComponentType.CODE,
+        } as Partial<Person>),
+      ],
       [building],
     );
     const mine = drift.find((d) => d.employeId === 2)!;

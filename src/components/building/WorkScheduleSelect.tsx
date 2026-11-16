@@ -31,9 +31,6 @@ const scheduleEffects = (s: WorkSchedule): string => {
     `production ×${d.output.toLocaleString("fr-FR")}`,
     `moral ${signed(d.morale)}/mois`,
   ];
-  if (d.quality !== 0) {
-    parts.push(`qualité ${d.quality < 0 ? "−" : "+"}½ cran`);
-  }
   return `${d.description} (${parts.join(", ")}) — ${shiftsLabel(s)}`;
 };
 

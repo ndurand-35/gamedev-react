@@ -55,6 +55,7 @@ import {
   PendingTraining,
   TrainingConfirmModal,
 } from "@/components/employe/TrainingConfirmModal";
+import { PostPicker } from "@/components/employe/PostPicker";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fiche d'un employé : en-tête (identité, moral, salaire), onglets par sujet,
@@ -229,6 +230,10 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
   const productionProgress = useAppSelector(
     (s) => s.component.productionProgress,
   );
+  const productionJobs = useAppSelector((s) => s.component.productionJobs);
+  const productionWaiting = useAppSelector(
+    (s) => s.component.productionWaiting,
+  );
   const buildingName = useAppSelector(
     (s) =>
       s.company.buildingList.find((b) => b.id === employe?.buildingId)?.name,
@@ -308,7 +313,7 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
 
   const isFounder = employe?.id === 1;
   const ratio = employe
-    ? employeTaskProgress(employe, productionProgress)
+    ? employeTaskProgress(employe, productionProgress, productionJobs)
     : null;
 
   const actions = employe && (
@@ -478,11 +483,26 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
                     />
                     {ratio != null && (
                       <TaskProgressBar
-                        activity={employeActivity(employe)}
+                        activity={employeActivity(employe, {
+                          jobs: productionJobs,
+                          waiting: productionWaiting,
+                        })}
                         ratio={ratio}
                         variant="toy"
                       />
                     )}
+                  </Section>
+                )}
+
+                {prod?.assignedComponentType && !prod.trainingType && (
+                  <Section
+                    title={
+                      <>
+                        Poste <CodexLink id="composants" />
+                      </>
+                    }
+                  >
+                    <PostPicker employe={prod} />
                   </Section>
                 )}
 
@@ -620,7 +640,10 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
                     {prod.trainingType && (
                       <>
                         <TaskProgressBar
-                          activity={employeActivity(employe)}
+                          activity={employeActivity(employe, {
+                            jobs: productionJobs,
+                            waiting: productionWaiting,
+                          })}
                           ratio={Math.min(
                             1,
                             (prod.trainingProgress ?? 0) / TRAINING_THRESHOLD,

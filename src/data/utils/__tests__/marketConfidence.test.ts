@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ComponentType,
   CompetitorProduct,
   Product,
   ProductGenre,
@@ -19,7 +18,10 @@ import {
   recentLaunches,
 } from "@/data/utils/marketConfidence";
 import { CONFIDENCE_MIN } from "@/data/utils/marketDemand";
-import { segmentAttraction, pickRivalGenre } from "@/data/utils/competitorProduct";
+import {
+  segmentAttraction,
+  pickRivalGenre,
+} from "@/data/utils/competitorProduct";
 
 const launch = (quality: number): SegmentLaunch => ({
   genre: ProductGenre.JEU,
@@ -45,18 +47,11 @@ const ours = (over: Partial<Product> = {}): Product => ({
   status: ProductStatus.LAUNCHED,
   genre: ProductGenre.JEU,
   features: ["core_game"],
-  requirements: {
-    [ComponentType.CODE]: 6,
-    [ComponentType.VISUEL]: 5,
-    [ComponentType.UX]: 1,
-  },
-  invested: {
-    [ComponentType.CODE]: 6,
-    [ComponentType.VISUEL]: 5,
-    [ComponentType.UX]: 1,
-  },
-  qualitySum: 12 * 1, // médiocre
-  qualityCount: 12,
+  // 16 pièces de base : taille 12 (16 / 1,3).
+  requirements: { code: 8, visuel: 6, ux: 2 },
+  invested: { code: 8, visuel: 6, ux: 2 },
+  qualitySum: 16 * 1, // finition médiocre
+  qualityCount: 16,
   launchTime: 0,
   bugs: 0,
   hype: 0,
@@ -77,7 +72,9 @@ describe("confiance du public", () => {
 
   it("chute quand le segment est inondé de sorties médiocres (krach)", () => {
     const flood = Array.from({ length: POOR_TOLERANCE + 3 }, () => launch(1));
-    expect(nextConfidence(1, flood)).toBeCloseTo(1 - 3 * CONFIDENCE_LOSS_PER_POOR);
+    expect(nextConfidence(1, flood)).toBeCloseTo(
+      1 - 3 * CONFIDENCE_LOSS_PER_POOR,
+    );
     // Mois après mois, jusqu'au plancher.
     let c = 1;
     for (let m = 0; m < 24; m++) c = nextConfidence(c, flood);
@@ -122,7 +119,13 @@ describe("les concurrents suivent la demande", () => {
       let jeu = 0;
       const n = 400;
       for (let i = 0; i < n; i++) {
-        const g = pickRivalGenre(undefined, [], () => (i + 0.5) / n, [], weights);
+        const g = pickRivalGenre(
+          undefined,
+          [],
+          () => (i + 0.5) / n,
+          [],
+          weights,
+        );
         if (g === ProductGenre.JEU) jeu++;
       }
       return jeu / n;

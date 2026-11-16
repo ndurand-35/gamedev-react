@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   Building,
+  CONSUMPTION_FACTOR,
   GENRES,
   Person,
   Product,
@@ -67,12 +68,9 @@ const product = (
   status,
   genre: ProductGenre.OUTIL,
   features: [],
-  requirements: {
-    Code: OUTIL_SIZE,
-    Visuel: 0,
-    UX: 0,
-  } as Product["requirements"],
-  invested: { Code: OUTIL_SIZE, Visuel: 0, UX: 0 } as Product["invested"],
+  // Pièces de base qui font cette taille (les produits consomment ×1,3).
+  requirements: { code: Math.round(OUTIL_SIZE * CONSUMPTION_FACTOR) },
+  invested: { code: Math.round(OUTIL_SIZE * CONSUMPTION_FACTOR) },
   qualitySum: 2.5 * OUTIL_SIZE,
   qualityCount: OUTIL_SIZE,
   launchTime,

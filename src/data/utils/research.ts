@@ -46,9 +46,9 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
     id: "delivery_advisor",
     name: "Arbitrage de livraison",
     description:
-      "Projeter le stock dans le temps : ce que l'équipe va produire, ce qui va se démoder, et ce que la prime d'avance pèse vraiment.",
+      "Projeter l'atelier dans le temps : ce que l'équipe va produire, recettes comprises, et quand chaque contrat sera livrable.",
     unlocks:
-      "Le conseiller de livraison apparaît sur chaque contrat en cours et chiffre « livrer maintenant » contre « attendre ».",
+      "Une prévision de livraison apparaît sur chaque contrat en cours : livrable maintenant, dans combien de temps, ou pas à temps.",
     cost: 2500,
     durationHours: 10 * 24,
   },

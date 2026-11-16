@@ -7,7 +7,8 @@ import {
   ProductFeature,
   ProductStatus,
 } from "@/data/interface";
-import { selectBestComponents } from "@/data/utils/component";
+import { selectComponents } from "@/data/utils/component";
+import { recipeToRequirements, unitsByFamily } from "@/data/utils/recipes";
 import {
   coreFeature,
   featureCost,
@@ -82,13 +83,14 @@ export interface FeatureTree {
 }
 
 /**
- * Branche d'une fonctionnalité : le type de composant qui pèse le plus dans
- * son coût. À égalité, l'ordre Code → Visuel → UX départage.
+ * Branche d'une fonctionnalité : la famille qui pèse le plus dans son coût
+ * (en travail). À égalité, l'ordre Code → Visuel → UX départage.
  */
 export const featureBranch = (f: ProductFeature): ComponentType => {
+  const units = unitsByFamily(recipeToRequirements(f.cost));
   let best = COMPONENT_TYPE_ORDER[0];
   for (const t of COMPONENT_TYPE_ORDER) {
-    if ((f.cost[t] ?? 0) > (f.cost[best] ?? 0)) best = t;
+    if (units[t] > units[best]) best = t;
   }
   return best;
 };
@@ -113,7 +115,7 @@ const nodeFor = (
   }
   // Même sélection que `addFeatureThunk` : ce qui s'affiche « disponible »
   // est exactement ce que l'ajout acceptera.
-  const { missing } = selectBestComponents(stock, featureRequirements(feature));
+  const { missing } = selectComponents(stock, featureRequirements(feature));
   return {
     feature,
     state: missing.length === 0 ? "available" : "short",
@@ -179,7 +181,10 @@ export interface ProductEdition {
  * embarque. Une étiquette, sans effet de jeu : elle ne fait que nommer la
  * progression que le joueur voit déjà dans l'arbre.
  */
-export const productEdition = (acquired: number, total: number): ProductEdition => {
+export const productEdition = (
+  acquired: number,
+  total: number,
+): ProductEdition => {
   const ratio = total === 0 ? 1 : acquired / total;
   if (ratio >= 1) return { name: "Édition ultime", rank: 4 };
   if (ratio >= 0.75) return { name: "Édition premium", rank: 3 };

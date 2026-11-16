@@ -27,7 +27,6 @@ import {
   LOW_MORALE_THRESHOLD,
   PersonType,
   ProductionPerson,
-  QUALITY_LABELS,
   jobLabel,
   buildingSeats,
 } from "@/data/interface";
@@ -54,6 +53,7 @@ import {
 import { SeatAssignModal } from "@/components/building/SeatAssignModal";
 import { WorkScheduleSelect } from "@/components/building/WorkScheduleSelect";
 import { AmenitiesModal } from "@/components/building/AmenitiesModal";
+import { kindLabel } from "@/data/utils/recipes";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Effectif d'un bâtiment, en trois présentations au choix du joueur.
@@ -177,13 +177,17 @@ export const BuildingEmployeView = ({
   const productionProgress = useAppSelector(
     (s) => s.component.productionProgress,
   );
+  const productionJobs = useAppSelector((s) => s.component.productionJobs);
   const progressById = useMemo(() => {
     const map = new Map<number, number | null>();
     for (const emp of employes) {
-      map.set(emp.id, employeTaskProgress(emp, productionProgress));
+      map.set(
+        emp.id,
+        employeTaskProgress(emp, productionProgress, productionJobs),
+      );
     }
     return map;
-  }, [employes, productionProgress]);
+  }, [employes, productionProgress, productionJobs]);
 
   const filtered = useMemo(() => {
     return employes.filter((emp) => {
@@ -461,8 +465,8 @@ const FreeSeatCard = ({ onClick }: { onClick: () => void }): ReactElement => (
 );
 
 /**
- * « +1 » qui s'élève au-dessus de la barre quand un composant sort, dans la
- * couleur de son type (Code, Visuel, UX) ; le libellé donne la qualité tirée.
+ * « +1 » qui s'élève au-dessus de la barre quand une pièce sort, dans la
+ * couleur de sa famille (Code, Visuel, UX) ; le libellé la nomme.
  */
 const ProductionFloat = ({
   burst,
@@ -470,7 +474,7 @@ const ProductionFloat = ({
   burst: ProductionBurst;
 }): ReactElement => {
   const TypeIcon = COMPONENT_ICON[burst.type];
-  const quality = QUALITY_LABELS[burst.quality];
+  const quality = kindLabel(burst.kind);
   return (
     <span
       aria-hidden
@@ -483,6 +487,13 @@ const ProductionFloat = ({
   );
 };
 
+/** Pièce en cours et attentes de chacun, pour les libellés d'activité. */
+const useProductionStatus = () => {
+  const jobs = useAppSelector((s) => s.component.productionJobs);
+  const waiting = useAppSelector((s) => s.component.productionWaiting);
+  return useMemo(() => ({ jobs, waiting }), [jobs, waiting]);
+};
+
 const CardsView = ({
   employes,
   progressById,
@@ -490,13 +501,14 @@ const CardsView = ({
   freeSeats,
   onFreeSeat,
 }: ViewProps): ReactElement => {
+  const production = useProductionStatus();
   const bursts = useProductionBursts();
   return (
     // Marge intérieure compensée : le halo d'une carte en bordure n'est pas
     // rogné par le défilement.
     <ul className="-m-2 grid min-h-0 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 overflow-y-auto p-2 pb-4">
       {employes.map((emp) => {
-        const activity = employeActivity(emp);
+        const activity = employeActivity(emp, production);
         const ratio = progressById.get(emp.id) ?? null;
         const burst = bursts[emp.id];
         const glowClass = burst
@@ -611,6 +623,7 @@ const CompactView = ({
   freeSeats,
   onFreeSeat,
 }: ViewProps): ReactElement => {
+  const production = useProductionStatus();
   const bursts = useProductionBursts();
   const [collapsed, setCollapsed] = useState<Set<PersonType>>(new Set());
   const toggle = (type: PersonType) =>
@@ -651,7 +664,7 @@ const CompactView = ({
             {open && (
               <ul className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-2">
                 {team.map((emp) => {
-                  const activity = employeActivity(emp);
+                  const activity = employeActivity(emp, production);
                   const ratio = progressById.get(emp.id) ?? null;
                   const alert = isEmployeInAlert(emp);
                   const burst = bursts[emp.id];
@@ -739,6 +752,7 @@ const TableView = ({
   freeSeats,
   onFreeSeat,
 }: ViewProps): ReactElement => {
+  const production = useProductionStatus();
   const columns = useMemo(
     () => [
       columnHelper.accessor(fullName, {
@@ -764,7 +778,7 @@ const TableView = ({
         header: "Rôle",
         cell: (info) => <EmployeTag employe={info.row.original} />,
       }),
-      columnHelper.accessor((emp) => employeActivity(emp).label, {
+      columnHelper.accessor((emp) => employeActivity(emp, production).label, {
         id: "assignment",
         header: "Activité",
         cell: (info) => (
@@ -783,7 +797,7 @@ const TableView = ({
           return (
             <span className="flex min-w-36 items-center gap-2">
               <TaskProgressBar
-                activity={employeActivity(emp)}
+                activity={employeActivity(emp, production)}
                 ratio={ratio}
                 variant="bar"
               />
@@ -809,7 +823,7 @@ const TableView = ({
         ),
       }),
     ],
-    [onSelect, progressById],
+    [onSelect, progressById, production],
   );
 
   return (

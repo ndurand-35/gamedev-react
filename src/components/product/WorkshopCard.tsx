@@ -1,15 +1,11 @@
 import { FC } from "react";
 
-import {
-  COMPONENT_TYPE_ORDER,
-  Product,
-  productAverageQuality,
-  productSize,
-} from "@/data/interface";
+import { Product, productAverageQuality, productSize } from "@/data/interface";
 import { affinityLabel, productFeatures } from "@/data/utils/feature";
 import { productGenre } from "@/data/utils/product";
-import { ComponentTypeBadge } from "@/components/component";
 import { ProductActions } from "@/components/product/ProductActions";
+import { KindPill } from "@/components/component";
+import { kindLabel, recipeToRequirements } from "@/data/utils/recipes";
 
 interface WorkshopCardProps {
   product: Product;
@@ -60,32 +56,34 @@ export const WorkshopCard: FC<WorkshopCardProps> = ({ product: p, onOpen }) => {
         )}
 
         <div className="space-y-2">
-          {COMPONENT_TYPE_ORDER.map((t) => {
-            const have = p.invested[t];
-            const need = p.requirements[t];
-            if (need === 0) return null;
-            return (
-              <div key={`${p.id}_${t}`}>
-                <div className="flex flex-row items-center justify-between text-xs">
-                  <ComponentTypeBadge type={t} size={12} />
-                  <span className="tabular-nums">
-                    {have}/{need}
-                  </span>
+          {recipeToRequirements(p.requirements).map(
+            ({ kind: t, quantity: need }) => {
+              const have = p.invested[t] ?? 0;
+              return (
+                <div key={`${p.id}_${t}`}>
+                  <div className="flex flex-row items-center justify-between text-xs">
+                    <span className="inline-flex items-center gap-1">
+                      <KindPill kind={t} size={14} />
+                      {kindLabel(t)}
+                    </span>
+                    <span className="tabular-nums">
+                      {have}/{need}
+                    </span>
+                  </div>
+                  <progress
+                    className="progress w-full h-1.5"
+                    value={Math.min(1, have / need) * 100}
+                    max={100}
+                  />
                 </div>
-                <progress
-                  className="progress w-full h-1.5"
-                  value={Math.min(1, have / need) * 100}
-                  max={100}
-                />
-              </div>
-            );
-          })}
+              );
+            },
+          )}
         </div>
 
         {p.qualityCount > 0 && (
           <p className="text-xs opacity-70">
-            {size} composants investis · qualité moyenne{" "}
-            {productAverageQuality(p).toFixed(2)} / 5
+            taille {size} · finition {productAverageQuality(p).toFixed(2)} / 5
           </p>
         )}
 

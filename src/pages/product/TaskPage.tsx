@@ -20,6 +20,7 @@ import {
   sortContracts,
 } from "@/data/utils/task";
 import { estimateContractLeadTime } from "@/data/utils/deliveryAdvisor";
+import { requirementsToRecipe } from "@/data/utils/recipes";
 import { FOUNDER_ID, hasFounderSkill } from "@/data/utils/research";
 
 export const TaskPage: React.FC = (): ReactElement => {
@@ -42,7 +43,12 @@ export const TaskPage: React.FC = (): ReactElement => {
   const productionProgress = useAppSelector(
     (state) => state.component.productionProgress,
   );
-  const time = useAppSelector((state) => state.engine.time);
+  const productionJobs = useAppSelector(
+    (state) => state.component.productionJobs,
+  );
+  const signed = useAppSelector((state) => state.task.taskList);
+  // L'estimation rejoue l'atelier sur des semaines : au jour près suffit.
+  const day = useAppSelector((state) => Math.floor(state.engine.time / 24));
 
   const leadTimeById = useMemo(() => {
     if (!canEstimate) return null;
@@ -50,6 +56,11 @@ export const TaskPage: React.FC = (): ReactElement => {
       ? employes.filter((e) => e.id !== FOUNDER_ID)
       : employes;
     const map = new Map<number, number | null>();
+    const time = day * 24;
+    // Un contrat pas encore signé passe derrière ceux déjà signés.
+    const demand = [...signed]
+      .sort((a, b) => a.startDate + a.time - (b.startDate + b.time))
+      .map((c) => requirementsToRecipe(c.requirements));
     for (const contract of availableContractList) {
       map.set(
         contract.id,
@@ -58,20 +69,24 @@ export const TaskPage: React.FC = (): ReactElement => {
           stock,
           employes: producing,
           productionProgress,
+          productionJobs,
           time,
           buildings,
+          demand,
         }),
       );
     }
     return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     canEstimate,
     founderResearching,
     availableContractList,
-    stock,
+    stock.length,
     employes,
-    productionProgress,
-    time,
+    productionJobs,
+    signed,
+    day,
     buildings,
   ]);
 

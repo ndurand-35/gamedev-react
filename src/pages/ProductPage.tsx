@@ -18,7 +18,6 @@ import {
 } from "iconoir-react";
 
 import {
-  COMPONENT_TYPE_ORDER,
   ComponentType,
   Component,
   Product,
@@ -61,7 +60,6 @@ import {
   launchProductThunk,
   patchProductThunk,
 } from "@/data/utils/productLifecycle";
-import { ComponentTypeBadge } from "@/components/component";
 import { NewProductModal } from "@/components/product";
 import { CostBadges } from "@/components/product/CostBadges";
 import { PromotionPanel } from "@/components/product/PromotionPanel";
@@ -84,6 +82,14 @@ import { TechnologyPanel } from "@/components/product/TechnologyPanel";
 import { CodexLink } from "@/components/codex/CodexLink";
 import { FeatureTree } from "@/components/product/FeatureTree";
 import { productTopMenuItems } from "@/pages/product/menu";
+import { KindPill } from "@/components/component";
+import {
+  kindFamily,
+  kindLabel,
+  recipeCount,
+  recipeToRequirements,
+} from "@/data/utils/recipes";
+import { requirementsLabel } from "@/data/utils/component";
 
 const pct = (ratio: number): string => `${Math.round(ratio * 100)} %`;
 
@@ -404,7 +410,7 @@ const Portfolio = ({
 // ── Fiche d'un nœud ──────────────────────────────────────────────────────────
 
 const missingLabel = (node: FeatureNode): string =>
-  node.missing.map((m) => `${m.quantity} ${m.type}`).join(", ");
+  requirementsLabel(node.missing);
 
 const NodeDetail = ({
   product,
@@ -548,11 +554,8 @@ const ProductPanel = ({
   const spike = launched ? launchSpikeMultiplier(p, time) : 1;
   const avgQ = productAverageQuality(p);
 
-  const invested = COMPONENT_TYPE_ORDER.reduce((a, t) => a + p.invested[t], 0);
-  const required = COMPONENT_TYPE_ORDER.reduce(
-    (a, t) => a + p.requirements[t],
-    0,
-  );
+  const invested = recipeCount(p.invested);
+  const required = recipeCount(p.requirements);
 
   return (
     <div className="space-y-4">
@@ -586,40 +589,44 @@ const ProductPanel = ({
                   Chantier
                 </span>
                 <span className="tabular-nums">
-                  {invested} / {required} composants
+                  {invested} / {required} pièces
                   {p.qualityCount > 0 &&
-                    ` · qualité ${avgQ.toFixed(1).replace(".", ",")}/5`}
+                    ` · finition ${avgQ.toFixed(1).replace(".", ",")}/5`}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                {COMPONENT_TYPE_ORDER.map((t) =>
-                  p.requirements[t] === 0 ? (
-                    <div key={t} />
-                  ) : (
-                    <div key={t} className="space-y-1">
-                      <div className="flex flex-row justify-between text-xs font-extrabold">
-                        <ComponentTypeBadge type={t} size={13} />
-                        <span className="tabular-nums">
-                          {p.invested[t]}/{p.requirements[t]}
-                        </span>
-                      </div>
-                      <div
-                        role="progressbar"
-                        aria-valuenow={p.invested[t]}
-                        aria-valuemin={0}
-                        aria-valuemax={p.requirements[t]}
-                        aria-label={`${t} : ${p.invested[t]} sur ${p.requirements[t]}`}
-                        className="h-3.5 overflow-hidden rounded-full border-2 border-ink bg-base-300"
-                      >
+                {recipeToRequirements(p.requirements).map(
+                  ({ kind: t, quantity: need }) => {
+                    const have = p.invested[t] ?? 0;
+                    return (
+                      <div key={t} className="space-y-1">
+                        <div className="flex flex-row justify-between gap-1 text-xs font-extrabold">
+                          <span className="inline-flex min-w-0 items-center gap-1">
+                            <KindPill kind={t} size={14} />
+                            <span className="truncate">{kindLabel(t)}</span>
+                          </span>
+                          <span className="tabular-nums">
+                            {have}/{need}
+                          </span>
+                        </div>
                         <div
-                          className={`stripes h-full ${CHANTIER_FILL[t]}`}
-                          style={{
-                            width: `${(p.invested[t] / p.requirements[t]) * 100}%`,
-                          }}
-                        />
+                          role="progressbar"
+                          aria-valuenow={have}
+                          aria-valuemin={0}
+                          aria-valuemax={need}
+                          aria-label={`${kindLabel(t)} : ${have} sur ${need}`}
+                          className="h-3.5 overflow-hidden rounded-full border-2 border-ink bg-base-300"
+                        >
+                          <div
+                            className={`stripes h-full ${CHANTIER_FILL[kindFamily(t)]}`}
+                            style={{
+                              width: `${(have / need) * 100}%`,
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  ),
+                    );
+                  },
                 )}
               </div>
             </div>
@@ -635,7 +642,7 @@ const ProductPanel = ({
               <Stat label="Part du segment" value={pct(share)} />
               <Stat label="Fraîcheur" value={pct(productFreshness(p, time))} />
               <Stat
-                label="Qualité"
+                label="Finition"
                 value={`${avgQ.toFixed(1).replace(".", ",")}/5`}
               />
               <Stat

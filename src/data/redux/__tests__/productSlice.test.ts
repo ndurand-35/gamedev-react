@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  COMPONENT_GRAIN as G,
-  ComponentQuality,
-  ComponentType,
+  ComponentKindId,
   ProductGenre,
   ProductStatus,
+  Recipe,
+  TIER_FINISH,
+  kindValue,
+  productAverageQuality,
+  productSize,
+  recipeEntries,
+  recipeValue,
 } from "@/data/interface";
 import productReducer, {
   addFeature,
@@ -19,10 +24,15 @@ import productReducer, {
 import { FEATURE_BY_ID, featureCost } from "@/data/utils/feature";
 import { UPDATE_REWIND_MONTHS } from "@/data/utils/product";
 
-const consumed = (type: ComponentType, n: number, quality: ComponentQuality) =>
-  Array.from({ length: n }, (_, i) => ({ id: i + 1, type, quality }));
+let nextId = 1;
+const consumed = (kind: ComponentKindId, n: number) =>
+  Array.from({ length: n }, () => ({ id: nextId++, kind }));
 
-/** Outil réduit à son socle : 4 Code, 1 Visuel, 1 UX (× grain). */
+/** Toutes les pièces d'une liste, prêtes à être versées. */
+const pieces = (recipe: Recipe) =>
+  recipeEntries(recipe).flatMap(([kind, n]) => consumed(kind, n));
+
+/** Outil réduit à son socle. */
 const created = () =>
   productReducer(
     undefined,
@@ -33,24 +43,18 @@ const created = () =>
     }),
   );
 
+/** Le socle versé en deux fois, pièce pour pièce. */
 const readyToLaunch = () => {
+  const all = pieces(FEATURE_BY_ID.core_tool.cost);
+  const half = Math.floor(all.length / 2);
   let state = created();
   state = productReducer(
     state,
-    investInProduct({
-      productId: 1,
-      consumed: consumed(ComponentType.CODE, 4 * G, ComponentQuality.BON),
-    }),
+    investInProduct({ productId: 1, consumed: all.slice(0, half) }),
   );
   state = productReducer(
     state,
-    investInProduct({
-      productId: 1,
-      consumed: [
-        ...consumed(ComponentType.VISUEL, 1 * G, ComponentQuality.BON),
-        ...consumed(ComponentType.UX, 1 * G, ComponentQuality.BON),
-      ],
-    }),
+    investInProduct({ productId: 1, consumed: all.slice(half) }),
   );
   return state;
 };
@@ -79,6 +83,58 @@ describe("productSlice", () => {
     expect(state.products).toEqual([]);
   });
 
+  it("verse les pièces dans le produit, sorte par sorte", () => {
+    const state = productReducer(
+      created(),
+      investInProduct({
+        productId: 1,
+        consumed: [...consumed("module", 1), ...consumed("code", 2)],
+      }),
+    );
+    expect(state.products[0].invested).toEqual({ module: 1, code: 2 });
+  });
+
+  it("la finition cumule la note de chaque niveau, pondérée par la valeur", () => {
+    const state = productReducer(
+      created(),
+      investInProduct({
+        productId: 1,
+        consumed: [...consumed("module", 1), ...consumed("code", 2)],
+      }),
+    );
+    const [p] = state.products;
+    // 1 Module (niveau 2, valeur 5) + 2 Code (niveau 1, valeur 1).
+    expect(kindValue("module")).toBe(5);
+    expect(p.qualitySum).toBe(TIER_FINISH[2] * 5 + 2 * TIER_FINISH[1] * 1);
+    expect(p.qualityCount).toBe(5 + 2);
+    expect(productAverageQuality(p)).toBeCloseTo((3 * 5 + 2 * 1 * 2) / (5 + 2));
+  });
+
+  it("une pièce de niveau 4 porte la finition au maximum", () => {
+    const state = productReducer(
+      created(),
+      investInProduct({ productId: 1, consumed: consumed("univers", 1) }),
+    );
+    const [p] = state.products;
+    expect(p.qualityCount).toBe(56);
+    expect(productAverageQuality(p)).toBe(TIER_FINISH[4]);
+  });
+
+  it("n'est prêt qu'avec chaque sorte demandée, pas seulement la valeur", () => {
+    const cost = FEATURE_BY_ID.core_tool.cost;
+    // Autant de valeur en Code qu'en Module, mais pas de Module.
+    const substitute = pieces({ ...cost, module: 0, code: cost.code! + 5 });
+    let state = productReducer(
+      created(),
+      investInProduct({ productId: 1, consumed: substitute }),
+    );
+    state = productReducer(
+      state,
+      launchProduct({ productId: 1, time: 10, hype: 0 }),
+    );
+    expect(state.products[0].status).toBe(ProductStatus.DEVELOPING);
+  });
+
   it("refuse de lancer un produit incomplet", () => {
     const state = productReducer(
       created(),
@@ -98,8 +154,12 @@ describe("productSlice", () => {
     expect(p.launchTime).toBe(10);
     expect(p.freshAt).toBe(10);
     expect(p.hype).toBe(0.6);
-    // Qualité 3/5 sur un outil de 6 (moitié de la taille pleine) : 0,7×6 + 0,3×5.
-    expect(p.launchScore).toBe(5.7);
+    // Socle de l'outil : 1 Module (finition 3, valeur 5) et 35 pièces de base
+    // (finition 2) → finition 85/40 ; taille 40/1,3 ≈ 31 sur 2 × 30.
+    expect(productAverageQuality(p)).toBeCloseTo(85 / 40);
+    expect(productSize(p)).toBe(31);
+    // 0,7 × 0,425 + 0,3 × 31/60 = 0,4525 → 4,5.
+    expect(p.launchScore).toBe(4.5);
     expect(state.productsLaunched).toBe(1);
   });
 
@@ -112,12 +172,13 @@ describe("productSlice", () => {
       state,
       investInProduct({
         productId: 1,
-        consumed: consumed(ComponentType.CODE, 2, ComponentQuality.EXCELLENT),
+        consumed: consumed("code", 2),
       }),
     );
-    expect(state.products[0].invested[ComponentType.CODE]).toBe(4 * G);
+    const core = FEATURE_BY_ID.core_tool.cost;
+    expect(state.products[0].invested.code).toBe(core.code);
 
-    const automation = FEATURE_BY_ID.automation; // 5 Code, 1 Visuel, 2 UX = 8
+    const automation = FEATURE_BY_ID.automation; // taille 40
     const later = UPDATE_REWIND_MONTHS * 30 * 24 * 2; // bien après un rappel plein
     state = productReducer(
       state,
@@ -128,26 +189,25 @@ describe("productSlice", () => {
       addFeature({
         productId: 1,
         featureId: automation.id,
-        consumed: [
-          ...consumed(ComponentType.CODE, 5 * G, ComponentQuality.EXCELLENT),
-          ...consumed(ComponentType.VISUEL, 1 * G, ComponentQuality.EXCELLENT),
-          ...consumed(ComponentType.UX, 2 * G, ComponentQuality.EXCELLENT),
-        ],
+        consumed: pieces(automation.cost),
         time: later,
       }),
     );
     const [p] = state.products;
     expect(p.features).toEqual(["core_tool", "automation"]);
-    expect(p.requirements[ComponentType.CODE]).toBe((4 + 5) * G);
-    expect(p.invested[ComponentType.CODE]).toBe((4 + 5) * G);
-    expect(p.qualityCount).toBe((6 + 8) * G);
+    const codeNeeded = core.code! + automation.cost.code!;
+    expect(p.requirements.code).toBe(codeNeeded);
+    expect(p.invested.code).toBe(codeNeeded);
+    expect(p.qualityCount).toBe(
+      recipeValue(core) + recipeValue(automation.cost),
+    );
     expect(p.bugs).toBe(0);
     expect(p.updates).toBe(1);
-    // 8 composants ajoutés sur 6 : 8/6 × 12 mois = 16 mois de rappel, sous
-    // les 24 mois écoulés → l'ancre avance de 16 mois depuis 0.
+    // Taille 40 ajoutée sur 31 : 40/31 × 12 mois de rappel, sous les 24 mois
+    // écoulés → l'ancre avance d'autant depuis 0.
     expect(p.freshAt).toBe(
       Math.round(
-        (UPDATE_REWIND_MONTHS * 30 * 24 * featureCost(automation)) / (6 * G),
+        (UPDATE_REWIND_MONTHS * 30 * 24 * featureCost(automation)) / 31,
       ),
     );
   });
@@ -189,7 +249,7 @@ describe("productSlice", () => {
       addFeature({
         productId: 1,
         featureId: "automation",
-        consumed: consumed(ComponentType.CODE, 8, ComponentQuality.BON),
+        consumed: consumed("code", 8),
         time: 100,
       }),
     );
@@ -208,7 +268,7 @@ describe("productSlice", () => {
       addFeature({
         productId: 1,
         featureId: "plugins",
-        consumed: consumed(ComponentType.CODE, 10, ComponentQuality.BON),
+        consumed: consumed("code", 10),
         time: 100,
       }),
     );

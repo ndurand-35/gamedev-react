@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 
-import { ComponentType, StartedContract } from "@/data/interface";
+import { Recipe, StartedContract } from "@/data/interface";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import {
   EARLY_DELIVERY_RATIO,
   deliverContract,
-  selectBestComponents,
+  selectComponents,
 } from "@/data/utils";
 
 /**
@@ -20,22 +20,18 @@ export const useContractDelivery = (contract: StartedContract) => {
   // Sélection sur le stock RÉEL : c'est elle qui doit décider si le bouton est
   // actif, puisque c'est exactement ce que `deliverContract` consommera.
   const selection = useMemo(
-    () => selectBestComponents(stock, contract.requirements),
+    () => selectComponents(stock, contract.requirements),
     [stock, contract.requirements],
   );
   const deliverable = selection.missing.length === 0;
 
-  // Ce que le stock couvre déjà, par type : la sélection ne remonte que le
+  // Ce que le stock couvre déjà, par pièce : la sélection ne remonte que le
   // manque, le reste est donc réputé disponible.
-  const heldByType = useMemo(() => {
-    const held: Record<ComponentType, number> = {
-      [ComponentType.CODE]: 0,
-      [ComponentType.VISUEL]: 0,
-      [ComponentType.UX]: 0,
-    };
+  const heldByKind = useMemo(() => {
+    const held: Recipe = {};
     for (const req of contract.requirements) {
-      const missing = selection.missing.find((m) => m.type === req.type);
-      held[req.type] = req.quantity - (missing?.quantity ?? 0);
+      const missing = selection.missing.find((m) => m.kind === req.kind);
+      held[req.kind] = req.quantity - (missing?.quantity ?? 0);
     }
     return held;
   }, [contract.requirements, selection.missing]);
@@ -48,7 +44,7 @@ export const useContractDelivery = (contract: StartedContract) => {
     time - contract.startDate < contract.time * EARLY_DELIVERY_RATIO;
   const deliver = () => dispatch(deliverContract(contract.id));
 
-  return { deliverable, heldByType, hoursLeft, daysLeft, early, deliver };
+  return { deliverable, heldByKind, hoursLeft, daysLeft, early, deliver };
 };
 
 /** « 3 jours », « 1 jour », « Délai dépassé ». */

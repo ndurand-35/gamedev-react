@@ -89,6 +89,8 @@ const STARTER_STOCK = starterStock();
 export const DEFAULT_COMPONENT_STATE: ComponentState = {
   stock: STARTER_STOCK,
   productionProgress: {},
+  productionJobs: {},
+  productionWaiting: {},
   nextComponentId: STARTER_STOCK.length + 1,
 };
 

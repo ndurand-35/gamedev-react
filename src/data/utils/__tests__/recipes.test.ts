@@ -6,13 +6,19 @@ import {
   COMPONENT_KINDS,
   COMPONENT_KIND_BY_ID,
   ComponentKindId,
+  ComponentTier,
   TIER_GATE,
+  composeFamily,
   craftBlocker,
   craftableKinds,
+  highestCraftableTier,
   isKindAvailable,
+  missingTechnology,
+  kindsAt,
   kindTechnologies,
   kindValue,
   laborByTier,
+  netDeficits,
   recipeValue,
 } from "@/data/utils/recipes";
 import { timeOfYear } from "@/data/utils/technology";
@@ -90,14 +96,23 @@ describe("technologies", () => {
     expect(isKindAvailable("mobile", timeOfYear(2007))).toBe(false);
     expect(isKindAvailable("mobile", timeOfYear(2008))).toBe(true);
   });
+
+  it("date l'invention par la dernière technologie qui manque", () => {
+    // La Plateforme cloud attend les réseaux (1985) puis internet (1995) :
+    // c'est internet qui la date, dès 1970 comme en 1990.
+    expect(missingTechnology("cloud", 0)?.id).toBe("internet");
+    expect(missingTechnology("cloud", timeOfYear(1990))?.id).toBe("internet");
+    expect(missingTechnology("cloud", timeOfYear(1995))).toBeUndefined();
+    expect(missingTechnology("moteur", 0)).toBeUndefined();
+  });
 });
 
 describe("qui sait fabriquer quoi", () => {
-  const dev = (code: number) => ({
-    specialty: ComponentType.CODE,
+  // Stat de Code donnée en points affichés ; Visuel et UX au plancher.
+  const dev = (code: number, others = 0) => ({
     codeStat: code * STAT_SCALE,
-    visualStat: 20 * STAT_SCALE,
-    uxStat: 20 * STAT_SCALE,
+    visualStat: others * STAT_SCALE,
+    uxStat: others * STAT_SCALE,
   });
   const LATE = timeOfYear(2010);
 
@@ -106,22 +121,108 @@ describe("qui sait fabriquer quoi", () => {
     expect(craftBlocker(dev(TIER_GATE[2]), "module", LATE)).toBeNull();
     expect(craftBlocker(dev(10), "moteur", LATE)).toBe("skill");
     expect(craftBlocker(dev(11), "moteur", LATE)).toBeNull();
+    expect(craftBlocker(dev(15), "cloud", LATE)).toBe("skill");
     expect(craftBlocker(dev(16), "cloud", LATE)).toBeNull();
   });
 
-  it("un spécialiste reste dans sa famille, un fullstack va partout", () => {
-    expect(craftBlocker(dev(20), "illustration", LATE)).toBe("specialty");
-    const fullstack = { ...dev(20), specialty: "FULLSTACK" as const };
-    expect(craftBlocker(fullstack, "illustration", LATE)).toBeNull();
+  it("n'importe qui fabrique les composants de base, quelle que soit sa stat", () => {
+    for (const id of ["code", "visuel", "ux"] as const) {
+      expect(craftBlocker(dev(0), id, 0)).toBeNull();
+    }
+  });
+
+  it("aucune restriction de spécialité : seule la stat de la famille compte", () => {
+    // Un profil Code avec 20 en Visuel fait des Illustrations…
+    expect(craftBlocker(dev(20, 20), "illustration", LATE)).toBeNull();
+    // …mais pas sans la stat Visuel, quel que soit son niveau en Code.
+    expect(craftBlocker(dev(20, 5), "illustration", LATE)).toBe("skill");
+  });
+
+  it("le décalage de seuil (traits) avance ou recule l'accès", () => {
+    // Seuil du niveau 2 : 6 points.
+    expect(craftBlocker(dev(5), "module", LATE, -1)).toBeNull();
+    expect(craftBlocker(dev(6), "module", LATE, 1)).toBe("skill");
+    expect(craftBlocker(dev(7), "module", LATE, 1)).toBeNull();
+    // Le niveau 1 reste ouvert à tous.
+    expect(craftBlocker(dev(0), "code", LATE, 1)).toBeNull();
   });
 
   it("la technologie bloque avant la compétence", () => {
     expect(craftBlocker(dev(5), "reseau", 0)).toBe("technology");
+    expect(craftBlocker(dev(20), "reseau", 0)).toBe("technology");
   });
 
-  it("liste ce qu'on sait faire, du plus haut niveau au plus bas", () => {
-    const kinds = craftableKinds(dev(12), 0).map((k) => k.id);
+  it("liste ce qu'on sait faire dans une famille, du plus haut niveau au plus bas", () => {
+    const kinds = craftableKinds(dev(12), ComponentType.CODE, 0).map(
+      (k) => k.id,
+    );
     expect(kinds).toEqual(["moteur", "module", "bdd", "code"]);
-    expect(craftableKinds(dev(0), 0).map((k) => k.id)).toEqual(["code"]);
+    expect(
+      craftableKinds(dev(0), ComponentType.CODE, 0).map((k) => k.id),
+    ).toEqual(["code"]);
+    // Plus tard, les réseaux sont inventés : le Réseau s'ajoute.
+    expect(
+      craftableKinds(dev(12), ComponentType.CODE, LATE).map((k) => k.id),
+    ).toEqual(["moteur", "reseau", "module", "bdd", "code"]);
+    // Dans une autre famille, c'est la stat de cette famille qui compte.
+    expect(
+      craftableKinds(dev(20, 7), ComponentType.VISUEL, 0).map((k) => k.id),
+    ).toEqual(["illustration", "charte", "visuel"]);
+  });
+
+  it("donne le plus haut niveau maîtrisé", () => {
+    expect(highestCraftableTier(dev(0), ComponentType.CODE, LATE)).toBe(1);
+    expect(highestCraftableTier(dev(12), ComponentType.CODE, LATE)).toBe(3);
+    expect(highestCraftableTier(dev(16), ComponentType.CODE, LATE)).toBe(4);
+    // Avant Internet, pas de Plateforme cloud.
+    expect(highestCraftableTier(dev(16), ComponentType.CODE, 0)).toBe(3);
+  });
+});
+
+describe("demande nette", () => {
+  it("une pièce manquante ajoute ses ingrédients, eux-mêmes déduits du stock", () => {
+    expect(netDeficits({ moteur: 1 }, {})).toEqual({
+      moteur: 1,
+      module: 2,
+      bdd: 1,
+      code: 2 * 3 + 2,
+      ux: 1,
+    });
+    // Deux Modules en stock : il ne reste que la BDD et ses ingrédients.
+    expect(netDeficits({ moteur: 1 }, { module: 2 })).toEqual({
+      moteur: 1,
+      bdd: 1,
+      code: 2,
+      ux: 1,
+    });
+    // Le Moteur est là : plus rien à faire.
+    expect(netDeficits({ moteur: 1 }, { moteur: 1 })).toEqual({});
+  });
+});
+
+describe("composition des demandes", () => {
+  it("compose une liste qui vaut exactement le budget en unités", () => {
+    const pick = (f: ComponentType, t: ComponentTier) =>
+      kindsAt(f, t, 0)[0]?.id;
+    const recipe = composeFamily(ComponentType.CODE, 100, 3, pick);
+    expect(recipeValue(recipe)).toBe(100);
+    expect(Object.keys(recipe)).toContain("moteur");
+    expect(Object.keys(recipe)).not.toContain("cloud");
+  });
+
+  it("niveau maximal 1 : que des composants de base", () => {
+    expect(composeFamily(ComponentType.UX, 12, 1, () => "parcours")).toEqual({
+      ux: 12,
+    });
+  });
+
+  it("ne liste que les pièces déjà inventées", () => {
+    expect(kindsAt(ComponentType.CODE, 3, 0).map((k) => k.id)).toEqual([
+      "moteur",
+    ]);
+    expect(kindsAt(ComponentType.CODE, 4, 0)).toEqual([]);
+    expect(
+      kindsAt(ComponentType.CODE, 4, timeOfYear(2010)).map((k) => k.id),
+    ).toEqual(["cloud"]);
   });
 });

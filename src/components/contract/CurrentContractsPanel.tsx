@@ -2,12 +2,9 @@ import { FC, ReactElement } from "react";
 import { NavLink } from "react-router-dom";
 import { NavArrowRight, Page } from "iconoir-react";
 
-import {
-  ComponentType,
-  QUALITY_LABELS,
-  StartedContract,
-} from "@/data/interface";
-import { COMPONENT_ICON } from "@/components/component";
+import { ComponentType, StartedContract } from "@/data/interface";
+import { KindPill } from "@/components/component";
+import { kindFamily, kindLabel } from "@/data/utils/recipes";
 import {
   deadlineLabel,
   useContractDelivery,
@@ -30,7 +27,7 @@ const TYPE_FILL: Record<ComponentType, string> = {
 const MissionCard: FC<{ contract: StartedContract }> = ({
   contract,
 }): ReactElement => {
-  const { deliverable, heldByType, hoursLeft, daysLeft, early, deliver } =
+  const { deliverable, heldByKind, hoursLeft, daysLeft, early, deliver } =
     useContractDelivery(contract);
 
   // Le bandeau vire à l'alerte quand le délai presse.
@@ -79,34 +76,28 @@ const MissionCard: FC<{ contract: StartedContract }> = ({
 
         <ul className="flex flex-col gap-2">
           {contract.requirements.map((req) => {
-            const Icon = COMPONENT_ICON[req.type];
-            const held = Math.min(heldByType[req.type], req.quantity);
+            const label = kindLabel(req.kind);
+            const fill = TYPE_FILL[kindFamily(req.kind)];
+            const held = Math.min(heldByKind[req.kind] ?? 0, req.quantity);
             return (
               <li
-                key={req.type}
+                key={req.kind}
                 className="flex items-center gap-2 text-sm font-extrabold"
-                title={
-                  req.minQuality != null
-                    ? `${req.type} : qualité ${QUALITY_LABELS[req.minQuality]} au moins`
-                    : `${req.type} : toute qualité`
-                }
               >
-                <span
-                  className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-ink text-white ${TYPE_FILL[req.type]}`}
-                >
-                  <Icon width={12} height={12} strokeWidth={2.6} />
+                <KindPill kind={req.kind} size={22} />
+                <span className="w-24 shrink-0 truncate" title={label}>
+                  {label}
                 </span>
-                <span className="w-12 shrink-0">{req.type}</span>
                 <span
                   role="progressbar"
-                  aria-label={`${req.type} : ${held} sur ${req.quantity}`}
+                  aria-label={`${label} : ${held} sur ${req.quantity}`}
                   aria-valuenow={held}
                   aria-valuemin={0}
                   aria-valuemax={req.quantity}
                   className="h-3 min-w-0 flex-1 overflow-hidden rounded-full border-2 border-ink bg-base-300"
                 >
                   <span
-                    className={`block h-full ${TYPE_FILL[req.type]}`}
+                    className={`block h-full ${fill}`}
                     style={{ width: `${(held / req.quantity) * 100}%` }}
                   />
                 </span>

@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { COMPONENT_GRAIN as G } from "@/data/interface";
 import {
-  ComponentType,
+  CONSUMPTION_FACTOR,
   GENRES,
   PRODUCT_GENRE_ORDER,
   Product,
   ProductGenre,
   ProductStatus,
+  recipeEntries,
+  recipeValue,
 } from "@/data/interface";
 import {
   FEATURES,
@@ -27,6 +29,12 @@ import {
   productFeatures,
 } from "@/data/utils/feature";
 import { productAppeal } from "@/data/utils/product";
+import { isKindAvailable, kindTier } from "@/data/utils/recipes";
+import {
+  START_YEAR,
+  featureTechnology,
+  timeOfYear,
+} from "@/data/utils/technology";
 
 const product = (
   genre: ProductGenre,
@@ -34,7 +42,7 @@ const product = (
   over: Partial<Product> = {},
 ): Product => {
   const requirements = featuresRequirements(features);
-  const size = Object.values(requirements).reduce((a, n) => a + n, 0);
+  const size = recipeValue(requirements);
   return {
     id: 1,
     name: "P",
@@ -43,7 +51,7 @@ const product = (
     features,
     requirements,
     invested: { ...requirements },
-    qualitySum: 2.5 * size, // qualité 2,5 → multiplicateur 1
+    qualitySum: 2.5 * size, // finition 2,5 → multiplicateur 1
     qualityCount: size,
     launchTime: 0,
     freshAt: 0,
@@ -99,24 +107,69 @@ describe("catalogue", () => {
 });
 
 describe("coûts et besoins", () => {
-  it("somme les coûts d'un assemblage type par type", () => {
-    expect(featuresRequirements(["core_tool", "automation"])).toEqual({
-      [ComponentType.CODE]: (4 + 5) * G,
-      [ComponentType.VISUEL]: (1 + 1) * G,
-      [ComponentType.UX]: (1 + 2) * G,
-    });
-    expect(featuresRequirements(["inconnu"])).toEqual({
-      [ComponentType.CODE]: 0,
-      [ComponentType.VISUEL]: 0,
-      [ComponentType.UX]: 0,
-    });
+  it("somme les coûts d'un assemblage pièce par pièce", () => {
+    const tool = FEATURE_BY_ID.core_tool.cost;
+    const automation = FEATURE_BY_ID.automation.cost;
+    const total = featuresRequirements(["core_tool", "automation"]);
+    const kinds = new Set([
+      ...Object.keys(tool),
+      ...Object.keys(automation),
+    ]) as Set<keyof typeof total>;
+    expect(Object.keys(total).sort()).toEqual([...kinds].sort());
+    for (const kind of kinds) {
+      expect(total[kind]).toBe((tool[kind] ?? 0) + (automation[kind] ?? 0));
+    }
+    expect(recipeValue(total)).toBe(
+      recipeValue(tool) + recipeValue(automation),
+    );
+    expect(featuresRequirements(["inconnu"])).toEqual({});
   });
 
-  it("exprime le coût d'une fonctionnalité en besoins, types nuls omis", () => {
+  it("exprime le coût d'une fonctionnalité en besoins, famille puis niveau", () => {
+    // Synchronisation cloud : des Bases de données, du Code et de l'UX.
+    expect(FEATURE_BY_ID.cloud_sync.cost).toEqual({ bdd: 2, code: 23, ux: 13 });
     expect(featureRequirements(FEATURE_BY_ID.cloud_sync)).toEqual([
-      { type: ComponentType.CODE, quantity: 5 * G },
-      { type: ComponentType.UX, quantity: 2 * G },
+      { kind: "bdd", quantity: 2 },
+      { kind: "code", quantity: 23 },
+      { kind: "ux", quantity: 13 },
     ]);
+  });
+
+  it("garde la taille d'avant la refonte, distincte du coût en pièces", () => {
+    expect(FEATURE_BY_ID.cloud_sync.size).toBe(7 * G);
+    expect(featureCost(FEATURE_BY_ID.cloud_sync)).toBe(7 * G);
+  });
+
+  it("coûte la taille × le facteur de consommation, à 2 unités près", () => {
+    for (const f of FEATURES) {
+      const expected = Math.round(f.size * CONSUMPTION_FACTOR);
+      expect(
+        Math.abs(recipeValue(f.cost) - expected),
+        `${f.id} : ${recipeValue(f.cost)} pour ${expected}`,
+      ).toBeLessThanOrEqual(2);
+      for (const [, q] of recipeEntries(f.cost)) {
+        expect(Number.isInteger(q) && q > 0, f.id).toBe(true);
+      }
+    }
+  });
+
+  it("garde les socles au niveau 2, sauf celui des Plateformes", () => {
+    for (const f of FEATURES.filter((f) => f.coreOf !== undefined)) {
+      const maxTier = Math.max(
+        ...recipeEntries(f.cost).map(([k]) => kindTier(k)),
+      );
+      if (f.id === "core_platform") expect(maxTier).toBeLessThanOrEqual(3);
+      else expect(maxTier, f.id).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("ne demande jamais une pièce pas encore inventée à l'époque de la fonctionnalité", () => {
+    for (const f of FEATURES) {
+      const era = timeOfYear(featureTechnology(f.id)?.year ?? START_YEAR);
+      for (const [kind] of recipeEntries(f.cost)) {
+        expect(isKindAvailable(kind, era), `${f.id} → ${kind}`).toBe(true);
+      }
+    }
   });
 });
 
@@ -133,8 +186,8 @@ describe("affinité et attractivité", () => {
 
   it("à coût égal, une brique de métier vaut plus qu'une générique tiède", () => {
     const core = featureCost(coreFeature(ProductGenre.JEU));
-    const story = product(ProductGenre.JEU, ["core_game", "story_mode"]); // 11 × 1,4
-    const ui = product(ProductGenre.JEU, ["core_game", "ui_polish"]); // 8 × 1,2
+    const story = product(ProductGenre.JEU, ["core_game", "story_mode"]); // taille 11 × 1,4
+    const ui = product(ProductGenre.JEU, ["core_game", "ui_polish"]); // taille 8 × 1,2
     expect(productBaseAppeal(story)).toBeCloseTo(core + 11 * G * 1.4);
     expect(productBaseAppeal(ui)).toBeCloseTo(core + 8 * G * 1.2);
     expect(productBaseAppeal(story)).toBeGreaterThan(productBaseAppeal(ui));
@@ -148,11 +201,12 @@ describe("affinité et attractivité", () => {
 
   it("un produit sans fonctionnalité garde sa taille brute", () => {
     const legacy = product(ProductGenre.OUTIL, [], {
-      requirements: { Code: 5, Visuel: 3, UX: 2 } as Product["requirements"],
-      invested: { Code: 5, Visuel: 3, UX: 2 } as Product["invested"],
+      requirements: { code: 7, visuel: 4, ux: 2 },
+      invested: { code: 7, visuel: 4, ux: 2 },
       qualitySum: 25,
       qualityCount: 10,
     });
+    // 13 pièces de base / 1,3 → taille 10.
     expect(productBaseAppeal(legacy)).toBe(10);
   });
 });

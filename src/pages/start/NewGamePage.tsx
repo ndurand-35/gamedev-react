@@ -4,12 +4,10 @@ import {
   PersonType,
   ProductionPerson,
   ProductionStatKey,
-  QUALITY_LABELS,
-  QUALITY_STAT_STEP,
   STAT_SCALE,
   Specialty,
   getBuildingMonthlyCharges,
-  qualityFromAverage,
+  TIER_GATE,
 } from "@/data/interface";
 import { initializeCompanyState } from "@/data/redux/companySlice";
 import { initializeComponentState } from "@/data/redux/componentSlice";
@@ -108,10 +106,13 @@ const FULLSTACK_PROFILE = PROFILES[0];
 const findProfile = (specialty: Specialty): ProfileDef =>
   PROFILES.find((p) => p.specialty === specialty) ?? FULLSTACK_PROFILE;
 
-// Qualité moyenne produite : rollComponent part de stat / QUALITY_STAT_STEP, on affiche
-// donc l'espérance sans le hasard.
-const previewQuality = (stat: number) =>
-  QUALITY_LABELS[qualityFromAverage(stat / QUALITY_STAT_STEP)];
+// Niveau de pièces que la stat ouvre (cf. les seuils de compétence).
+const previewQuality = (stat: number): string => {
+  const tier = ([4, 3, 2, 1] as const).find(
+    (t) => stat >= TIER_GATE[t] * STAT_SCALE,
+  );
+  return tier === 1 ? "pièces de base" : `jusqu'au niveau ${tier}`;
+};
 
 const STARTER_BUILDING = DEFAULT_COMPANY_STATE.buildingList[0];
 const formatEuros = (n: number) => `${n.toLocaleString("fr-FR")}\u00a0€`;

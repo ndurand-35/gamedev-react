@@ -8,6 +8,7 @@ import {
   Person,
   ProductionPerson,
   STAT_KEY_BY_TYPE,
+  ComponentKindId,
 } from "@/data/interface";
 import { DEFAULT_EMPLOYE_STATE } from "@/data/utils/constant";
 
@@ -173,7 +174,11 @@ export const employeSlice = createSlice({
     // Départ en congés : absent jusqu'à `until` (cf. `utils/leave`).
     startLeave(
       state,
-      action: PayloadAction<{ employeId: number; until: number; morale: number }>,
+      action: PayloadAction<{
+        employeId: number;
+        until: number;
+        morale: number;
+      }>,
     ) {
       const employe = state.employeList.find(
         (e: Person) => e.id === action.payload.employeId,
@@ -257,7 +262,25 @@ export const employeSlice = createSlice({
         (e: Person) => e.id === action.payload.employeId,
       ) as ProductionPerson | undefined;
       if (!employe) return;
+      if (employe.assignedComponentType !== action.payload.componentType) {
+        // Nouvelle famille : le poste repart en Auto.
+        employe.post = null;
+      }
       employe.assignedComponentType = action.payload.componentType;
+    },
+    /** Poste : une pièce précise de sa famille, ou Auto (`null`). */
+    setPost(
+      state,
+      action: PayloadAction<{
+        employeId: number;
+        post: ComponentKindId | null;
+      }>,
+    ) {
+      const employe = state.employeList.find(
+        (e: Person) => e.id === action.payload.employeId,
+      ) as ProductionPerson | undefined;
+      if (!employe) return;
+      employe.post = action.payload.post;
     },
     adjustMorale(
       state,
@@ -387,6 +410,7 @@ export const {
   setAvatar,
   assignBuilding,
   assignComponentType,
+  setPost,
   adjustMorale,
   resignEmploye,
   setTraining,

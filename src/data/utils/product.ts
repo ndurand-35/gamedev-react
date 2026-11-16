@@ -1,5 +1,6 @@
 import {
   COMPONENT_GRAIN,
+  CONSUMPTION_FACTOR,
   CompetitorProduct,
   ComponentType,
   GENRES,
@@ -19,6 +20,12 @@ import {
   revenueDecayMultiplier,
 } from "@/data/utils/economy";
 import { productBaseAppeal } from "@/data/utils/feature";
+import {
+  Recipe,
+  isComponentKindId,
+  recipeToRequirements,
+  unitsByFamily,
+} from "@/data/utils/recipes";
 import {
   naturalPopularityFromScore,
   popularityAppealMultiplier,
@@ -88,14 +95,28 @@ export const LAUNCH_SCORE_QUALITY_WEIGHT = 0.7;
 
 // ── Accès défensifs (produits d'une partie antérieure aux genres) ───────────
 
-/** Genre le plus proche du mix demandé : le type dominant fait le genre. */
+/** Genre le plus proche du mix demandé : la famille dominante fait le genre. */
 export const inferGenre = (
-  requirements: Record<ComponentType, number>,
+  requirements: Recipe | Partial<Record<ComponentType, number>>,
 ): ProductGenre => {
-  const code = requirements[ComponentType.CODE] ?? 0;
-  const visuel = requirements[ComponentType.VISUEL] ?? 0;
-  const ux = requirements[ComponentType.UX] ?? 0;
-  const total = code + visuel + ux;
+  // Une sauvegarde ancienne (migrée pas à pas) compte encore par type :
+  // « { Code: 4 } » vaut alors 4 unités d'avant la refonte.
+  const legacy = {
+    [ComponentType.CODE]: 0,
+    [ComponentType.VISUEL]: 0,
+    [ComponentType.UX]: 0,
+  };
+  const recipe: Recipe = {};
+  for (const [key, n] of Object.entries(requirements)) {
+    if (typeof n !== "number") continue;
+    if (key in legacy) legacy[key as ComponentType] += n * CONSUMPTION_FACTOR;
+    else if (isComponentKindId(key)) recipe[key] = n;
+  }
+  const units = unitsByFamily(recipeToRequirements(recipe));
+  const code = units[ComponentType.CODE] + legacy[ComponentType.CODE];
+  const visuel = units[ComponentType.VISUEL] + legacy[ComponentType.VISUEL];
+  const ux = units[ComponentType.UX] + legacy[ComponentType.UX];
+  const total = (code + visuel + ux) / CONSUMPTION_FACTOR;
   if (total >= GENRES[ProductGenre.PLATEFORME].minSize) {
     return ProductGenre.PLATEFORME;
   }

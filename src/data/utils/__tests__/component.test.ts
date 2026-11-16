@@ -1,249 +1,219 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  COMPONENT_DECAY_PERIOD_HOURS,
-  COMPONENT_FRESHNESS_HOURS,
-  Component,
-  ComponentQuality,
   ComponentType,
   PersonType,
+  Product,
+  ProductStatus,
   ProductionPerson,
-  componentDecayLevels,
-  computeComponentDecay,
-  hoursBeforeNextDecay,
+  StartedContract,
 } from "@/data/interface";
 import {
-  decayComponents,
+  demandOf,
+  demandQueueOf,
   produceComponents,
-  rollComponent,
+  productionContext,
+  requirementsLabel,
+  totalRequirementQuantity,
 } from "@/data/utils/component";
 import {
   PRODUCTION_THRESHOLD,
-  applyDecayTick,
   applyProductionTick,
 } from "@/data/redux/componentSlice";
 import { pushNotification } from "@/data/redux/notificationSlice";
+import { FOUNDER_ID } from "@/data/utils/research";
 import type { RootState } from "@/data/redux/store";
 
-const makeComponent = (over: Partial<Component> = {}): Component => ({
-  id: 1,
-  type: ComponentType.CODE,
-  quality: ComponentQuality.BON,
-  producedBy: 1,
-  producedAt: 0,
-  ...over,
+describe("listes de pièces", () => {
+  it("libellé court et total d'une liste d'exigences", () => {
+    const reqs = [
+      { kind: "module" as const, quantity: 2 },
+      { kind: "code" as const, quantity: 5 },
+    ];
+    expect(requirementsLabel(reqs)).toBe("2 Module, 5 Code");
+    expect(totalRequirementQuantity(reqs)).toBe(7);
+  });
 });
 
-describe("obsolescence des composants", () => {
-  it("ne dégrade rien pendant la période de fraîcheur", () => {
-    const c = makeComponent();
-    expect(componentDecayLevels(c, COMPONENT_FRESHNESS_HOURS)).toBe(0);
-    expect(computeComponentDecay(c, COMPONENT_FRESHNESS_HOURS)).toBeNull();
-  });
+describe("demandOf", () => {
+  it("additionne les contrats et ce qui manque encore aux produits en développement", () => {
+    const developing = {
+      status: ProductStatus.DEVELOPING,
+      requirements: { code: 10, maquette: 2 },
+      invested: { code: 4, maquette: 2 },
+    } as unknown as Product;
+    const launched = {
+      status: ProductStatus.LAUNCHED,
+      requirements: { moteur: 5 },
+      invested: {},
+    } as unknown as Product;
 
-  it("retire un niveau par palier écoulé après la fraîcheur", () => {
-    const c = makeComponent();
-    const t = COMPONENT_FRESHNESS_HOURS + COMPONENT_DECAY_PERIOD_HOURS;
-
-    const first = computeComponentDecay(c, t);
-    expect(first).toEqual({
-      id: 1,
-      quality: ComponentQuality.CORRECT,
-      lastDecayAt: t,
-    });
-
-    const twoPeriods = computeComponentDecay(
-      c,
-      COMPONENT_FRESHNESS_HOURS + 2 * COMPONENT_DECAY_PERIOD_HOURS,
-    );
-    expect(twoPeriods?.quality).toBe(ComponentQuality.MEDIOCRE);
-  });
-
-  it("repart du dernier palier appliqué", () => {
-    const c = makeComponent({
-      quality: ComponentQuality.CORRECT,
-      lastDecayAt: 1000,
-    });
     expect(
-      computeComponentDecay(c, 1000 + COMPONENT_DECAY_PERIOD_HOURS - 1),
-    ).toBeNull();
-    expect(
-      computeComponentDecay(c, 1000 + COMPONENT_DECAY_PERIOD_HOURS),
-    ).toEqual({
-      id: 1,
-      quality: ComponentQuality.MEDIOCRE,
-      lastDecayAt: 1000 + COMPONENT_DECAY_PERIOD_HOURS,
-    });
-  });
-
-  it("plafonne au plancher Bâclé tout en consommant les paliers", () => {
-    const c = makeComponent({ quality: ComponentQuality.BACLE });
-    const t = COMPONENT_FRESHNESS_HOURS + 3 * COMPONENT_DECAY_PERIOD_HOURS;
-    const update = computeComponentDecay(c, t);
-    expect(update?.quality).toBe(ComponentQuality.BACLE);
-    expect(update?.lastDecayAt).toBe(t);
-  });
-
-  it("expose le délai avant la prochaine perte de niveau", () => {
-    const c = makeComponent();
-    expect(hoursBeforeNextDecay(c, 0)).toBe(
-      COMPONENT_FRESHNESS_HOURS + COMPONENT_DECAY_PERIOD_HOURS,
-    );
-    expect(
-      hoursBeforeNextDecay(
-        c,
-        COMPONENT_FRESHNESS_HOURS + COMPONENT_DECAY_PERIOD_HOURS + 50,
+      demandOf(
+        [
+          { requirements: [{ kind: "code", quantity: 3 }] },
+          {
+            requirements: [
+              { kind: "code", quantity: 1 },
+              { kind: "module", quantity: 2 },
+            ],
+          },
+        ] as unknown as StartedContract[],
+        [developing, launched],
       ),
-    ).toBe(0);
-  });
-
-  it("dispatche un seul tick pour les composants concernés", () => {
-    const dispatch = vi.fn();
-    const fresh = makeComponent({ id: 2, producedAt: 100 });
-    const old = makeComponent({ id: 3, producedAt: 0 });
-    const state = {
-      engine: {
-        time: COMPONENT_FRESHNESS_HOURS + COMPONENT_DECAY_PERIOD_HOURS,
-      },
-      component: { stock: [fresh, old] },
-    } as any;
-
-    decayComponents(dispatch, state);
-
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch).toHaveBeenCalledWith(
-      applyDecayTick([
-        {
-          id: 3,
-          quality: ComponentQuality.CORRECT,
-          lastDecayAt: COMPONENT_FRESHNESS_HOURS + COMPONENT_DECAY_PERIOD_HOURS,
-        },
-      ]),
-    );
-  });
-
-  it("ne dispatche rien quand aucun composant n'a vieilli", () => {
-    const dispatch = vi.fn();
-    const state = {
-      engine: { time: 10 },
-      component: { stock: [makeComponent()] },
-    } as any;
-
-    decayComponents(dispatch, state);
-    expect(dispatch).not.toHaveBeenCalled();
+    ).toEqual({ code: 3 + 1 + 6, module: 2 });
   });
 });
 
-// ── Tirage de qualité et coup de génie ───────────────────────────────────────
+describe("demandQueueOf", () => {
+  it("range les contrats par échéance, puis les produits en développement", () => {
+    const contract = (startDate: number, time: number, quantity: number) =>
+      ({
+        startDate,
+        time,
+        requirements: [{ kind: "code", quantity }],
+      }) as unknown as StartedContract;
+    const developing = {
+      status: ProductStatus.DEVELOPING,
+      requirements: { ux: 3 },
+      invested: { ux: 1 },
+    } as unknown as Product;
 
-// Le tirage consomme deux aléas, dans l'ordre : variance, puis bonus rare.
-const mockRolls = (variance: number, bonus: number) =>
-  vi
-    .spyOn(Math, "random")
-    .mockReturnValueOnce(variance)
-    .mockReturnValueOnce(bonus);
-
-describe("rollComponent", () => {
-  afterEach(() => vi.restoreAllMocks());
-
-  it("sans bonus, la qualité suit la stat et rien n'est fêté", () => {
-    mockRolls(0.5, 0.5);
-    expect(rollComponent(150)).toEqual({
-      quality: ComponentQuality.BON,
-      lucky: false,
-    });
-  });
-
-  it("au plafond des stats, Excellent n'arrive que par le bonus rare", () => {
-    mockRolls(0.9999, 0.5);
-    expect(rollComponent(200).quality).toBe(ComponentQuality.TRES_BON);
-
-    mockRolls(0.5, 0);
-    expect(rollComponent(200)).toEqual({
-      quality: ComponentQuality.EXCELLENT,
-      lucky: true,
-    });
-  });
-
-  it("un bonus absorbé par le plafond de qualité n'est pas un coup de génie", () => {
-    mockRolls(0.5, 0);
-    expect(rollComponent(250)).toEqual({
-      quality: ComponentQuality.EXCELLENT,
-      lucky: false,
-    });
+    expect(
+      demandQueueOf(
+        [contract(0, 500, 1), contract(100, 200, 2), contract(0, 1000, 3)],
+        [developing],
+      ),
+    ).toEqual([{ code: 2 }, { code: 1 }, { code: 3 }, { ux: 2 }]);
   });
 });
 
-describe("produceComponents — coup de génie", () => {
+const producer: ProductionPerson = {
+  id: 2,
+  sex: "F",
+  firstName: "Alice",
+  lastName: "Martin",
+  salary: 0,
+  personType: PersonType.PROD,
+  morale: 100,
+  buildingId: 1,
+  specialty: "FULLSTACK",
+  codeStat: 200,
+  codeMaxStat: 200,
+  visualStat: 100,
+  visualMaxStat: 200,
+  uxStat: 100,
+  uxMaxStat: 200,
+  assignedComponentType: ComponentType.CODE,
+};
+
+const stateAboutToProduce = (
+  over: { researching?: boolean; interview?: unknown } = {},
+) =>
+  ({
+    // Jeudi 10 h : heures de bureau.
+    engine: { time: 10 },
+    research: {
+      acquired: [],
+      current: over.researching ? { id: "x", startedAt: 0 } : null,
+    },
+    company: { buildingList: [] },
+    employe: { employeList: [producer], interview: over.interview ?? null },
+    task: { taskList: [{ requirements: [{ kind: "code", quantity: 4 }] }] },
+    product: { products: [] },
+    component: {
+      // Il ne manque qu'un point au Code en cours.
+      productionProgress: { 2: PRODUCTION_THRESHOLD - 1 },
+      productionJobs: { 2: { kind: "code", reserved: [] } },
+      productionWaiting: {},
+      stock: [],
+      nextComponentId: 7,
+    },
+  }) as unknown as RootState;
+
+describe("productionContext", () => {
+  it("reprend l'heure, la demande des contrats et le seuil de production", () => {
+    const c = productionContext(stateAboutToProduce());
+    expect(c.time).toBe(10);
+    expect(c.demand).toEqual([{ code: 4 }]);
+    expect(c.threshold).toBe(PRODUCTION_THRESHOLD);
+    expect(c.busy.size).toBe(0);
+  });
+
+  it("met le fondateur de côté quand il se forme ou fait passer un entretien", () => {
+    expect(
+      productionContext(stateAboutToProduce({ researching: true })).busy.has(
+        FOUNDER_ID,
+      ),
+    ).toBe(true);
+    expect(
+      productionContext(stateAboutToProduce({ interview: {} })).busy.has(
+        FOUNDER_ID,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("produceComponents", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  const producer: ProductionPerson = {
-    id: 2,
-    sex: "F",
-    firstName: "Alice",
-    lastName: "Martin",
-    salary: 0,
-    personType: PersonType.PROD,
-    morale: 100,
-    buildingId: 1,
-    specialty: "FULLSTACK",
-    codeStat: 200,
-    codeMaxStat: 200,
-    visualStat: 100,
-    visualMaxStat: 200,
-    uxStat: 100,
-    uxMaxStat: 200,
-    assignedComponentType: ComponentType.CODE,
-  };
+  const tickOf = (dispatch: ReturnType<typeof vi.fn>) =>
+    dispatch.mock.calls.find(([a]) => a.type === applyProductionTick.type)![0]
+      .payload;
 
-  const stateAboutToProduce = () =>
-    ({
-      // Jeudi 10 h : heures de bureau.
-      engine: { time: 10 },
-      research: { acquired: [], current: null },
-      company: { buildingList: [] },
-      employe: { employeList: [producer] },
-      component: {
-        productionProgress: { 2: PRODUCTION_THRESHOLD - 1 },
-        stock: [],
-      },
-    }) as unknown as RootState;
-
-  it("marque le composant et le signale au journal", () => {
-    mockRolls(0.5, 0);
+  it("une production ordinaire rend l'atelier mis à jour, sans notification", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const dispatch = vi.fn();
     produceComponents(dispatch as never, stateAboutToProduce());
 
-    const tick = dispatch.mock.calls.find(
-      ([a]) => a.type === applyProductionTick.type,
-    );
-    expect(tick![0].payload.produced).toEqual([
-      expect.objectContaining({
-        quality: ComponentQuality.EXCELLENT,
-        lucky: true,
-      }),
+    const world = tickOf(dispatch);
+    expect(world.stock).toEqual([
+      {
+        id: 7,
+        kind: "code",
+        type: ComponentType.CODE,
+        producedBy: 2,
+        producedAt: 10,
+      },
     ]);
+    expect(world.nextId).toBe(8);
+    expect(
+      dispatch.mock.calls.some(([a]) => a.type === pushNotification.type),
+    ).toBe(false);
+  });
+
+  it("un coup de génie sur un composant de base en sort deux et le signale", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const dispatch = vi.fn();
+    produceComponents(dispatch as never, stateAboutToProduce());
+
+    const world = tickOf(dispatch);
+    expect(world.stock).toHaveLength(2);
+    expect(world.stock[0].lucky).toBe(true);
+    expect(world.stock[1].lucky).toBeUndefined();
     expect(dispatch).toHaveBeenCalledWith(
       pushNotification({
-        message:
-          "Coup de génie ! Alice Martin sort un composant Code Excellent.",
+        message: "Coup de génie ! Alice Martin sort deux Code d'un coup.",
         type: "success",
       }),
     );
   });
 
-  it("une production ordinaire ne notifie rien", () => {
-    mockRolls(0.5, 0.5);
+  it("un fondateur en formation ne produit rien", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const founder = { ...producer, id: FOUNDER_ID };
+    const state = stateAboutToProduce({ researching: true });
+    const withFounder = {
+      ...state,
+      employe: { ...state.employe, employeList: [founder] },
+      component: {
+        ...state.component,
+        productionProgress: { [FOUNDER_ID]: PRODUCTION_THRESHOLD - 1 },
+        productionJobs: { [FOUNDER_ID]: { kind: "code", reserved: [] } },
+      },
+    } as unknown as RootState;
     const dispatch = vi.fn();
-    produceComponents(dispatch as never, stateAboutToProduce());
-
-    const tick = dispatch.mock.calls.find(
-      ([a]) => a.type === applyProductionTick.type,
-    );
-    expect(tick![0].payload.produced).toHaveLength(1);
-    expect(tick![0].payload.produced[0].lucky).toBeUndefined();
-    expect(
-      dispatch.mock.calls.some(([a]) => a.type === pushNotification.type),
-    ).toBe(false);
+    produceComponents(dispatch as never, withFounder);
+    expect(tickOf(dispatch).stock).toEqual([]);
   });
 });

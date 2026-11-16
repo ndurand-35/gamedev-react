@@ -38,7 +38,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "La **qualité** d'un produit est la moyenne des qualités des composants qui y sont versés, sur 5. Elle évolue à chaque fonctionnalité ajoutée après le lancement.",
+        text: "La **finition** d'un produit, sur 5, tient au niveau des composants qui y sont versés : des composants de base donnent une finition de 2, des composants de niveau 4 une finition de 5, chacun pesant selon le travail qu'il contient. Elle évolue à chaque fonctionnalité ajoutée après le lancement.",
       },
       {
         type: "p",
@@ -144,9 +144,15 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
           ["Acquise", "Embarquée dans le produit."],
           ["En chantier", "Prévue dans un produit en développement."],
           ["Disponible", "Ajoutable maintenant avec le stock."],
-          ["Stock insuffisant", "Ajoutable, mais le stock ne couvre pas son coût."],
+          [
+            "Stock insuffisant",
+            "Ajoutable, mais le stock ne couvre pas son coût.",
+          ],
           ["Verrouillée", "Produit en développement ou retiré."],
-          ["À venir", "Pas encore inventée : une technologie la rendra possible."],
+          [
+            "À venir",
+            "Pas encore inventée : une technologie la rendra possible.",
+          ],
         ],
       },
       {
@@ -191,7 +197,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "Le lancement fige la **note publique** du produit, sur 10. Elle tient d'abord à la **qualité**, ensuite à la **taille** par rapport au minimum du genre.",
+        text: "Le lancement fige la **note publique** du produit, sur 10. Elle tient d'abord à la **finition**, ensuite à la **taille** par rapport au minimum du genre.",
       },
       {
         type: "p",
@@ -231,7 +237,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "Le 1er de chaque mois, un produit lancé peut attraper un **bug**. Le risque est plus élevé pour un produit de **faible qualité**, et grandit avec son **âge**. Les testeurs **QA** du studio interceptent une partie des bugs avant qu'ils n'atteignent le public.",
+        text: "Le 1er de chaque mois, un produit lancé peut attraper un **bug**. Le risque est plus élevé pour un produit de **faible finition**, et grandit avec son **âge**. Les testeurs **QA** du studio interceptent une partie des bugs avant qu'ils n'atteignent le public.",
       },
       {
         type: "p",
@@ -266,10 +272,19 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
         type: "table",
         head: ["Genre", "Règle"],
         rows: [
-          ["Outil", "Le bouche-à-oreille fait l'essentiel ; la publicité y porte peu."],
-          ["Service", "Popularité durable et lente ; chaque bug l'entame lourdement."],
+          [
+            "Outil",
+            "Le bouche-à-oreille fait l'essentiel ; la publicité y porte peu.",
+          ],
+          [
+            "Service",
+            "Popularité durable et lente ; chaque bug l'entame lourdement.",
+          ],
           ["Jeu", "La promotion porte loin, mais l'engouement retombe vite."],
-          ["Plateforme", "Effet réseau : chaque point pèse plus quand elle est déjà connue."],
+          [
+            "Plateforme",
+            "Effet réseau : chaque point pèse plus quand elle est déjà connue.",
+          ],
         ],
       },
       {
@@ -311,7 +326,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       {
         type: "list",
         items: [
-          "L'attractivité d'un produit dépend de ses **fonctionnalités**, de sa **qualité**, de sa **fraîcheur**, de ses **bugs** et de sa **popularité**.",
+          "L'attractivité d'un produit dépend de ses **fonctionnalités**, de sa **finition**, de sa **fraîcheur**, de ses **bugs** et de sa **popularité**.",
           "Le **pic de lancement** et une campagne marketing **Acquisition** ou **Rétention** en cours majorent ensuite le revenu.",
           "Les revenus des produits sont encaissés à la clôture du mois, maintenance déduite.",
         ],

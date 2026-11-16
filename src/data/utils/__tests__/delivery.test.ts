@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   Component,
-  ComponentQuality,
+  ComponentKindId,
   ComponentType,
   ContractType,
   StartedContract,
@@ -16,22 +16,27 @@ import {
   EARLY_DELIVERY_RATIO,
   computeContractPayout,
   contractReputationAllowance,
+  contractReputationGain,
   deliverContract,
   gameMonthKey,
-  qualityMultiplier,
   treatTasks,
 } from "@/data/utils/task";
+import { selectComponents } from "@/data/utils/component";
+import { kindFamily } from "@/data/utils/recipes";
 import { removeComponents } from "@/data/redux/componentSlice";
 import { removeTask, setTaskList } from "@/data/redux/taskSlice";
 import {
   addReputation,
+  addReputationByType,
   applyContractMalus,
   recordContractReputation,
   setMoney,
 } from "@/data/redux/companySlice";
 import type { RootState } from "@/data/redux/store";
 
-const makeContract = (over: Partial<StartedContract> = {}): StartedContract => ({
+const makeContract = (
+  over: Partial<StartedContract> = {},
+): StartedContract => ({
   id: 1,
   name: "Contrat test",
   time: 1000,
@@ -45,18 +50,23 @@ const makeContract = (over: Partial<StartedContract> = {}): StartedContract => (
   priceMalus: 300,
   type: ContractType.DEV,
   taskDifficulty: 10,
-  requirements: [{ type: ComponentType.CODE, quantity: 2 }],
+  requirements: [{ kind: "code", quantity: 2 }],
   ...over,
 });
 
-const makeComponent = (over: Partial<Component> = {}): Component => ({
-  id: 1,
-  type: ComponentType.CODE,
-  quality: ComponentQuality.BON,
-  producedBy: 1,
-  producedAt: 0,
-  ...over,
-});
+const makeComponent = (
+  over: Partial<Component> & { kind?: ComponentKindId } = {},
+): Component => {
+  const kind = over.kind ?? "code";
+  return {
+    id: 1,
+    kind,
+    type: kindFamily(kind),
+    producedBy: 1,
+    producedAt: 0,
+    ...over,
+  };
+};
 
 const stateWith = (over: {
   taskList?: StartedContract[];
@@ -77,25 +87,51 @@ const stateWith = (over: {
     engine: { time: over.time ?? 0 },
   }) as unknown as RootState;
 
-// Le solde ne dépend plus d'un avancement produit par les employés, mais de la
-// qualité du stock consommé au moment où le joueur décide de livrer.
+describe("selectComponents", () => {
+  it("prend les pièces les plus anciennes d'abord", () => {
+    const stock = [
+      makeComponent({ id: 1, producedAt: 30 }),
+      makeComponent({ id: 2, producedAt: 10 }),
+      makeComponent({ id: 3, producedAt: 20 }),
+    ];
+    const sel = selectComponents(stock, [{ kind: "code", quantity: 2 }]);
+    expect(sel.consumed.map((c) => c.id)).toEqual([2, 3]);
+    expect(sel.remainingStock.map((c) => c.id)).toEqual([1]);
+    expect(sel.missing).toEqual([]);
+  });
+
+  it("ne prend que la sorte exacte demandée, pas une autre de la même famille", () => {
+    const stock = [
+      makeComponent({ id: 1, kind: "module" }),
+      makeComponent({ id: 2, kind: "code" }),
+    ];
+    const sel = selectComponents(stock, [{ kind: "module", quantity: 1 }]);
+    expect(sel.consumed).toEqual([{ id: 1, kind: "module" }]);
+    expect(sel.remainingStock.map((c) => c.id)).toEqual([2]);
+  });
+
+  it("signale ce qui manque sans rien prendre pour l'exigence incomplète", () => {
+    const stock = [
+      makeComponent({ id: 1, kind: "code" }),
+      makeComponent({ id: 2, kind: "ux" }),
+    ];
+    const sel = selectComponents(stock, [
+      { kind: "code", quantity: 3 },
+      { kind: "ux", quantity: 1 },
+    ]);
+    expect(sel.missing).toEqual([{ kind: "code", quantity: 2 }]);
+    // L'exigence UX, elle, est couverte.
+    expect(sel.consumed).toEqual([{ id: 2, kind: "ux" }]);
+    expect(sel.remainingStock.map((c) => c.id)).toEqual([1]);
+  });
+});
+
 describe("valorisation d'une livraison", () => {
-  it("applique le multiplicateur de qualité au solde", () => {
+  it("verse le solde convenu, sans autre modulation, en livraison normale", () => {
     const contract = makeContract();
-    // Livraison tardive pour isoler l'effet qualité de la prime d'anticipation.
-    const late = contract.time;
-
-    const bacle = computeContractPayout(contract, ComponentQuality.BACLE, late);
-    const excellent = computeContractPayout(
-      contract,
-      ComponentQuality.EXCELLENT,
-      late,
-    );
-
-    expect(bacle.early).toBe(false);
-    expect(bacle.reward).toBe(1000 * qualityMultiplier(0));
-    expect(excellent.reward).toBe(1000 * qualityMultiplier(5));
-    expect(excellent.reward).toBeGreaterThan(bacle.reward);
+    const payout = computeContractPayout(contract, contract.time);
+    expect(payout.early).toBe(false);
+    expect(payout.reward).toBe(1000);
   });
 
   it("prime la livraison anticipée et l'éteint passé le seuil", () => {
@@ -103,72 +139,143 @@ describe("valorisation d'une livraison", () => {
     const justBefore = Math.floor(contract.time * EARLY_DELIVERY_RATIO) - 1;
     const justAfter = Math.ceil(contract.time * EARLY_DELIVERY_RATIO);
 
-    const early = computeContractPayout(contract, 3, justBefore);
-    const onTime = computeContractPayout(contract, 3, justAfter);
+    const early = computeContractPayout(contract, justBefore);
+    const onTime = computeContractPayout(contract, justAfter);
 
     expect(early.early).toBe(true);
     expect(onTime.early).toBe(false);
-    expect(early.reward).toBe(Math.round(onTime.reward * EARLY_DELIVERY_BONUS));
+    expect(early.reward).toBe(Math.round(1000 * EARLY_DELIVERY_BONUS));
+    expect(onTime.reward).toBe(1000);
+  });
+
+  it("l'avance se mesure depuis la signature, pas depuis le début de partie", () => {
+    const contract = makeContract({ startDate: 5000 });
+    expect(computeContractPayout(contract, 5100).early).toBe(true);
+    expect(computeContractPayout(contract, 5000 + 800).early).toBe(false);
+  });
+
+  it("rapporte un point de réputation, deux si le contrat demande du niveau 3", () => {
+    expect(contractReputationGain(makeContract())).toBe(1);
+    expect(
+      contractReputationGain(
+        makeContract({ requirements: [{ kind: "module", quantity: 1 }] }),
+      ),
+    ).toBe(1);
+    expect(
+      contractReputationGain(
+        makeContract({
+          requirements: [
+            { kind: "code", quantity: 4 },
+            { kind: "moteur", quantity: 1 },
+          ],
+        }),
+      ),
+    ).toBe(2);
+    expect(
+      computeContractPayout(
+        makeContract({ requirements: [{ kind: "cloud", quantity: 1 }] }),
+        0,
+      ).reputationGain,
+    ).toBe(2);
   });
 });
 
 describe("deliverContract", () => {
-  it("consomme le stock, verse le solde et retire le contrat", () => {
+  it("consomme les pièces les plus anciennes, verse le solde et retire le contrat", () => {
     const dispatch = vi.fn();
     const state = stateWith({
       taskList: [makeContract()],
       stock: [
-        makeComponent({ id: 10, quality: ComponentQuality.CORRECT }),
-        makeComponent({ id: 11, quality: ComponentQuality.EXCELLENT }),
-        makeComponent({ id: 12, quality: ComponentQuality.BACLE }),
+        makeComponent({ id: 10, producedAt: 50 }),
+        makeComponent({ id: 11, producedAt: 5 }),
+        makeComponent({ id: 12, producedAt: 20 }),
+        makeComponent({ id: 13, kind: "ux", producedAt: 0 }),
       ],
       money: 5000,
+      time: 900,
     });
 
     deliverContract(1)(dispatch as never, (() => state) as never);
 
-    // selectBestComponents sert les meilleures qualités d'abord : 5 et 2.
-    expect(dispatch).toHaveBeenCalledWith(removeComponents([11, 10]));
-    const { reward } = computeContractPayout(state.task.taskList[0], 3.5, 0);
-    expect(dispatch).toHaveBeenCalledWith(setMoney(5000 + reward));
+    expect(dispatch).toHaveBeenCalledWith(removeComponents([11, 12]));
+    // Livré à 900 h sur 1000 : pas de prime d'anticipation.
+    expect(dispatch).toHaveBeenCalledWith(setMoney(5000 + 1000));
     expect(dispatch).toHaveBeenCalledWith(removeTask(1));
+  });
+
+  it("verse la prime quand la livraison est anticipée", () => {
+    const dispatch = vi.fn();
+    const state = stateWith({
+      taskList: [makeContract()],
+      stock: [makeComponent({ id: 10 }), makeComponent({ id: 11 })],
+      money: 5000,
+      time: 10,
+    });
+
+    deliverContract(1)(dispatch as never, (() => state) as never);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      setMoney(5000 + Math.round(1000 * EARLY_DELIVERY_BONUS)),
+    );
+  });
+
+  it("crédite la réputation de la famille des pièces livrées", () => {
+    const dispatch = vi.fn();
+    const state = stateWith({
+      taskList: [makeContract()],
+      stock: [makeComponent({ id: 10 }), makeComponent({ id: 11 })],
+    });
+
+    deliverContract(1)(dispatch as never, (() => state) as never);
+
+    expect(dispatch).toHaveBeenCalledWith(
+      addReputationByType({ type: ComponentType.CODE, delta: 1 }),
+    );
+    const typed = dispatch.mock.calls.filter(
+      ([a]) => a.type === addReputationByType.type,
+    );
+    expect(typed).toHaveLength(1);
   });
 
   it("refuse la livraison sans rien consommer si le stock est incomplet", () => {
     const dispatch = vi.fn();
     const state = stateWith({
       taskList: [makeContract()],
-      stock: [makeComponent({ id: 10 })], // 1 composant pour 2 demandés
+      // 1 Code pour 2 demandés, et un Module qui ne le remplace pas.
+      stock: [
+        makeComponent({ id: 10 }),
+        makeComponent({ id: 11, kind: "module" }),
+      ],
     });
 
     deliverContract(1)(dispatch as never, (() => state) as never);
 
     const kinds = dispatch.mock.calls.map((c) => c[0].type);
-    expect(kinds).not.toContain(removeComponents([]).type);
-    expect(kinds).not.toContain(removeTask(1).type);
+    expect(kinds).not.toContain(removeComponents.type);
+    expect(kinds).not.toContain(removeTask.type);
+    expect(kinds).not.toContain(setMoney.type);
     expect(kinds).toContain("notification/pushNotification");
   });
 
-  it("la réputation des contrats est plafonnée par mois, pas leurs pertes", () => {
-    const deliver = (
-      stock: Component[],
-      contractReputation?: { month: string; gained: number },
-    ) => {
+  it("la réputation des contrats est plafonnée par mois", () => {
+    const deliver = (contractReputation?: {
+      month: string;
+      gained: number;
+    }) => {
       const dispatch = vi.fn();
       const state = stateWith({
-        taskList: [makeContract()],
-        stock,
+        // Contrat de niveau 3 : il « mérite » 2 points.
+        taskList: [
+          makeContract({ requirements: [{ kind: "moteur", quantity: 1 }] }),
+        ],
+        stock: [makeComponent({ id: 10, kind: "moteur" })],
         contractReputation,
       });
       deliverContract(1)(dispatch as never, (() => state) as never);
       return dispatch;
     };
-    const excellent = [
-      makeComponent({ id: 10, quality: ComponentQuality.EXCELLENT }),
-      makeComponent({ id: 11, quality: ComponentQuality.EXCELLENT }),
-    ];
-    // Qualité 5 : +4 « mérités », ramenés au plafond du mois.
-    const first = deliver(excellent);
+
+    const first = deliver();
     expect(first).toHaveBeenCalledWith(
       addReputation(CONTRACT_REPUTATION_PER_MONTH),
     );
@@ -178,22 +285,17 @@ describe("deliverContract", () => {
         gained: CONTRACT_REPUTATION_PER_MONTH,
       }),
     );
-    // Le mois est déjà servi : plus rien.
-    const second = deliver(excellent, {
+
+    // Le mois est déjà servi : plus rien, mais le contrat est bien livré.
+    const second = deliver({
       month: gameMonthKey(0),
       gained: CONTRACT_REPUTATION_PER_MONTH,
     });
     const kinds = second.mock.calls.map((c) => c[0].type);
-    expect(kinds).not.toContain(addReputation(0).type);
-    // Du bâclé coûte sa réputation, plafond atteint ou non.
-    const bacle = deliver(
-      [
-        makeComponent({ id: 10, quality: ComponentQuality.BACLE }),
-        makeComponent({ id: 11, quality: ComponentQuality.BACLE }),
-      ],
-      { month: gameMonthKey(0), gained: CONTRACT_REPUTATION_PER_MONTH },
-    );
-    expect(bacle).toHaveBeenCalledWith(addReputation(-1));
+    expect(kinds).not.toContain(addReputation.type);
+    expect(kinds).not.toContain(recordContractReputation.type);
+    expect(second).toHaveBeenCalledWith(removeComponents([10]));
+    expect(second).toHaveBeenCalledWith(removeTask(1));
   });
 
   it("ignore un contrat inconnu", () => {

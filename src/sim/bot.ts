@@ -15,7 +15,6 @@ import {
   ProductStatus,
   ProductionPerson,
   QA,
-  QUALITY_STAT_STEP,
   STAT_KEY_BY_TYPE,
   StartedContract,
   AMENITIES,
@@ -24,7 +23,6 @@ import {
   getBuildingMonthlyCharges,
   isProductReady,
   moraleProductivityMultiplier,
-  productSize,
 } from "@/data/interface";
 import {
   PRODUCTION_THRESHOLD,
@@ -73,11 +71,26 @@ import {
   planMonthlyBilling,
   runMonthlyBilling,
 } from "@/data/utils/billing";
+import { grantProactiveRaise, payBonus } from "@/data/utils/morale";
+import { gateShift, productionSpeedMultiplier } from "@/data/utils/traits";
 import {
-  grantProactiveRaise,
-  payBonus,
-} from "@/data/utils/morale";
-import { productionSpeedMultiplier } from "@/data/utils/traits";
+  CONSUMPTION_FACTOR,
+  ComponentKindId,
+  Recipe,
+  TIER_LABOR,
+  addRecipes,
+  countKinds,
+  craftBlocker,
+  kindFamily,
+  kindTier,
+  netDeficits,
+  recipeCount,
+  recipeShortfall,
+  recipeValue,
+  requirementUnits,
+  requirementsToRecipe,
+} from "@/data/utils/recipes";
+import { stockCovers } from "@/data/utils/deliveryAdvisor";
 import { FOUNDER_ID, isFounderResearching } from "@/data/utils/research";
 import {
   SearchRole,
@@ -90,7 +103,6 @@ import {
   coreFeature,
   featureAppeal,
   featureCost,
-  featureRequirements,
   unlockedOptionalFeatures,
 } from "@/data/utils/feature";
 import {
@@ -239,49 +251,34 @@ const statOf = (e: ProductionPerson, t: ComponentType): number =>
 
 const deadlineOf = (c: StartedContract): number => c.startDate + c.time;
 
-/** Qualités du stock par type, de la moins bonne à la meilleure. */
-type StockPool = Record<ComponentType, number[]>;
-
-const stockPool = (stock: Component[]): StockPool => {
-  const pool = {
-    [ComponentType.CODE]: [],
-    [ComponentType.VISUEL]: [],
-    [ComponentType.UX]: [],
-  } as StockPool;
-  for (const c of stock) pool[c.type].push(c.quality);
-  for (const t of COMPONENT_TYPE_ORDER) pool[t].sort((a, b) => a - b);
-  return pool;
-};
-
-const clonePool = (pool: StockPool): StockPool => ({
-  [ComponentType.CODE]: [...pool[ComponentType.CODE]],
-  [ComponentType.VISUEL]: [...pool[ComponentType.VISUEL]],
-  [ComponentType.UX]: [...pool[ComponentType.UX]],
-});
-
 /**
- * Prend dans le pool, pour une exigence, les composants les moins bons qui
- * l'atteignent encore ; renvoie combien. Un composant trop médiocre pour un
- * contrat exigeant ne compte pas comme du stock pour lui.
+ * Prend dans le pool les pièces demandées ; renvoie ce qui manque. Le pool
+ * est modifié : les contrats suivants ne voient que le reste.
  */
 const takeFromPool = (
-  pool: StockPool,
-  req: { type: ComponentType; quantity: number; minQuality?: number },
-): number => {
-  const list = pool[req.type];
-  const min = req.minQuality ?? 0;
-  let start = 0;
-  while (start < list.length && list[start] < min) start++;
-  const n = Math.min(req.quantity, list.length - start);
-  list.splice(start, n);
-  return n;
+  pool: Recipe,
+  requirements: { kind: ComponentKindId; quantity: number }[],
+): Recipe => {
+  const missing: Recipe = {};
+  for (const r of requirements) {
+    const have = pool[r.kind] ?? 0;
+    const taken = Math.min(have, r.quantity);
+    pool[r.kind] = have - taken;
+    if (r.quantity > taken) {
+      missing[r.kind] = (missing[r.kind] ?? 0) + r.quantity - taken;
+    }
+  }
+  return missing;
 };
 
-/** Part attendue des composants d'un producteur atteignant une qualité. */
-const qualifiedShare = (stat: number, minQuality?: number): number =>
-  minQuality == null
-    ? 1
-    : Math.max(0, Math.min(1, stat / QUALITY_STAT_STEP - minQuality + 1));
+/** Travail propre (unités) que des pièces à fabriquer demandent, par famille. */
+const laborByFamily = (net: Recipe): TypeCounts => {
+  const out = zeroCounts();
+  for (const [kind, n] of Object.entries(net) as [ComponentKindId, number][]) {
+    out[kindFamily(kind)] += n * TIER_LABOR[kindTier(kind)];
+  }
+  return out;
+};
 
 /** Charges mensuelles récurrentes : paie, locaux, maintenance, prêts. */
 export const monthlyBurn = (state: RootState): number => {
@@ -319,12 +316,6 @@ export class Bot {
   private readonly replaces = new Map<number, number>();
   private update: UpdateProject | null = null;
   private productSerial = 0;
-  /** Producteurs affectés aux projets produit lors du dernier tour. */
-  private productTeam = new Set<number>();
-  /** Composants fabriqués par l'équipe produit : ils vont aux projets. */
-  private readonly owned = new Set<number>();
-  private readonly ownedType = new Map<number, ComponentType>();
-  private lastClaim = 0;
 
   constructor(
     private readonly store: SimStore,
@@ -361,9 +352,7 @@ export class Bot {
     if (decision?.id.startsWith("poach-")) {
       // Retenir coûte cher : seulement si la trésorerie le supporte.
       const keep = this.state.company.money > 6 * monthlyBurn(this.state);
-      this.dispatch(
-        resolveDecision(keep ? "surencherir" : "laisser") as never,
-      );
+      this.dispatch(resolveDecision(keep ? "surencherir" : "laisser") as never);
       if (keep) this.counters.poachCountered++;
       else this.counters.poachLost++;
       return;
@@ -487,30 +476,33 @@ export class Bot {
     if (this.hasProject(state)) {
       for (const t of COMPONENT_TYPE_ORDER) points[t] *= 1 - PRODUCT_SHARE;
     }
-    const pool = stockPool(this.contractStock());
-    const needed = zeroCounts();
+    const pool = countKinds(state.component.stock);
+    let missing: Recipe = {};
     const now = state.engine.time;
     const list = [...state.task.taskList].sort(
       (a, b) => deadlineOf(a) - deadlineOf(b),
     );
     for (const c of list) {
-      for (const req of c.requirements) {
-        needed[req.type] += req.quantity - takeFromPool(pool, req);
-      }
-      if (now + this.workHours(needed, points) + 24 > deadlineOf(c)) {
+      missing = addRecipes(missing, takeFromPool(pool, c.requirements));
+      if (now + this.workHours(missing, points) + 24 > deadlineOf(c)) {
         return true;
       }
     }
     return false;
   }
 
-  /** Heures de toute l'équipe pour produire ces composants. */
-  private workHours(needed: TypeCounts, points: TypeCounts): number {
+  /**
+   * Heures de toute l'équipe pour fabriquer ce qui manque, ingrédients
+   * compris : la même équipe se partage entre les familles, les heures
+   * s'additionnent.
+   */
+  private workHours(missing: Recipe, points: TypeCounts): number {
+    const labor = laborByFamily(netDeficits(missing, {}));
     let hours = 0;
     for (const t of COMPONENT_TYPE_ORDER) {
-      if (needed[t] <= 0) continue;
+      if (labor[t] <= 0) continue;
       if (points[t] <= 0) return Infinity;
-      hours += (needed[t] * PRODUCTION_THRESHOLD) / points[t];
+      hours += (labor[t] * PRODUCTION_THRESHOLD) / points[t];
     }
     return hours;
   }
@@ -518,129 +510,68 @@ export class Bot {
   // ── Stock : ce qui est promis aux contrats, ce qui reste libre ─────────────
 
   /**
-   * Réserve aux contrats, par échéance, les meilleurs composants qui
-   * conviennent — comme la livraison, qui prend toujours les meilleurs ; le
-   * reste du stock est libre pour les produits (trié du meilleur au moins bon).
+   * Réserve aux contrats, par échéance, les pièces qu'ils demandent ; le
+   * reste du stock est libre pour les produits.
    */
-  private reserve(state: RootState): {
-    free: Component[];
-    reserved: Component[];
-    deficit: TypeCounts;
-  } {
-    const buckets = {} as Record<ComponentType, Component[]>;
-    const next = zeroCounts();
-    for (const t of COMPONENT_TYPE_ORDER) buckets[t] = [];
-    for (const c of state.component.stock) {
-      if (!this.owned.has(c.id)) buckets[c.type].push(c);
-    }
-    for (const t of COMPONENT_TYPE_ORDER) {
-      buckets[t].sort((a, b) => b.quality - a.quality);
-    }
-    const deficit = zeroCounts();
+  private reserve(state: RootState): { free: Component[]; deficit: Recipe } {
+    const pool = countKinds(state.component.stock);
+    let deficit: Recipe = {};
     const contracts = [...state.task.taskList].sort(
       (a, b) => deadlineOf(a) - deadlineOf(b),
     );
+    const promised: Recipe = {};
     for (const c of contracts) {
-      for (const req of c.requirements) {
-        const bucket = buckets[req.type];
-        let taken = 0;
-        // Les meilleurs restants sont en tête : s'ils ne passent pas la
-        // qualité demandée, aucun autre ne la passe.
-        while (
-          taken < req.quantity &&
-          next[req.type] < bucket.length &&
-          (req.minQuality == null ||
-            bucket[next[req.type]].quality >= req.minQuality)
-        ) {
-          next[req.type]++;
-          taken++;
+      const before = { ...pool };
+      deficit = addRecipes(deficit, takeFromPool(pool, c.requirements));
+      for (const r of c.requirements) {
+        promised[r.kind] =
+          (promised[r.kind] ?? 0) + (before[r.kind] ?? 0) - (pool[r.kind] ?? 0);
+      }
+    }
+    // Les plus anciennes pièces partent aux contrats (comme à la livraison).
+    const left = { ...promised };
+    const free = [...state.component.stock]
+      .sort((a, b) => a.producedAt - b.producedAt)
+      .filter((c) => {
+        if ((left[c.kind] ?? 0) > 0) {
+          left[c.kind]!--;
+          return false;
         }
-        deficit[req.type] += req.quantity - taken;
-      }
-    }
-    const free = COMPONENT_TYPE_ORDER.flatMap((t) =>
-      buckets[t].slice(next[t]),
-    );
-    const reserved = COMPONENT_TYPE_ORDER.flatMap((t) =>
-      buckets[t].slice(0, next[t]),
-    );
-    return { free, reserved, deficit };
+        return true;
+      });
+    return { free, deficit };
   }
 
-  /** Meilleurs composants libres pour ces besoins (partiel si le stock manque). */
-  private pick(free: Component[], needs: TypeCounts): Component[] {
-    const picked: Component[] = [];
-    for (const t of COMPONENT_TYPE_ORDER) {
-      if (needs[t] <= 0) continue;
-      // `free` est déjà trié du meilleur au moins bon, type par type.
-      picked.push(...free.filter((c) => c.type === t).slice(0, needs[t]));
-    }
-    return picked;
-  }
-
-  /**
-   * Ce que l'équipe produit a fabriqué depuis le dernier tour revient aux
-   * projets ; ce dont aucun projet n'a besoin retourne au pot commun.
-   */
-  private claimProjectComponents() {
-    const state = this.state;
-    const now = state.engine.time;
-    const inStock = new Set(state.component.stock.map((c) => c.id));
-    for (const id of [...this.owned]) {
-      if (!inStock.has(id)) {
-        this.owned.delete(id);
-        this.ownedType.delete(id);
-      }
-    }
-    for (const c of state.component.stock) {
-      if (c.producedAt >= this.lastClaim && this.productTeam.has(c.producedBy)) {
-        this.own(c);
-      }
-    }
-    this.lastClaim = now;
-    const needs = this.projectTotals(state);
-    for (const c of state.component.stock) {
-      if (this.owned.has(c.id) && needs[c.type] <= 0) {
-        this.owned.delete(c.id);
-        this.ownedType.delete(c.id);
-      }
-    }
-  }
-
-  /** Stock des projets : leurs composants d'abord, puis le stock libre. */
-  private projectStock(state: RootState): Component[] {
-    const { free } = this.reserve(state);
-    const owned = state.component.stock
-      .filter((c) => this.owned.has(c.id))
-      .sort((a, b) => b.quality - a.quality);
-    // `pick` filtre par type en gardant l'ordre : les composants des projets
-    // passent avant le stock libre.
-    return [...owned, ...free];
+  /** Pièces libres pour ces besoins (partiel si le stock manque). */
+  private pick(free: Component[], needs: Recipe): Component[] {
+    const left = { ...needs };
+    return free.filter((c) => {
+      if ((left[c.kind] ?? 0) <= 0) return false;
+      left[c.kind]!--;
+      return true;
+    });
   }
 
   /** Besoins bruts des projets en cours (développement + mise à jour). */
-  private projectTotals(state: RootState): TypeCounts {
-    const needs = zeroCounts();
+  private projectTotals(state: RootState): Recipe {
+    let needs: Recipe = {};
     const product = this.developing(state);
     if (product) {
-      for (const t of COMPONENT_TYPE_ORDER) {
-        needs[t] += Math.max(0, product.requirements[t] - product.invested[t]);
-      }
+      needs = addRecipes(
+        needs,
+        recipeShortfall(product.requirements, product.invested),
+      );
     }
-    const feature = this.update ? FEATURE_BY_ID[this.update.featureId] : undefined;
-    for (const r of feature ? featureRequirements(feature) : []) {
-      needs[r.type] += r.quantity;
-    }
+    const feature = this.update
+      ? FEATURE_BY_ID[this.update.featureId]
+      : undefined;
+    if (feature) needs = addRecipes(needs, feature.cost);
     return needs;
   }
 
   private consume(components: Component[]) {
     this.dispatch(removeComponents(components.map((c) => c.id)));
-    return components.map((c) => ({
-      id: c.id,
-      type: c.type,
-      quality: c.quality,
-    }));
+    return components.map((c) => ({ id: c.id, kind: c.kind }));
   }
 
   // ── Tour quotidien ─────────────────────────────────────────────────────────
@@ -648,84 +579,30 @@ export class Bot {
   daily() {
     if (this.state.engine.gameOver) return;
     this.applySchedule();
-    this.claimProjectComponents();
     this.deliverContracts();
-    const month = getTimeAsDate(this.state.engine.time).diff(getTimeAsDate(0), "month");
+    const month = getTimeAsDate(this.state.engine.time).diff(
+      getTimeAsDate(0),
+      "month",
+    );
     if (month >= this.productsFromMonth) this.planProject();
     this.acceptContracts();
     this.investInProject();
     this.assignWork();
   }
 
-  /** Qualités du stock par type, de la meilleure à la moins bonne. */
-  private qualitiesByType(stock: Component[]): Record<ComponentType, number[]> {
-    const byType = {} as Record<ComponentType, number[]>;
-    for (const t of COMPONENT_TYPE_ORDER) byType[t] = [];
-    for (const c of stock) byType[c.type].push(c.quality);
-    for (const t of COMPONENT_TYPE_ORDER) byType[t].sort((a, b) => b - a);
-    return byType;
-  }
-
-  /** Stock hors projets : ce que les contrats peuvent consommer. */
-  private contractStock(): Component[] {
-    return this.state.component.stock.filter((c) => !this.owned.has(c.id));
-  }
-
-  /**
-   * La livraison du jeu prend les meilleurs composants de tout le stock, ceux
-   * des projets compris : on rend aux projets autant de composants du même
-   * type, pris dans le reste du stock.
-   */
-  private restoreOwned() {
-    const stock = this.state.component.stock;
-    const inStock = new Set(stock.map((c) => c.id));
-    const lost = zeroCounts();
-    for (const id of [...this.owned]) {
-      if (inStock.has(id)) continue;
-      this.owned.delete(id);
-      const type = this.ownedType.get(id);
-      if (type) lost[type]++;
-      this.ownedType.delete(id);
-    }
-    for (const t of COMPONENT_TYPE_ORDER) {
-      if (lost[t] === 0) continue;
-      const spare = stock
-        .filter((c) => c.type === t && !this.owned.has(c.id))
-        .sort((a, b) => b.quality - a.quality)
-        .slice(0, lost[t]);
-      for (const c of spare) this.own(c);
-    }
-  }
-
-  private own(c: Component) {
-    this.owned.add(c.id);
-    this.ownedType.set(c.id, c.type);
-  }
-
   private deliverContracts() {
     const contracts = [...this.state.task.taskList].sort(
       (a, b) => deadlineOf(a) - deadlineOf(b),
     );
-    let qualities = this.qualitiesByType(this.contractStock());
     for (const c of contracts) {
-      // Le joueur ne clique que si le stock (hors projets) suffit.
-      // Chaque exigence porte sur un type distinct ; les meilleurs d'abord.
-      const ready = c.requirements.every((req) => {
-        const q = qualities[req.type];
-        return (
-          q.length >= req.quantity &&
-          (req.minQuality == null || q[req.quantity - 1] >= req.minQuality)
-        );
-      });
-      if (!ready) continue;
+      // Le joueur ne clique que si le stock suffit.
+      if (!stockCovers(this.state.component.stock, c.requirements)) continue;
       const before = this.state.company.money;
       this.dispatch(deliverContract(c.id) as never);
-      this.restoreOwned();
       this.counters.contractsDelivered++;
       const gain = this.state.company.money - before;
       this.counters.contractIncome += gain;
       this.contractIncomeThisMonth += gain;
-      qualities = this.qualitiesByType(this.contractStock());
     }
   }
 
@@ -735,33 +612,32 @@ export class Bot {
     state: RootState,
     producers: ProductionPerson[],
     points: TypeCounts,
-    stockPoolAll: StockPool,
+    stock: Recipe,
   ): boolean {
     if (producers.length === 0) return false;
-    // Qualité atteignable : la moitié au moins de la production doit passer.
-    for (const req of contract.requirements) {
-      if (req.minQuality == null) continue;
-      const total = producers.reduce((acc, e) => acc + statOf(e, req.type), 0);
-      const ok = producers.reduce(
-        (acc, e) =>
-          acc + statOf(e, req.type) * qualifiedShare(statOf(e, req.type), req.minQuality),
-        0,
-      );
-      if (total <= 0 || ok / total < 0.5) return false;
+    const now = state.engine.time;
+    // Chaque pièce demandée (et ses ingrédients) doit être à la portée de
+    // quelqu'un : sinon le contrat est intenable, quel que soit le délai.
+    const needed = netDeficits(requirementsToRecipe(contract.requirements), {});
+    for (const kind of Object.keys(needed) as ComponentKindId[]) {
+      if (
+        !producers.some(
+          (e) => craftBlocker(e, kind, now, gateShift(e)) === null,
+        )
+      ) {
+        return false;
+      }
     }
 
-    const now = state.engine.time;
     const list: StartedContract[] = [
       ...state.task.taskList,
       { ...contract, startDate: now },
     ].sort((a, b) => deadlineOf(a) - deadlineOf(b));
-    const pool = clonePool(stockPoolAll);
-    const needed = zeroCounts();
+    const pool = { ...stock };
+    let missing: Recipe = {};
     for (const c of list) {
-      for (const req of c.requirements) {
-        needed[req.type] += req.quantity - takeFromPool(pool, req);
-      }
-      const hours = this.workHours(needed, points) * DEADLINE_SAFETY;
+      missing = addRecipes(missing, takeFromPool(pool, c.requirements));
+      const hours = this.workHours(missing, points) * DEADLINE_SAFETY;
       if (now + hours + 24 > deadlineOf(c)) return false;
     }
     return true;
@@ -781,15 +657,14 @@ export class Bot {
     if (this.hasProject(state)) {
       for (const t of COMPONENT_TYPE_ORDER) points[t] *= 1 - PRODUCT_SHARE;
     }
-    const pool = stockPool(state.component.stock);
-    const qty = (c: Contract) =>
-      c.requirements.reduce((acc, r) => acc + r.quantity, 0);
+    const stock = countKinds(state.component.stock);
+    const work = (c: Contract) => Math.max(1, requirementUnits(c.requirements));
     const best = state.task.availableContractList
-      .filter((c) => this.canTake(c, state, producers, points, pool))
+      .filter((c) => this.canTake(c, state, producers, points, stock))
       .sort(
         (a, b) =>
-          (b.priceDeposit + b.priceAdditional) / qty(b) -
-          (a.priceDeposit + a.priceAdditional) / qty(a),
+          (b.priceDeposit + b.priceAdditional) / work(b) -
+          (a.priceDeposit + a.priceAdditional) / work(a),
       )[0];
     if (!best) return false;
     this.dispatch(setMoney(state.company.money + best.priceDeposit));
@@ -824,7 +699,7 @@ export class Bot {
    */
   private investInProject() {
     const state = this.state;
-    let stock = this.projectStock(state);
+    let stock = this.reserve(state).free;
 
     if (this.update) {
       const { productId, featureId } = this.update;
@@ -833,12 +708,8 @@ export class Bot {
       if (!feature || !target || target.status !== ProductStatus.LAUNCHED) {
         this.update = null;
       } else {
-        const needs = zeroCounts();
-        for (const r of featureRequirements(feature)) {
-          needs[r.type] += r.quantity;
-        }
-        const picked = this.pick(stock, needs);
-        if (picked.length >= featureCost(feature)) {
+        const picked = this.pick(stock, feature.cost);
+        if (picked.length >= recipeCount(feature.cost)) {
           this.dispatch(
             addFeature({
               productId,
@@ -859,11 +730,10 @@ export class Bot {
 
     const product = this.developing(state);
     if (!product) return;
-    const needs = zeroCounts();
-    for (const t of COMPONENT_TYPE_ORDER) {
-      needs[t] = Math.max(0, product.requirements[t] - product.invested[t]);
-    }
-    const picked = this.pick(stock, needs);
+    const picked = this.pick(
+      stock,
+      recipeShortfall(product.requirements, product.invested),
+    );
     if (picked.length > 0) {
       this.dispatch(
         investInProduct({
@@ -892,25 +762,24 @@ export class Bot {
     }
   }
 
-  /** Ce qui manque aux projets, une fois leur stock compté. */
-  private projectNeeds(state: RootState): TypeCounts {
-    const needs = this.projectTotals(state);
-    for (const c of this.projectStock(state)) needs[c.type]--;
-    for (const t of COMPONENT_TYPE_ORDER) needs[t] = Math.max(0, needs[t]);
-    return needs;
-  }
-
   /**
-   * Chaque producteur sur le type qui manque le plus, à sa mesure : les
-   * contrats d'abord, mais `PRODUCT_SHARE` de l'équipe va au projet en cours.
+   * Chaque producteur sur la famille qui manque le plus de travail, à sa
+   * mesure : contrats et projets confondus, ingrédients compris. Le poste
+   * reste en Auto : l'atelier choisit lui-même la pièce la plus utile.
    */
   private assignWork() {
     const state = this.state;
-    const { free, deficit } = this.reserve(state);
-    const contract = { ...deficit };
-    const product = this.projectNeeds(state);
+    const supply = countKinds(state.component.stock);
+    for (const job of Object.values(state.component.productionJobs ?? {})) {
+      supply[job.kind] = (supply[job.kind] ?? 0) + 1;
+    }
+    const demand = addRecipes(
+      requirementsToRecipe(state.task.taskList.flatMap((c) => c.requirements)),
+      this.projectTotals(state),
+    );
+    const remaining = laborByFamily(netDeficits(demand, supply));
     const freeCount = zeroCounts();
-    for (const c of free) freeCount[c.type]++;
+    for (const c of state.component.stock) freeCount[c.type]++;
     const occupancy = this.occupancy(state);
     const productivity = techProductivity(state.engine.time);
     const schedules = scheduleByBuilding(state.company.buildingList);
@@ -919,29 +788,14 @@ export class Bot {
     const producers = [...this.producers(state)].sort(
       (a, b) => topStat(b) - topStat(a),
     );
-    const anyOf = (needs: TypeCounts) =>
-      COMPONENT_TYPE_ORDER.some((t) => needs[t] > 0);
-    let productPoints = 0;
-    let totalPoints = 0;
-    const productTeam = new Set<number>();
+    const anyNeed = COMPONENT_TYPE_ORDER.some((t) => remaining[t] > 0);
 
     for (const e of producers) {
-      const own = Math.max(
-        ...COMPONENT_TYPE_ORDER.map((t) =>
-          this.pointsPerHour(e, t, productivity, occupancy, schedules),
-        ),
-      );
-      const productTurn =
-        anyOf(product) &&
-        (!anyOf(contract) ||
-          productPoints < PRODUCT_SHARE * (totalPoints + own));
-      const pool = productTurn ? product : anyOf(contract) ? contract : null;
-
       let best = COMPONENT_TYPE_ORDER[0];
       let bestScore = -Infinity;
       for (const t of COMPONENT_TYPE_ORDER) {
-        const score = pool
-          ? pool[t] * statOf(e, t)
+        const score = anyNeed
+          ? remaining[t] * statOf(e, t)
           : statOf(e, t) / (1 + freeCount[t]);
         if (score > bestScore) {
           bestScore = score;
@@ -955,21 +809,14 @@ export class Bot {
         occupancy,
         schedules,
       );
-      // Ce que cet employé produira en ~20 jours sur ce type.
-      if (pool) pool[best] -= (points * 24 * 20) / PRODUCTION_THRESHOLD;
-      if (productTurn) {
-        productPoints += points;
-        productTeam.add(e.id);
-      }
-      totalPoints += points;
+      // Ce que cet employé abat en ~20 jours dans cette famille.
+      if (anyNeed) remaining[best] -= (points * 24 * 20) / PRODUCTION_THRESHOLD;
       if (e.assignedComponentType !== best) {
         this.dispatch(
           assignComponentType({ employeId: e.id, componentType: best }),
         );
       }
     }
-
-    this.productTeam = productTeam;
 
     // Recrues sans bureau : on les installe là où il reste de la place.
     for (const e of state.employe.employeList) {
@@ -1014,7 +861,8 @@ export class Bot {
     const state = this.state;
     const staff = state.employe.employeList.filter(isProduction);
     const training = staff.filter((e) => e.trainingType).length;
-    let slots = Math.max(1, Math.floor(staff.length * TRAINING_SHARE)) - training;
+    let slots =
+      Math.max(1, Math.floor(staff.length * TRAINING_SHARE)) - training;
     const burn = monthlyBurn(state);
     let money = state.company.money;
     const researching = isFounderResearching(state);
@@ -1045,10 +893,9 @@ export class Bot {
     for (const p of this.state.product.products) {
       if (p.status !== ProductStatus.LAUNCHED || (p.bugs ?? 0) < 2) continue;
       const { free } = this.reserve(this.state);
-      const needs = zeroCounts();
-      needs[ComponentType.CODE] = (p.bugs ?? 0) * PATCH_CODE_PER_BUG;
+      const needs: Recipe = { code: (p.bugs ?? 0) * PATCH_CODE_PER_BUG };
       const picked = this.pick(free, needs);
-      if (picked.length < needs[ComponentType.CODE]) continue;
+      if (picked.length < (needs.code ?? 0)) continue;
       this.consume(picked);
       this.dispatch(patchProduct(p.id));
       this.counters.patches++;
@@ -1083,7 +930,11 @@ export class Bot {
     const avg =
       COMPONENT_TYPE_ORDER.reduce((acc, t) => acc + points[t], 0) /
       COMPONENT_TYPE_ORDER.length;
-    return (avg * PRODUCT_BUILD_HOURS * PRODUCT_TEAM_SHARE) / PRODUCTION_THRESHOLD;
+    return (
+      (avg * PRODUCT_BUILD_HOURS * PRODUCT_TEAM_SHARE) /
+      PRODUCTION_THRESHOLD /
+      CONSUMPTION_FACTOR
+    );
   }
 
   /** Socle + les options les plus rentables qui tiennent dans la taille visée. */
@@ -1200,7 +1051,10 @@ export class Bot {
     buildable: number,
     time: number,
   ): number | undefined {
-    const size = Math.max(GENRES[genre].minSize, Math.min(buildable, GENRES[genre].minSize * 2.5));
+    const size = Math.max(
+      GENRES[genre].minSize,
+      Math.min(buildable, GENRES[genre].minSize * 2.5),
+    );
     const features = this.assemble(genre, size, time);
     // Frais de création payés, il reste de quoi traverser le développement.
     const cost = PRODUCT_CREATION_COST[genre];
@@ -1237,11 +1091,7 @@ export class Bot {
 
     const developing = this.developing(state);
     const progress = (p: Product) =>
-      productSize(p) /
-      Math.max(
-        1,
-        COMPONENT_TYPE_ORDER.reduce((acc, t) => acc + p.requirements[t], 0),
-      );
+      recipeValue(p.invested) / Math.max(1, recipeValue(p.requirements));
     let target: Product | undefined =
       developing && progress(developing) >= 0.7 && canPromote(developing, time)
         ? developing
@@ -1357,21 +1207,34 @@ export class Bot {
     const launched = state.product.products.filter(
       (p) => p.status === ProductStatus.LAUNCHED,
     ).length;
-    const marketers = staff.filter((e) => e.personType === PersonType.MARKETING).length;
+    const marketers = staff.filter(
+      (e) => e.personType === PersonType.MARKETING,
+    ).length;
     const qa = staff.filter((e) => e.personType === PersonType.QA).length;
-    if (launched >= 1 && production >= 3 && marketers < 1 + Math.floor(production / 12)) {
+    if (
+      launched >= 1 &&
+      production >= 3 &&
+      marketers < 1 + Math.floor(production / 12)
+    ) {
       return PersonType.MARKETING;
     }
-    if (launched >= 2 && production >= 4 && qa < 1 + Math.floor(production / 10)) {
+    if (
+      launched >= 2 &&
+      production >= 4 &&
+      qa < 1 + Math.floor(production / 10)
+    ) {
       return PersonType.QA;
     }
-    // Le type le plus en retard sur la capacité de l'équipe, s'il l'est nettement.
+    // La famille la plus en retard sur la capacité de l'équipe, ingrédients
+    // compris, si elle l'est nettement.
     const { deficit } = this.reserve(state);
-    const needs = this.projectNeeds(state);
+    const labor = laborByFamily(
+      netDeficits(addRecipes(deficit, this.projectTotals(state)), {}),
+    );
     const points = this.teamPoints(state);
     const ratio = COMPONENT_TYPE_ORDER.map((t) => ({
       t,
-      r: (deficit[t] + needs[t]) / Math.max(1, points[t]),
+      r: labor[t] / Math.max(1, points[t]),
     })).sort((a, b) => b.r - a.r);
     const mean = ratio.reduce((acc, x) => acc + x.r, 0) / ratio.length;
     return ratio[0].r > 1.5 * mean && ratio[0].r > 0 ? ratio[0].t : "FULLSTACK";
@@ -1453,13 +1316,14 @@ export class Bot {
     this.counters.recruitSpend += cost;
     const fresh = this.state.employe.candidateList
       .filter((c) => !known.has(c.id))
-      .sort((a, b) => this.candidateValue(b, role) - this.candidateValue(a, role));
+      .sort(
+        (a, b) => this.candidateValue(b, role) - this.candidateValue(a, role),
+      );
     const pick = fresh[0];
     if (!pick) return;
-    const hired = this.dispatch(
-      hireCandidate(pick.id) as never,
-    ) as unknown as { ok: boolean };
+    const hired = this.dispatch(hireCandidate(pick.id) as never) as unknown as {
+      ok: boolean;
+    };
     if (hired.ok) this.counters.hires++;
   }
 }
-

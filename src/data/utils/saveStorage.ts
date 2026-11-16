@@ -17,6 +17,7 @@ import { normalizeProduct } from "@/data/utils/product";
 import { INACTIVE_TUTORIAL } from "@/data/redux/tutorialSlice";
 import { rescaleStateStats } from "@/data/utils/statScale";
 import { rescaleStateGrain } from "@/data/utils/componentGrain";
+import { migrateToComponentKinds } from "@/data/utils/componentKinds";
 
 // --- Constantes ------------------------------------------------------------
 
@@ -42,7 +43,8 @@ export const GAME_VERSION = "0.0.0";
 // 9 : premiers pas (`tutorial`).
 // 10 : stats de métier sur 0..200 (au lieu de 0..20).
 // 11 : composants au grain fin (`COMPONENT_GRAIN`).
-export const SAVE_SCHEMA_VERSION = 11;
+// 12 : composants à recettes (`kind`), sans qualité ; postes et réservations.
+export const SAVE_SCHEMA_VERSION = 12;
 
 // Slots manuels exposés au joueur (wireframe §4 : 3 slots).
 export const MANUAL_SLOT_IDS = ["slot_1", "slot_2", "slot_3"] as const;
@@ -237,6 +239,9 @@ export const migrations: Record<
   // 10 → 11 : grain fin des composants. Stock, exigences et tailles sont
   // multipliés par le grain ; l'effort et l'argent ne bougent pas.
   10: (state) => rescaleStateGrain(state),
+  // 11 → 12 : composants à recettes. Le stock passe aux pièces de base, la
+  // qualité disparaît ; les exigences en cours sont gardées en pièces de base.
+  11: (state) => migrateToComponentKinds(state),
 };
 
 /**

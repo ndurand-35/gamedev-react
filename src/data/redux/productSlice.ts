@@ -2,9 +2,12 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
 import {
-  ComponentType,
   ConsumedComponent,
   Product,
+  COMPONENT_KIND_BY_ID,
+  TIER_FINISH,
+  kindValue,
+  recipeEntries,
   ProductGenre,
   ProductStatus,
   isProductReady,
@@ -68,17 +71,16 @@ const initialState: ProductState = {
   lastMarketTime: null,
 };
 
-const blankInvested = (): Record<ComponentType, number> => ({
-  [ComponentType.CODE]: 0,
-  [ComponentType.VISUEL]: 0,
-  [ComponentType.UX]: 0,
-});
-
+/**
+ * Verse des pièces dans un produit : elles comptent dans son avancement, et
+ * leur finition (selon le niveau, pondérée par leur valeur) dans la sienne.
+ */
 const absorb = (p: Product, consumed: ConsumedComponent[]) => {
   for (const c of consumed) {
-    p.invested[c.type] += 1;
-    p.qualitySum += c.quality;
-    p.qualityCount += 1;
+    p.invested[c.kind] = (p.invested[c.kind] ?? 0) + 1;
+    const value = kindValue(c.kind);
+    p.qualitySum += TIER_FINISH[COMPONENT_KIND_BY_ID[c.kind].tier] * value;
+    p.qualityCount += value;
   }
 };
 
@@ -142,7 +144,7 @@ export const productSlice = createSlice({
         genre,
         features: [...features],
         requirements: featuresRequirements(features),
-        invested: blankInvested(),
+        invested: {},
         qualitySum: 0,
         qualityCount: 0,
         bugs: 0,
@@ -207,8 +209,8 @@ export const productSlice = createSlice({
       if (p.features.includes(feature.id)) return;
       const sizeBefore = productSize(p);
       p.features.push(feature.id);
-      for (const t of Object.values(ComponentType)) {
-        p.requirements[t] += feature.cost[t] ?? 0;
+      for (const [kind, q] of recipeEntries(feature.cost)) {
+        p.requirements[kind] = (p.requirements[kind] ?? 0) + q;
       }
       absorb(p, action.payload.consumed);
       const anchor = p.freshAt ?? p.launchTime ?? action.payload.time;

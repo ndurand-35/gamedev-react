@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   Component,
-  ComponentQuality,
   ComponentType,
   Contract,
   ContractType,
@@ -10,10 +9,7 @@ import {
   ProductionPerson,
 } from "@/data/interface";
 import { setMoney } from "@/data/redux/companySlice";
-import {
-  PRODUCTION_THRESHOLD,
-  applyProductionTick,
-} from "@/data/redux/componentSlice";
+import { applyProductionTick } from "@/data/redux/componentSlice";
 import { completeResearch, startResearch } from "@/data/redux/researchSlice";
 import type { RootState } from "@/data/redux/store";
 import { produceComponents } from "@/data/utils/component";
@@ -97,7 +93,15 @@ const stateWith = (over: {
     engine: { time: over.time ?? 0 },
     research: { acquired: over.acquired ?? [], current: over.current ?? null },
     employe: { employeList: over.employeList ?? [] },
-    component: { productionProgress: {}, stock: [] },
+    task: { taskList: [] },
+    product: { products: [] },
+    component: {
+      productionProgress: {},
+      productionJobs: {},
+      productionWaiting: {},
+      stock: [],
+      nextComponentId: 1,
+    },
   }) as unknown as RootState;
 
 describe("startFounderResearch", () => {
@@ -232,14 +236,14 @@ const makeContract = (over: Partial<Contract> = {}): Contract => ({
   priceMalus: 300,
   type: ContractType.DEV,
   taskDifficulty: 10,
-  requirements: [{ type: ComponentType.CODE, quantity: 2 }],
+  requirements: [{ kind: "code", quantity: 2 }],
   ...over,
 });
 
 const makeComponent = (over: Partial<Component> = {}): Component => ({
   id: 1,
+  kind: "code",
   type: ComponentType.CODE,
-  quality: ComponentQuality.BON,
   producedBy: 1,
   producedAt: 0,
   ...over,
@@ -258,8 +262,9 @@ describe("estimateContractLeadTime", () => {
   });
 
   it("projette la production de l'effectif pour dater le premier créneau", () => {
-    // stat 20, moral 100, seul dans son bâtiment : 20 pts/h, 1 composant
-    // tous les 80 h. Deux composants → 160 h.
+    // Stat 200, moral 100, seul dans son bâtiment : 840 points par heure de
+    // bureau (×4,2), 3200 par Code. Depuis jeudi 0 h, le premier Code sort à
+    // 12 h, le second à 17 h.
     const hours = estimateContractLeadTime({
       contract: makeContract(),
       stock: [],
@@ -267,12 +272,13 @@ describe("estimateContractLeadTime", () => {
       productionProgress: {},
       time: 0,
     });
-    expect(hours).toBe(Math.ceil((2 * PRODUCTION_THRESHOLD) / 200));
+    expect(hours).toBe(17);
   });
 
   it("renvoie null quand le délai du contrat ne suffira pas", () => {
     const hours = estimateContractLeadTime({
-      contract: makeContract({ time: 24 }),
+      // Deux Code demandés en 16 h : le second ne sort qu'à 17 h.
+      contract: makeContract({ time: 16 }),
       stock: [],
       employes: [founder()],
       productionProgress: {},
@@ -281,19 +287,27 @@ describe("estimateContractLeadTime", () => {
     expect(hours).toBeNull();
   });
 
-  it("ignore les composants sous la qualité minimale demandée", () => {
+  it("ne compte pas une pièce d'une autre sorte, même de la même famille", () => {
     const hours = estimateContractLeadTime({
       contract: makeContract({
-        requirements: [
-          {
-            type: ComponentType.CODE,
-            quantity: 1,
-            minQuality: ComponentQuality.EXCELLENT,
-          },
-        ],
+        requirements: [{ kind: "module", quantity: 1 }],
       }),
-      stock: [makeComponent({ quality: ComponentQuality.BACLE })],
+      stock: [makeComponent({ id: 1 }), makeComponent({ id: 2 })],
       employes: [],
+      productionProgress: {},
+      time: 0,
+    });
+    expect(hours).toBeNull();
+  });
+
+  it("renvoie null pour une pièce que personne n'a le niveau de fabriquer", () => {
+    // Moteur : seuil 11 points, le fondateur n'en a que 10.
+    const hours = estimateContractLeadTime({
+      contract: makeContract({
+        requirements: [{ kind: "moteur", quantity: 1 }],
+      }),
+      stock: [],
+      employes: [founder({ codeStat: 100 })],
       productionProgress: {},
       time: 0,
     });

@@ -13,7 +13,6 @@ import {
   ContractType,
   StartedContract,
 } from "@/data/interface";
-import { ComponentType } from "@/data/interface";
 
 const baseState = (overrides: Partial<TaskState> = {}): TaskState => ({
   taskList: [],
@@ -52,7 +51,7 @@ const startedContract = (
   priceMalus: 600,
   type: ContractType.DEV,
   taskDifficulty: 10,
-  requirements: [{ type: ComponentType.CODE, quantity: 2 }],
+  requirements: [{ kind: "code", quantity: 2 }],
   ...overrides,
 });
 
@@ -122,7 +121,12 @@ describe("taskSlice — carnet de clients", () => {
 
     const floored = taskReducer(
       baseState({ clients: { c1: client({ relation: 0 }) } }),
-      recordClientDelivery({ clientId: "c1", delta: -1, early: false, time: 1 }),
+      recordClientDelivery({
+        clientId: "c1",
+        delta: -1,
+        early: false,
+        time: 1,
+      }),
     );
     expect(floored.clients["c1"].relation).toBe(0);
   });
@@ -143,7 +147,12 @@ describe("taskSlice — carnet de clients", () => {
     // Un client rompu ne se répare pas : plus aucune livraison ne le compte.
     const after = taskReducer(
       lost,
-      recordClientDelivery({ clientId: "c1", delta: 2, early: true, time: 950 }),
+      recordClientDelivery({
+        clientId: "c1",
+        delta: 2,
+        early: true,
+        time: 950,
+      }),
     );
     expect(after.clients["c1"]).toMatchObject({ lost: true, relation: 0 });
   });
@@ -151,7 +160,12 @@ describe("taskSlice — carnet de clients", () => {
   it("ignore une livraison pour un client inconnu", () => {
     const next = taskReducer(
       baseState(),
-      recordClientDelivery({ clientId: "ghost", delta: 2, early: true, time: 1 }),
+      recordClientDelivery({
+        clientId: "ghost",
+        delta: 2,
+        early: true,
+        time: 1,
+      }),
     );
     expect(next.clients).toEqual({});
   });

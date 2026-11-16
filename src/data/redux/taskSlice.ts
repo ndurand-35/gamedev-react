@@ -62,6 +62,7 @@ export const taskSlice = createSlice({
           action.payload.reputation,
           ensureClients(state),
           action.payload.competitors ?? [],
+          action.payload.time,
         );
         // Tant que le studio n'a rien signé, le premier contrat — toujours le
         // même, couvert par le stock de départ — ouvre la liste.

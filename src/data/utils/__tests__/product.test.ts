@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   COMPONENT_GRAIN as G,
-  ComponentType,
+  CONSUMPTION_FACTOR,
   GENRES,
   Product,
   ProductGenre,
   ProductStatus,
+  Recipe,
+  productSize,
 } from "@/data/interface";
 import {
   CampaignType,
@@ -45,15 +47,18 @@ import { segmentDemand } from "@/data/utils/marketDemand";
 /** Concurrence diffuse du segment Outil : un produit de cette taille l'égale. */
 const AT_BASELINE = { size: GENRES[ProductGenre.OUTIL].baseline };
 
-const mix = (
-  code: number,
-  visuel = 0,
-  ux = 0,
-): Record<ComponentType, number> => ({
-  [ComponentType.CODE]: code,
-  [ComponentType.VISUEL]: visuel,
-  [ComponentType.UX]: ux,
-});
+/**
+ * Pièces de base qui font, par famille, ce travail d'avant la refonte : les
+ * produits en consomment `CONSUMPTION_FACTOR` fois plus.
+ */
+const mix = (code: number, visuel = 0, ux = 0): Recipe => {
+  const out: Recipe = {};
+  const scaled = (n: number) => Math.round(n * CONSUMPTION_FACTOR);
+  if (code > 0) out.code = scaled(code);
+  if (visuel > 0) out.visuel = scaled(visuel);
+  if (ux > 0) out.ux = scaled(ux);
+  return out;
+};
 
 /** Produit lancé à t=0 : `size` composants de qualité moyenne `quality`. */
 const launched = (
@@ -82,6 +87,19 @@ const launched = (
 
 const months = (n: number): number => addMonthsToTime(0, n);
 const AFTER_SPIKE = months(LAUNCH_SPIKE_MONTHS);
+
+describe("taille", () => {
+  it("ramène le travail investi à l'échelle d'avant la refonte", () => {
+    expect(productSize(launched({ size: 15 }))).toBe(15);
+    expect(productSize(launched(AT_BASELINE))).toBe(AT_BASELINE.size);
+  });
+
+  it("compte la valeur des pièces avancées, pas leur nombre", () => {
+    // 1 Moteur (19) + 2 Modules (2 × 5) + 10 Code = 39 unités → taille 30.
+    const p = launched({ invested: { moteur: 1, module: 2, code: 10 } });
+    expect(productSize(p)).toBe(30);
+  });
+});
 
 describe("attractivité", () => {
   it("vaut taille × qualité × fraîcheur × bugs", () => {
@@ -267,6 +285,12 @@ describe("vie du produit", () => {
 });
 
 describe("produits d'une partie antérieure", () => {
+  it("pèse les familles à la valeur des pièces, pas à leur nombre", () => {
+    // 2 Modules valent 10 unités de Code : plus que 6 Visuels.
+    expect(inferGenre({ module: 2, visuel: 6 })).toBe(ProductGenre.OUTIL);
+    expect(inferGenre({ code: 2, visuel: 6 })).toBe(ProductGenre.JEU);
+  });
+
   it("déduit le genre du type dominant, Plateforme au-delà de sa taille", () => {
     expect(inferGenre(mix(5, 3, 2))).toBe(ProductGenre.OUTIL);
     expect(inferGenre(mix(2, 6, 1))).toBe(ProductGenre.JEU);

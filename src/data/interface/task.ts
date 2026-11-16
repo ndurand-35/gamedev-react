@@ -1,8 +1,5 @@
-import {
-  ComponentQuality,
-  ComponentRequirement,
-  ComponentType,
-} from "@/data/interface/component";
+import { ComponentRequirement } from "@/data/interface/component";
+import type { ComponentKindId } from "@/data/interface/component";
 
 export interface Task {
   id: number;
@@ -55,8 +52,7 @@ export interface Contract extends Task {
 
 export interface ConsumedComponent {
   id: number;
-  type: ComponentType;
-  quality: ComponentQuality;
+  kind: ComponentKindId;
 }
 
 export interface StartedContract extends StartedTask, Contract {}

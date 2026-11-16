@@ -17,7 +17,7 @@ import taskReducer, {
   generateAvailableContractList,
   initializeTaskState,
 } from "@/data/redux/taskSlice";
-import { selectBestComponents } from "@/data/utils/component";
+import { selectComponents } from "@/data/utils/component";
 import {
   FIRST_CONTRACT_CLIENT,
   firstContract,
@@ -167,7 +167,7 @@ describe("étapes des premiers pas", () => {
       component: {
         stock: [
           ...starterStock(),
-          { id: 9, type: ComponentType.CODE, producedBy: 1 },
+          { id: 9, kind: "code", type: ComponentType.CODE, producedBy: 1 },
         ],
       },
     });
@@ -180,8 +180,26 @@ describe("premier contrat", () => {
     expect(firstContract()).toEqual(firstContract());
   });
 
+  it("demande des composants de base Code et UX", () => {
+    expect(firstContract().requirements.map((r) => r.kind)).toEqual([
+      "code",
+      "ux",
+    ]);
+  });
+
   it("le stock de départ le couvre exactement", () => {
-    const selection = selectBestComponents(
+    const stock = starterStock();
+    expect(stock.filter((c) => c.kind === "ux")).not.toHaveLength(0);
+    expect(
+      stock.every(
+        (c) =>
+          c.type ===
+          (c.kind === "code" ? ComponentType.CODE : ComponentType.UX),
+      ),
+    ).toBe(true);
+    // Ids uniques : le stock se consomme pièce par pièce.
+    expect(new Set(stock.map((c) => c.id)).size).toBe(stock.length);
+    const selection = selectComponents(
       starterStock(),
       firstContract().requirements,
     );

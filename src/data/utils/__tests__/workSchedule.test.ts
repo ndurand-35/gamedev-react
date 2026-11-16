@@ -62,7 +62,6 @@ describe("préréglages", () => {
     expect(WORK_SCHEDULES.NORMAL).toMatchObject({
       output: 1,
       morale: 0,
-      quality: 0,
     });
   });
 
@@ -130,7 +129,15 @@ describe("production", () => {
       research: { acquired: [], current: null },
       company: { buildingList: [studio(schedule)] },
       employe: { employeList: [prod()], interview: null },
-      component: { productionProgress: {}, stock: [] },
+      task: { taskList: [] },
+      product: { products: [] },
+      component: {
+        productionProgress: {},
+        productionJobs: {},
+        productionWaiting: {},
+        stock: [],
+        nextComponentId: 1,
+      },
     } as unknown as RootState;
     produceComponents(dispatch as never, state);
     const tick = dispatch.mock.calls.find(
@@ -172,40 +179,23 @@ describe("production", () => {
     }
   });
 
-  it("la fatigue du crunch abîme la qualité", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const produce = (schedule: WorkSchedule) => {
-      const dispatch = vi.fn();
-      produceComponents(
-        dispatch as never,
-        {
-          engine: { time: OFFICE_HOUR },
-          research: { acquired: [], current: null },
-          company: { buildingList: [studio(schedule)] },
-          employe: { employeList: [prod({ codeStat: 125 })], interview: null },
-          component: {
-            productionProgress: { 2: PRODUCTION_THRESHOLD - 1 },
-            stock: [],
-          },
-        } as unknown as RootState,
+  it("le rythme ne change pas les pièces, seulement leur cadence", () => {
+    // Plus de qualité : le crunch coûte du moral, pas de la finition.
+    for (const s of WORK_SCHEDULE_ORDER) {
+      expect(Object.keys(WORK_SCHEDULES[s]).sort()).toEqual(
+        ["description", "label", "morale", "output", "weeklyHours"].sort(),
       );
-      const tick = dispatch.mock.calls.find(
-        ([a]) => a.type === applyProductionTick.type,
-      );
-      return tick![0].payload.produced[0].quality as number;
-    };
-    // 125 / 50 = 2,5 : arrondi à 3 au rythme normal, 2 en crunch.
-    expect(produce("NORMAL")).toBe(3);
-    expect(produce("CRUNCH")).toBe(2);
+    }
   });
 
   it("la prévision de livraison suit le rythme du studio", () => {
     const count = (schedule: WorkSchedule) =>
       forecastProduction([prod()], {}, 0, 2000, [studio(schedule)]).length;
     const output = 100 * moraleProductivityMultiplier(100);
-    expect(count("NORMAL")).toBe(
-      Math.floor((output * 2000) / PRODUCTION_THRESHOLD),
-    );
+    // Même total qu'en continu, au découpage des heures de bureau près.
+    const continuous = Math.floor((output * 2000) / PRODUCTION_THRESHOLD);
+    expect(count("NORMAL")).toBeGreaterThanOrEqual(continuous - 1);
+    expect(count("NORMAL")).toBeLessThanOrEqual(continuous);
     expect(count("CRUNCH")).toBeGreaterThan(count("NORMAL"));
     expect(count("DETENTE")).toBeLessThan(count("NORMAL"));
   });

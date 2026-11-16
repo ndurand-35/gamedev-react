@@ -1,5 +1,6 @@
 import { ComponentType } from "@/data/interface/component";
 import { AvatarConfig } from "@/data/interface/avatar";
+import type { ComponentKindId } from "@/data/interface/component";
 
 export enum PersonType {
   PROD = "Production",
@@ -102,8 +103,6 @@ export interface CandidateSearchInfo {
 // l'équilibrage identique tout en donnant de la finesse aux valeurs.
 export const STAT_SCALE = 10;
 export const MAX_STAT_POSSIBLE = 20 * STAT_SCALE;
-/** Stat par cran de qualité d'un composant : 50 → Moyen (1), 200 → 4. */
-export const QUALITY_STAT_STEP = 5 * STAT_SCALE;
 
 export const DEFAULT_MORALE = 70;
 export const MAX_MORALE = 100;
@@ -139,7 +138,13 @@ export interface ProductionPerson extends Person {
   uxStat: number;
   uxMaxStat: number;
 
+  /** Famille où il travaille (null : rien). */
   assignedComponentType?: ComponentType | null;
+  /**
+   * Poste : la pièce précise qu'il fabrique dans cette famille. Absent ou
+   * null : Auto — la pièce la plus utile aux contrats et produits en cours.
+   */
+  post?: ComponentKindId | null;
   trainingType?: ComponentType | null;
   trainingProgress?: number;
 }
@@ -174,14 +179,12 @@ export const STAT_KEY_BY_TYPE: Record<ComponentType, ProductionStatKey> = {
   [ComponentType.UX]: "uxStat",
 };
 
-export const MAX_STAT_KEY_BY_TYPE: Record<
-  ComponentType,
-  ProductionMaxStatKey
-> = {
-  [ComponentType.CODE]: "codeMaxStat",
-  [ComponentType.VISUEL]: "visualMaxStat",
-  [ComponentType.UX]: "uxMaxStat",
-};
+export const MAX_STAT_KEY_BY_TYPE: Record<ComponentType, ProductionMaxStatKey> =
+  {
+    [ComponentType.CODE]: "codeMaxStat",
+    [ComponentType.VISUEL]: "visualMaxStat",
+    [ComponentType.UX]: "uxMaxStat",
+  };
 
 /** Toute stat de métier qu'un candidat peut porter (prod, QA, marketing). */
 export type CandidateStatKey =

@@ -1,7 +1,6 @@
 import {
   COMPONENT_GRAIN,
   Component,
-  ComponentQuality,
   ComponentType,
   Contract,
   ContractType,
@@ -21,7 +20,7 @@ export const FIRST_CONTRACT_CLIENT = {
   image: "",
 };
 
-/** Un petit programme : dix composants Code, cinq UX, sans exigence de qualité. */
+/** Un petit programme : dix composants Code, cinq UX, rien d'avancé. */
 export const firstContract = (): Contract => ({
   id: 0,
   name: "Programme de facturation",
@@ -37,8 +36,8 @@ export const firstContract = (): Contract => ({
   type: ContractType.DEV,
   taskDifficulty: 2,
   requirements: [
-    { type: ComponentType.CODE, quantity: 2 * COMPONENT_GRAIN },
-    { type: ComponentType.UX, quantity: 1 * COMPONENT_GRAIN },
+    { kind: "code", quantity: 2 * COMPONENT_GRAIN },
+    { kind: "ux", quantity: 1 * COMPONENT_GRAIN },
   ],
 });
 
@@ -47,11 +46,13 @@ export const STARTER_PRODUCER = 0;
 
 /** Stock de départ : exactement ce que demande le premier contrat. */
 export const starterStock = (): Component[] =>
-  firstContract().requirements.flatMap((req) =>
-    Array.from({ length: req.quantity }, () => ({
-      type: req.type,
-      quality: ComponentQuality.CORRECT,
-      producedBy: STARTER_PRODUCER,
-      producedAt: 0,
-    })),
-  ).map((c, i) => ({ ...c, id: i + 1 }));
+  firstContract()
+    .requirements.flatMap((req) =>
+      Array.from({ length: req.quantity }, () => ({
+        kind: req.kind,
+        type: req.kind === "code" ? ComponentType.CODE : ComponentType.UX,
+        producedBy: STARTER_PRODUCER,
+        producedAt: 0,
+      })),
+    )
+    .map((c, i) => ({ ...c, id: i + 1 }));

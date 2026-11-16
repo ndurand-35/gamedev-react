@@ -27,7 +27,11 @@ export const TEAM_ENTRIES: CodexEntry[] = [
             "Polyvalent, Développeur, Graphiste, Designer UX",
             "Produit les composants Code, Visuel et UX",
           ],
-          ["QA", "Testeur", "Intercepte une partie des bugs des produits lancés"],
+          [
+            "QA",
+            "Testeur",
+            "Intercepte une partie des bugs des produits lancés",
+          ],
           [
             "Marketing",
             "Marketeur",
@@ -75,7 +79,7 @@ export const TEAM_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "En production, la compétence du type de composant fabriqué règle à la fois la **cadence** et la **qualité** des composants. Le moral et le bâtiment modulent ensuite la cadence.",
+        text: "En production, la compétence de la famille du composant fabriqué règle la **cadence** et les **composants accessibles** : il faut 6, 11 ou 16 pour fabriquer les composants de niveau 2, 3 ou 4. Le moral et le bâtiment modulent ensuite la cadence.",
       },
       {
         type: "p",
@@ -211,7 +215,10 @@ export const TEAM_ENTRIES: CodexEntry[] = [
         head: ["Moral", "Conséquence"],
         rows: [
           ["50 et plus", "Aucune réclamation"],
-          ["Sous 50", "Demandes d'augmentation possibles, de plus en plus pressantes"],
+          [
+            "Sous 50",
+            "Demandes d'augmentation possibles, de plus en plus pressantes",
+          ],
           ["Sous 20", "Démission possible à tout moment"],
         ],
       },
@@ -286,7 +293,7 @@ export const TEAM_ENTRIES: CodexEntry[] = [
           ["Détente", "32 h", "×0,8", "+2"],
           ["Normal", "40 h", "×1", "—"],
           ["Soutenu", "50 h", "×1,2", "−2"],
-          ["Crunch", "65 h", "×1,4", "−8, et qualité en baisse"],
+          ["Crunch", "65 h", "×1,4", "−8"],
         ],
       },
       {
@@ -421,7 +428,7 @@ export const TEAM_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "Chaque mois, un produit lancé risque de voir apparaître un **bug** ; le risque grandit quand sa qualité est faible et avec son âge.",
+        text: "Chaque mois, un produit lancé risque de voir apparaître un **bug** ; le risque grandit quand sa finition est faible et avec son âge.",
       },
       {
         type: "p",

@@ -16,7 +16,7 @@ import {
 } from "@/data/redux/competitorSlice";
 import { buildRoster } from "@/data/utils/competitor";
 import { treatTasks } from "@/data/utils/task";
-import { decayComponents, produceComponents } from "@/data/utils/component";
+import { produceComponents } from "@/data/utils/component";
 import {
   processCampaignTick,
   processMonthlyBilling,
@@ -113,7 +113,6 @@ export const runGameTick = (
   const state = getState();
   treatTasks(dispatch, state);
   produceComponents(dispatch, state);
-  decayComponents(dispatch, state);
   processTrainingTick(dispatch, state);
   processLeaveTick(dispatch, state);
   processMonthlyBilling(dispatch, state);
@@ -150,9 +149,7 @@ export const runGameTick = (
   // Partie antérieure au marché (slice absent de la sauvegarde) : on
   // le peuple à partir du carnet existant avant le premier lot.
   if (state.competitor.roster.length === 0) {
-    dispatch(
-      initializeCompetitorState(buildRoster(state.task.clients)),
-    );
+    dispatch(initializeCompetitorState(buildRoster(state.task.clients)));
   }
   dispatch(
     generateAvailableContractList({
@@ -195,10 +192,7 @@ export const runGameTick = (
 };
 
 /** Auto-save sur événements clés, évaluée sur l'état d'avant le tick. */
-const maybeAutoSave = (
-  state: GameLoopState,
-  getState: () => GameLoopState,
-) => {
+const maybeAutoSave = (state: GameLoopState, getState: () => GameLoopState) => {
   const date = getTimeAsDate(state.engine.time);
   // Auto-save (MYL-24) : événements clés + filet temporel, débouncé.
   const now = Date.now();
@@ -217,10 +211,7 @@ const maybeAutoSave = (
 
   if (shouldAutoSave) {
     if (date.hour() === 0) lastAutoSaveDay = state.engine.time;
-    triggerAutoSave(
-      getState() as unknown as Record<string, unknown>,
-      now,
-    );
+    triggerAutoSave(getState() as unknown as Record<string, unknown>, now);
   }
 };
 

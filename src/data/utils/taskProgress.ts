@@ -1,5 +1,6 @@
 import { Employe, PersonType, ProductionPerson } from "@/data/interface";
 import { PRODUCTION_THRESHOLD } from "@/data/redux/componentSlice";
+import { ProductionJob, kindPoints } from "@/data/utils/production";
 import { TRAINING_THRESHOLD } from "@/data/utils/training";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,12 +23,18 @@ const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 export const employeTaskProgress = (
   emp: Employe,
   productionProgress: Record<number, number>,
+  /** Pièces en cours : une pièce avancée demande plus de points. */
+  productionJobs: Record<number, ProductionJob> = {},
 ): number | null => {
   if (emp.personType !== PersonType.PROD) return null;
   const prod = emp as ProductionPerson;
 
   if (prod.assignedComponentType) {
-    return clamp01((productionProgress[prod.id] ?? 0) / PRODUCTION_THRESHOLD);
+    const job = productionJobs[prod.id];
+    const cost = job
+      ? kindPoints(job.kind, PRODUCTION_THRESHOLD)
+      : PRODUCTION_THRESHOLD;
+    return clamp01((productionProgress[prod.id] ?? 0) / cost);
   }
   if (prod.trainingType) {
     return clamp01((prod.trainingProgress ?? 0) / TRAINING_THRESHOLD);
