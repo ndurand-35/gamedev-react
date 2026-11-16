@@ -215,13 +215,13 @@ export const BuildingEmployeView = ({
     <div className="flex h-full min-h-0 flex-col gap-3 p-3">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="font-display text-3xl font-bold">{building.name}</h1>
-        {/* Occupation (effectif sur places disponibles) et masse salariale :
-            elles varient avec les filtres. */}
-        <span className="badge h-7 bg-base-300 px-3">
-          {isFiltered
-            ? `${filtered.length} / ${employes.length} affichés`
-            : `${employes.length} / ${buildingSeats(building)} place${buildingSeats(building) > 1 ? "s" : ""}`}
-        </span>
+        {/* Effectif affiché quand un filtre en masque une partie, et masse
+            salariale de la sélection. */}
+        {isFiltered && (
+          <span className="badge h-7 bg-base-300 px-3">
+            {`${filtered.length} / ${employes.length} affichés`}
+          </span>
+        )}
         <span className="text-sm font-bold text-base-content/70">
           {formatPrice(payroll)} / mois
         </span>

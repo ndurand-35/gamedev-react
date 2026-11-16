@@ -321,9 +321,21 @@ body::before {
       --btn-shadow: 0 3px 0 var(--color-ink);
       border-width: 2px;
     }
-    .btn:not(.btn-ghost, .btn-link):active:not(:disabled, .btn-disabled),
+    /* Sélection durable (onglet, bascule) : à moitié enfoncé, le bas reste
+       aligné sur les voisins. Le clic, lui, enfonce jusqu'au bout. */
     .btn:not(.btn-ghost, .btn-link)[aria-pressed="true"],
     .btn:not(.btn-ghost, .btn-link).btn-active {
+      --btn-shadow: 0 2px 0 var(--color-ink);
+      translate: 0 2px;
+    }
+    .btn:is(.btn-sm, .btn-xs):not(.btn-ghost, .btn-link):is(
+        [aria-pressed="true"],
+        .btn-active
+      ) {
+      --btn-shadow: 0 2px 0 var(--color-ink);
+      translate: 0 1px;
+    }
+    .btn:not(.btn-ghost, .btn-link):active:not(:disabled, .btn-disabled) {
       --btn-shadow: 0 1px 0 var(--color-ink);
       translate: 0 3px;
     }
