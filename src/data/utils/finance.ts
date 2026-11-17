@@ -19,18 +19,21 @@ import {
   CompetitorProduct,
   Person,
   Product,
+  ProductGenre,
   getBuildingMonthlyCharges,
 } from "@/data/interface";
+import {
+  applyStepToMarket,
+  stepMarketAudience,
+  totalProductRevenue,
+} from "@/data/utils/audience";
 import {
   ActiveCampaign,
   Loan,
   applyLoanRepayment,
   getBuildingVariableCharges,
 } from "@/data/utils/economy";
-import {
-  computeMaintenanceCost,
-  computeProductRevenue,
-} from "@/data/utils/product";
+import { computeMaintenanceCost } from "@/data/utils/product";
 import { addMonthsToTime, getTimeAsDate } from "@/data/utils/time";
 import type { MarketConfidence } from "@/data/utils/marketDemand";
 
@@ -84,10 +87,12 @@ interface ProjectionInput {
   loans: Loan[];
   time: number;
   campaign?: ActiveCampaign;
-  /** Produits des studios concurrents : ils diluent nos parts de segment. */
+  /** Produits des studios concurrents : ils se disputent le public. */
   rivals?: CompetitorProduct[];
-  /** Confiance du public par segment : elle module la demande. */
+  /** Confiance du public par segment : elle module la population. */
   confidence?: MarketConfidence;
+  /** Utilisateurs de la concurrence diffuse par segment. */
+  diffuse?: Partial<Record<ProductGenre, number>>;
 }
 
 /** Charges immobilières du mois, ventilées fixe / variable (occupation). */
@@ -115,13 +120,11 @@ export const computeMonthlyProjection = ({
   campaign,
   rivals = [],
   confidence,
+  diffuse,
 }: ProjectionInput): FinanceProjection => {
-  const revenue = computeProductRevenue(
+  const revenue = totalProductRevenue(
+    stepMarketAudience({ products, rivals, diffuse, time, confidence, campaign }),
     products,
-    time,
-    campaign,
-    rivals,
-    confidence,
   );
   const { fixedCharges, variableCharges } = computeBuildingCharges(
     buildings,
@@ -196,6 +199,7 @@ export const computeCashProjection = ({
   money,
   rivals = [],
   confidence,
+  diffuse,
   months = PROJECTION_HORIZON_MONTHS,
 }: CashProjectionInput): CashProjection => {
   const { fixedCharges, variableCharges } = computeBuildingCharges(
@@ -209,16 +213,22 @@ export const computeCashProjection = ({
   let schedule = loans.filter((l) => l.remainingMonths > 0);
   let running = money;
   const projected: ProjectedMonth[] = [];
+  // Le marché avance mois après mois : les utilisateurs gagnés ou perdus
+  // pèsent sur les mois suivants.
+  let market = { products, rivals, diffuse: diffuse ?? {} };
 
   for (let offset = 1; offset <= months; offset++) {
     const monthTime = addMonthsToTime(time, offset - 1);
-    const revenue = computeProductRevenue(
-      products,
-      monthTime,
-      campaign,
-      rivals,
+    const step = stepMarketAudience({
+      products: market.products,
+      rivals: market.rivals,
+      diffuse: market.diffuse,
+      time: monthTime,
       confidence,
-    );
+      campaign,
+    });
+    const revenue = totalProductRevenue(step, market.products);
+    market = applyStepToMarket(step, market.products, market.rivals);
 
     let loanPayments = 0;
     const remaining: Loan[] = [];

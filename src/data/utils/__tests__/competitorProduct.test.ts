@@ -14,8 +14,10 @@ import {
 import {
   RIVAL_LAUNCH_BASE_CHANCE,
   RIVAL_LAUNCH_REPUTATION_CHANCE,
-  RIVAL_LIFETIME_MAX_MONTHS,
-  RIVAL_LIFETIME_MIN_MONTHS,
+  RIVAL_LIFETIME_MONTHS,
+  RIVAL_PRICE_MAX_RATIO,
+  RIVAL_PRICE_MIN_RATIO,
+  pickRivalModel,
   RIVAL_MAX_PRODUCTS,
   RIVAL_QUALITY_MAX,
   RIVAL_QUALITY_MIN,
@@ -27,14 +29,18 @@ import {
 } from "@/data/utils/competitorProduct";
 import {
   LAUNCH_SPIKE_MONTHS,
-  computeProductRevenue,
-  computeProductShares,
   productQualityMultiplier,
   rivalAppeal,
-  segmentReports,
 } from "@/data/utils/product";
 import { addMonthsToTime } from "@/data/utils/time";
 import { segmentDemand } from "@/data/utils/marketDemand";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
+import {
+  computeProductRevenue,
+  computeProductRevenues,
+  segmentReports,
+} from "@/data/utils/audience";
+import { timeOfYear } from "@/data/utils/technology";
 
 /** Pièces de base qui font cette taille (les produits consomment ×1,3). */
 const mix = (size: number): Recipe => ({
@@ -60,6 +66,10 @@ const ours = (over: Partial<Product> = {}): Product => ({
   bugs: 0,
   hype: 0,
   updates: 0,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL),
+  users: 0,
+  usersHistory: [],
   ...over,
 });
 
@@ -72,6 +82,9 @@ const rival = (over: Partial<CompetitorProduct> = {}): CompetitorProduct => ({
   quality: 2.5,
   launchTime: 0,
   retireAt: addMonthsToTime(0, 18),
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL),
+  users: 0,
   ...over,
 });
 
@@ -99,33 +112,52 @@ describe("rivalAppeal", () => {
   });
 });
 
-describe("dilution par les concurrents", () => {
-  it("un rival d'attractivité égale fait passer notre part de 1/2 à 1/3", () => {
+describe("partage avec les concurrents", () => {
+  it("un rival d'attractivité égale fait passer nos arrivées de 1/2 à 1/3", () => {
     const p = ours();
-    expect(computeProductShares([p], AFTER_SPIKE)[1]).toBeCloseTo(0.5);
-    expect(computeProductShares([p], AFTER_SPIKE, [rival()])[1]).toBeCloseTo(
-      1 / 3,
-    );
+    const demand = segmentDemand(ProductGenre.OUTIL, AFTER_SPIKE);
+    expect(computeProductRevenue([p], AFTER_SPIKE)).toBe(Math.round(demand / 2));
     expect(computeProductRevenue([p], AFTER_SPIKE, undefined, [rival()])).toBe(
-      Math.round(segmentDemand(ProductGenre.OUTIL, AFTER_SPIKE) / 3),
+      Math.round(demand / 3),
     );
   });
 
-  it("n'est diluée que par les rivaux du même segment", () => {
+  it("n'est partagé qu'avec les rivaux du même segment", () => {
     const p = ours();
     const elsewhere = rival({ genre: ProductGenre.JEU });
-    expect(computeProductShares([p], AFTER_SPIKE, [elsewhere])[1]).toBeCloseTo(
-      0.5,
-    );
+    expect(
+      computeProductRevenues([p], AFTER_SPIKE, undefined, [elsewhere])[1],
+    ).toBe(computeProductRevenues([p], AFTER_SPIKE)[1]);
+  });
+
+  it("un rival moins cher attire davantage", () => {
+    const p = ours();
+    const cheap = rival({ price: defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL) / 2 });
+    expect(
+      computeProductRevenue([p], AFTER_SPIKE, undefined, [cheap]),
+    ).toBeLessThan(computeProductRevenue([p], AFTER_SPIKE, undefined, [rival()]));
   });
 
   it("apparaît dans la lecture par segment", () => {
-    const reports = segmentReports([ours()], AFTER_SPIKE, [rival()]);
+    const reports = segmentReports([ours()], AFTER_SPIKE, [rival({ users: 40 })]);
     const outil = reports.find((r) => r.genre.genre === ProductGenre.OUTIL)!;
     expect(outil.rivals).toHaveLength(1);
-    expect(outil.rivalAppeal).toBe(BASE);
-    expect(outil.rivalShare).toBeCloseTo(1 / 3);
-    expect(outil.share).toBeCloseTo(1 / 3);
+    expect(outil.rivalUsers).toBe(40);
+    expect(outil.rivalShare).toBeCloseTo(40 / outil.population);
+  });
+});
+
+describe("pickRivalModel", () => {
+  it("en 1970, tout se vend à l'unité", () => {
+    expect(pickRivalModel(ProductGenre.JEU, 0, () => 0.99)).toBe(BusinessModel.SALE);
+  });
+
+  it("favorise le modèle le plus récent", () => {
+    const at = timeOfYear(2010);
+    // Poids 1, 2, 4 : au-delà de 3/7, c'est le freemium.
+    expect(pickRivalModel(ProductGenre.JEU, at, () => 0)).toBe(BusinessModel.SALE);
+    expect(pickRivalModel(ProductGenre.JEU, at, () => 0.99)).toBe(BusinessModel.FREEMIUM);
+    expect(pickRivalModel(ProductGenre.JEU, at, () => 0.3)).toBe(BusinessModel.PER_PLAY);
   });
 });
 
@@ -199,8 +231,15 @@ describe("rollRivalLaunch", () => {
     expect(low.size).toBe(GENRES[low.genre].minSize);
     expect(low.quality).toBe(RIVAL_QUALITY_MIN);
     expect(low.launchTime).toBe(1000);
-    expect(low.retireAt).toBe(1000 + RIVAL_LIFETIME_MIN_MONTHS * 30 * 24);
+    expect(low.retireAt).toBe(
+      1000 + RIVAL_LIFETIME_MONTHS[low.genre][0] * 30 * 24,
+    );
     expect(low.name).toBeTruthy();
+    expect(low.model).toBe(BusinessModel.SALE);
+    expect(low.price).toBeCloseTo(
+      defaultPrice(BusinessModel.SALE, low.genre) * RIVAL_PRICE_MIN_RATIO,
+    );
+    expect(low.users).toBe(0);
 
     // Bornes hautes : le tirage de lancement doit rester sous la chance.
     let calls = 0;
@@ -213,7 +252,10 @@ describe("rollRivalLaunch", () => {
     );
     expect(high.quality).toBeCloseTo(RIVAL_QUALITY_MAX, 1);
     expect(high.retireAt).toBeLessThanOrEqual(
-      1000 + RIVAL_LIFETIME_MAX_MONTHS * 30 * 24,
+      1000 + RIVAL_LIFETIME_MONTHS[high.genre][1] * 30 * 24,
+    );
+    expect(high.price).toBeLessThanOrEqual(
+      defaultPrice(BusinessModel.SALE, high.genre) * RIVAL_PRICE_MAX_RATIO,
     );
   });
 });

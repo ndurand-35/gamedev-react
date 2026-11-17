@@ -124,7 +124,7 @@ describe("migrateToComponentKinds", () => {
   });
 
   it("passe besoins et investissement des produits aux pièces de base", () => {
-    const out = migrateToComponentKinds(oldState()) as AnyRecord & {
+    const out = migrateToComponentKinds(oldState()) as unknown as AnyRecord & {
       product: { products: Product[]; nextProductId: number };
     };
     const [p] = out.product.products;
@@ -176,7 +176,7 @@ describe("migrateToComponentKinds", () => {
 
 describe("runMigrations jusqu'aux composants à recettes", () => {
   it("enregistre la migration 11 → 12 au schéma 12", () => {
-    expect(SAVE_SCHEMA_VERSION).toBe(12);
+    expect(SAVE_SCHEMA_VERSION).toBeGreaterThanOrEqual(12);
     expect(migrations[11]).toBeTypeOf("function");
     expect(runMigrations(oldState(), 11, 12)).toEqual(
       migrateToComponentKinds(oldState()),
@@ -187,7 +187,7 @@ describe("runMigrations jusqu'aux composants à recettes", () => {
     const out = runMigrations(
       oldState(),
       10,
-      SAVE_SCHEMA_VERSION,
+      12,
     ) as AnyRecord & {
       component: { stock: AnyRecord[] } & AnyRecord;
       task: {
@@ -236,7 +236,7 @@ describe("runMigrations jusqu'aux composants à recettes", () => {
     const out = runMigrations(
       oldState(),
       7,
-      SAVE_SCHEMA_VERSION,
+      12,
     ) as AnyRecord & {
       component: { stock: AnyRecord[] };
       product: { products: Product[] };

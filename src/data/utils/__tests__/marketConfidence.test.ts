@@ -22,6 +22,7 @@ import {
   segmentAttraction,
   pickRivalGenre,
 } from "@/data/utils/competitorProduct";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
 
 const launch = (quality: number): SegmentLaunch => ({
   genre: ProductGenre.JEU,
@@ -38,6 +39,9 @@ const rival = (over: Partial<CompetitorProduct> = {}): CompetitorProduct => ({
   quality: 1.5,
   launchTime: 0,
   retireAt: 100_000,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.JEU),
+  users: 0,
   ...over,
 });
 
@@ -56,6 +60,10 @@ const ours = (over: Partial<Product> = {}): Product => ({
   bugs: 0,
   hype: 0,
   updates: 0,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.JEU),
+  users: 0,
+  usersHistory: [],
   ...over,
 });
 

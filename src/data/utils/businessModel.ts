@@ -160,7 +160,16 @@ export const modelsUnlockedBy = (tech: TechnologyId): BusinessModel[] =>
 
 // ── Prix ─────────────────────────────────────────────────────────────────────
 
-/** Prix de référence (€) par modèle et genre. La publicité n'en a pas. */
+/**
+ * Prix de référence (€) par modèle et genre. La publicité n'en a pas.
+ *
+ * Calés pour qu'au prix de référence, un utilisateur rapporte à peu près
+ * autant par mois d'un modèle à l'autre sur un même genre (en vente unitaire :
+ * prix × attrition de base, puisque chaque départ est remplacé par un achat).
+ * Les modèles se distinguent par leur dynamique, pas par un rendement
+ * supérieur : la vente encaisse dès le lancement, les modèles récurrents
+ * bâtissent une base qui dure.
+ */
 export const REFERENCE_PRICE: Partial<
   Record<BusinessModel, Partial<Record<ProductGenre, number>>>
 > = {
@@ -170,24 +179,24 @@ export const REFERENCE_PRICE: Partial<
     [JEU]: 40,
     [PLATEFORME]: 20000,
   },
-  [BusinessModel.PER_PLAY]: { [JEU]: 0.25 },
-  [BusinessModel.ANNUAL_LICENSE]: { [OUTIL]: 1500, [PLATEFORME]: 15000 },
+  [BusinessModel.PER_PLAY]: { [JEU]: 0.15 },
+  [BusinessModel.ANNUAL_LICENSE]: { [OUTIL]: 650, [PLATEFORME]: 2200 },
   [BusinessModel.SUBSCRIPTION]: {
-    [OUTIL]: 30,
-    [SERVICE]: 15,
-    [PLATEFORME]: 500,
+    [OUTIL]: 55,
+    [SERVICE]: 17,
+    [PLATEFORME]: 190,
   },
-  [BusinessModel.FREEMIUM]: { [JEU]: 10 },
+  [BusinessModel.FREEMIUM]: { [JEU]: 30 },
 };
 
 /** Recette publicitaire par utilisateur et par mois, à la pression 3 (€). */
-export const AD_REFERENCE_REVENUE = 0.6;
+export const AD_REFERENCE_REVENUE = 6;
 
 /** Parties jouées par mois et par joueur (paiement à la partie). */
 export const PLAYS_PER_MONTH = 30;
 
 /** Part des joueurs qui paient, au prix de référence (freemium). */
-export const FREEMIUM_BASE_CONVERSION = 0.05;
+export const FREEMIUM_BASE_CONVERSION = 0.08;
 
 /** Facteur d'acquisition des modèles gratuits. */
 export const FREE_ACQUISITION_FACTOR = 2;

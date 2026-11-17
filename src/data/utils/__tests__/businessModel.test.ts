@@ -122,7 +122,7 @@ describe("facteur prix (acquisition)", () => {
       Math.pow(0.5, 0.5),
     );
     // 20 % sous la référence d'une partie : ×1,40.
-    expect(priceFactor(PER_PLAY, JEU, 0.2)).toBeCloseTo(1.398, 2);
+    expect(priceFactor(PER_PLAY, JEU, 0.12)).toBeCloseTo(1.398, 2);
   });
 
   it("est borné", () => {
@@ -139,10 +139,10 @@ describe("facteur prix (acquisition)", () => {
 });
 
 describe("conversion freemium", () => {
-  it("vaut 5 % au prix de référence et baisse quand le prix monte", () => {
-    expect(freemiumConversion(JEU, 10)).toBeCloseTo(FREEMIUM_BASE_CONVERSION);
-    expect(freemiumConversion(JEU, 20)).toBeLessThan(FREEMIUM_BASE_CONVERSION);
-    expect(freemiumConversion(JEU, 5)).toBeGreaterThan(
+  it("vaut la base au prix de référence et baisse quand le prix monte", () => {
+    expect(freemiumConversion(JEU, 30)).toBeCloseTo(FREEMIUM_BASE_CONVERSION);
+    expect(freemiumConversion(JEU, 60)).toBeLessThan(FREEMIUM_BASE_CONVERSION);
+    expect(freemiumConversion(JEU, 15)).toBeGreaterThan(
       FREEMIUM_BASE_CONVERSION,
     );
   });
@@ -152,9 +152,9 @@ describe("effets sur l'attrition", () => {
   it("le prix ne joue que pour les modèles récurrents", () => {
     expect(priceChurnFactor(SALE, OUTIL, 4000)).toBe(1);
     expect(priceChurnFactor(PER_PLAY, JEU, 1)).toBe(1);
-    expect(priceChurnFactor(ANNUAL_LICENSE, OUTIL, 1500)).toBeCloseTo(1);
+    expect(priceChurnFactor(ANNUAL_LICENSE, OUTIL, 650)).toBeCloseTo(1);
     // 10 % sous la référence d'un Outil : (0,9)^0,5 ≈ 0,95.
-    expect(priceChurnFactor(ANNUAL_LICENSE, OUTIL, 1350)).toBeCloseTo(0.949, 3);
+    expect(priceChurnFactor(ANNUAL_LICENSE, OUTIL, 585)).toBeCloseTo(0.949, 3);
     expect(priceChurnFactor(SUBSCRIPTION, SERVICE, 30)).toBeGreaterThan(1);
   });
 
@@ -213,8 +213,8 @@ describe("revenu du mois", () => {
 
   it("paiement à la partie : utilisateurs × parties × prix", () => {
     expect(
-      monthlyRevenue({ ...base, genre: JEU, model: PER_PLAY, price: 0.25 }),
-    ).toBeCloseTo(124 * PLAYS_PER_MONTH * 0.25);
+      monthlyRevenue({ ...base, genre: JEU, model: PER_PLAY, price: 0.15 }),
+    ).toBeCloseTo(124 * PLAYS_PER_MONTH * 0.15);
   });
 
   it("licence annuelle : utilisateurs × prix ÷ 12", () => {
@@ -249,8 +249,8 @@ describe("revenu du mois", () => {
         users: 10000,
         arrivals: 0,
         model: FREEMIUM,
-        price: 10,
+        price: 30,
       }),
-    ).toBeCloseTo(10000 * FREEMIUM_BASE_CONVERSION * 10);
+    ).toBeCloseTo(10000 * FREEMIUM_BASE_CONVERSION * 30);
   });
 });

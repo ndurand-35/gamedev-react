@@ -48,12 +48,14 @@ import {
 import {
   PATCH_CODE_PER_BUG,
   PRODUCT_CREATION_COST,
-  computeProductRevenues,
   launchHype,
   launchReputationDelta,
   launchScore,
   rollProductBug,
 } from "@/data/utils/product";
+import {
+  computeProductRevenues,
+} from "@/data/utils/audience";
 import { getTimeAsDate } from "@/data/utils/time";
 import { formatPrice } from "@/data/utils";
 import { Marketing, PersonType, QA } from "@/data/interface";
@@ -172,6 +174,7 @@ export const launchProductThunk =
         state.company.activeCampaign,
         state.competitor?.products ?? [],
         state.product.confidence,
+        state.product.diffuseUsers,
       )[productId] ?? 0;
 
     const reputation =

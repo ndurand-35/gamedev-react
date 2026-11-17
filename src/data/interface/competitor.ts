@@ -1,3 +1,4 @@
+import type { BusinessModel } from "@/data/utils/businessModel";
 import { ProductGenre } from "@/data/interface/product";
 
 /**
@@ -36,4 +37,12 @@ export interface CompetitorProduct {
   launchTime: number;
   /** Heure de jeu du retrait : un produit concurrent ne vit pas éternellement. */
   retireAt: number;
+  /** Modèle économique, tiré au lancement. */
+  model: BusinessModel;
+  /** Prix (€), fixé au lancement. */
+  price: number;
+  /** Pression publicitaire 1–5 (modèle Publicité seulement). */
+  adPressure?: number;
+  /** Utilisateurs actuels. */
+  users: number;
 }

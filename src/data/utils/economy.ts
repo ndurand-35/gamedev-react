@@ -197,8 +197,6 @@ export const campaignEffectiveness = (
   );
 };
 
-export const ACQUISITION_MAX_REVENUE_BONUS = 0.5; // jusqu'à +50 % de revenu
-export const RETENTION_MAX_REVENUE_BONUS = 0.3; // jusqu'à +30 % (compense la décroissance)
 export const NOTORIETY_MAX_MONTHLY_REPUTATION = 4; // +réputation/mois à pleine efficacité
 
 /**
@@ -206,18 +204,6 @@ export const NOTORIETY_MAX_MONTHLY_REPUTATION = 4; // +réputation/mois à plein
  * active. Notoriété n'affecte pas le revenu (elle agit sur la réputation).
  * Sans campagne → 1 (aucune régression sur la facturation Phase 1).
  */
-export const campaignRevenueMultiplier = (campaign?: ActiveCampaign): number => {
-  if (!campaign) return 1;
-  switch (campaign.type) {
-    case CampaignType.ACQUISITION:
-      return 1 + ACQUISITION_MAX_REVENUE_BONUS * campaign.effectiveness;
-    case CampaignType.RETENTION:
-      return 1 + RETENTION_MAX_REVENUE_BONUS * campaign.effectiveness;
-    default:
-      return 1;
-  }
-};
-
 /** Gain de réputation mensuel d'une campagne Notoriété active (≥ 1 sinon 0). */
 export const campaignMonthlyReputation = (campaign?: ActiveCampaign): number => {
   if (!campaign || campaign.type !== CampaignType.NOTORIETY) return 0;

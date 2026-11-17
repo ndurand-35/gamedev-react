@@ -7,7 +7,7 @@ import {
 } from "iconoir-react";
 
 import { useFounderSkill } from "@/data/hooks/useFounderSkill";
-import { useMarketConfidence } from "@/data/hooks/useMarket";
+import { useMarketConfidence, useDiffuseUsers } from "@/data/hooks/useMarket";
 import { useTopMenu } from "@/data/hooks/useTopMenu";
 import { useAppSelector } from "@/data/redux/hooks";
 import { selectLoanSummary } from "@/data/redux/selectors";
@@ -125,6 +125,7 @@ export const FinancePage: FC = (): ReactElement => {
   const products = useAppSelector((s) => s.product.products);
   const rivals = useAppSelector((s) => s.competitor.products);
   const confidence = useMarketConfidence();
+  const diffuse = useDiffuseUsers();
   const loans = useAppSelector((s) => s.loan.loans);
   const time = useAppSelector((s) => s.engine.time);
   // Garde défensive : une partie chargée d'un slot antérieur au slice `finance`
@@ -150,6 +151,7 @@ export const FinancePage: FC = (): ReactElement => {
         campaign,
         rivals,
         confidence,
+        diffuse,
       });
     }
     const maintenance = lastReport?.maintenance ?? 0;
@@ -171,6 +173,7 @@ export const FinancePage: FC = (): ReactElement => {
       net: revenue - expenses,
     };
   }, [
+    diffuse,
     hasForecast,
     lastReport,
     products,

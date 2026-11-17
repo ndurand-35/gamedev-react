@@ -11,6 +11,8 @@ import {
   pickAutoWriteTarget,
   pickMostRecentValid,
   SAVE_SCHEMA_VERSION,
+  MIN_COMPATIBLE_SCHEMA_VERSION,
+  withSchemaIntegrity,
   GAME_VERSION,
   AUTO_SLOT_A,
   AUTO_SLOT_B,
@@ -115,6 +117,34 @@ describe("validateLoaded", () => {
     const result = validateLoaded(meta, json);
     expect(result.integrity).toBe("outdated");
     expect(result.state).toBeNull();
+  });
+
+  it("refuse une partie antérieure au marché d'utilisateurs (incompatible)", () => {
+    const json = JSON.stringify({ engine: {} });
+    const meta = metaFor(json, {
+      schemaVersion: MIN_COMPATIBLE_SCHEMA_VERSION - 1,
+      checksum: fnv1a(json),
+    });
+    const result = validateLoaded(meta, json);
+    expect(result.integrity).toBe("incompatible");
+    expect(result.state).toBeNull();
+  });
+
+  it("signale l'incompatibilité dès la liste des slots", () => {
+    const meta = metaFor("{}", {
+      schemaVersion: MIN_COMPATIBLE_SCHEMA_VERSION - 1,
+    });
+    expect(withSchemaIntegrity(meta)?.integrity).toBe("incompatible");
+    expect(withSchemaIntegrity(metaFor("{}"))?.integrity).toBe("ok");
+    expect(withSchemaIntegrity(null)).toBeNull();
+  });
+
+  it("recharge à l'identique une partie de la version courante", () => {
+    const json = JSON.stringify({ product: { products: [], diffuseUsers: {} } });
+    const meta = metaFor(json, { checksum: fnv1a(json) });
+    const result = validateLoaded(meta, json);
+    expect(result.integrity).toBe("ok");
+    expect(result.state).toEqual(JSON.parse(json));
   });
 });
 

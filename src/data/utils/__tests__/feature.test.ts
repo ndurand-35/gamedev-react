@@ -35,6 +35,7 @@ import {
   featureTechnology,
   timeOfYear,
 } from "@/data/utils/technology";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
 
 const product = (
   genre: ProductGenre,
@@ -58,6 +59,10 @@ const product = (
     bugs: 0,
     hype: 0,
     updates: 0,
+    model: BusinessModel.SALE,
+    price: defaultPrice(BusinessModel.SALE, genre),
+    users: 0,
+    usersHistory: [],
     ...over,
   };
 };

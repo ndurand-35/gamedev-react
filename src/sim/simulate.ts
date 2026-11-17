@@ -24,9 +24,11 @@ import { runGameTick } from "@/data/redux/gameLoopMiddleware";
 import { buildRoster } from "@/data/utils/competitor";
 import { planMonthlyBilling } from "@/data/utils/billing";
 import {
-  computeProductRevenues,
   productMaintenance,
 } from "@/data/utils/product";
+import {
+  computeProductRevenues,
+} from "@/data/utils/audience";
 import { productSize } from "@/data/interface";
 import { segmentConfidence, segmentDemand } from "@/data/utils/marketDemand";
 import { techProductivity, techSalaryIndex } from "@/data/utils/technology";

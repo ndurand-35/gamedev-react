@@ -5,7 +5,6 @@ import {
   ComponentType,
   GENRES,
   GenreDef,
-  PRODUCT_GENRE_ORDER,
   Product,
   ProductGenre,
   ProductStatus,
@@ -15,10 +14,10 @@ import {
 import {
   ActiveCampaign,
   CampaignType,
-  campaignRevenueMultiplier,
   isCampaignActive,
   revenueDecayMultiplier,
 } from "@/data/utils/economy";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
 import { productBaseAppeal } from "@/data/utils/feature";
 import {
   Recipe,
@@ -33,12 +32,6 @@ import {
 } from "@/data/utils/popularity";
 import { getTimeAsDate } from "@/data/utils/time";
 import { MarketTrend, trendNaturalFactor } from "@/data/utils/trends";
-import {
-  MarketConfidence,
-  potentialDemand,
-  segmentConfidence,
-  segmentDemand,
-} from "@/data/utils/marketDemand";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Économie des produits.
@@ -143,6 +136,10 @@ export const normalizeProduct = (p: Product): Product => ({
   hype: p.hype ?? 0,
   updates: p.updates ?? 0,
   popularity: p.popularity ?? 0,
+  model: p.model ?? BusinessModel.SALE,
+  price: p.price ?? defaultPrice(p.model ?? BusinessModel.SALE, p.genre),
+  users: p.users ?? 0,
+  usersHistory: p.usersHistory ?? [],
 });
 
 // ── Attractivité ─────────────────────────────────────────────────────────────
@@ -270,167 +267,9 @@ export const launchReputationDelta = (score: number): number => {
   return 0;
 };
 
-// ── Segments ─────────────────────────────────────────────────────────────────
-
-export interface SegmentReport {
-  genre: GenreDef;
-  /** Demande mensuelle réelle du segment à cet instant (€) : potentiel × confiance. */
-  demand: number;
-  /** Demande potentielle, d'après les technologies adoptées (€). */
-  potential: number;
-  /** Confiance du public dans le segment (0,3..1). */
-  confidence: number;
-  /** Nos produits lancés sur ce segment. */
-  products: Product[];
-  /** Attractivité cumulée de nos produits. */
-  appeal: number;
-  /** Part de la demande captée par nos produits (0..1). */
-  share: number;
-  /** Revenu mensuel de nos produits sur ce segment (hors campagne). */
-  revenue: number;
-  /** Produits des studios concurrents sur ce segment. */
-  rivals: CompetitorProduct[];
-  /** Attractivité cumulée des concurrents. */
-  rivalAppeal: number;
-  /** Part de la demande captée par les concurrents (0..1). */
-  rivalShare: number;
-}
+// ── Vie du produit ───────────────────────────────────────────────────────────
 
 const isLaunched = (p: Product): boolean => p.status === ProductStatus.LAUNCHED;
-
-/**
- * Un segment à un instant donné : nos produits lancés, leurs attractivités,
- * celles des concurrents, et le dénominateur commun (concurrence diffuse +
- * tout le monde). Base unique des revenus, des parts et de la lecture.
- */
-const segmentSnapshot = (
-  genre: ProductGenre,
-  products: Product[],
-  rivals: CompetitorProduct[],
-  time: number,
-  confidence?: MarketConfidence,
-) => {
-  const def = GENRES[genre];
-  const ours = products.filter(
-    (p) => isLaunched(p) && productGenre(p).genre === genre,
-  );
-  const theirs = rivals.filter((r) => r.genre === genre);
-  const appeals = ours.map((p) => productAppeal(p, time));
-  const appeal = appeals.reduce((acc, a) => acc + a, 0);
-  const rivalTotal = theirs.reduce((acc, r) => acc + rivalAppeal(r, time), 0);
-  return {
-    def,
-    // La demande suit les technologies et la confiance du public (cf.
-    // `utils/marketDemand`).
-    demand: segmentDemand(genre, time, confidence),
-    ours,
-    theirs,
-    appeals,
-    appeal,
-    rivalTotal,
-    total: def.baseline + appeal + rivalTotal,
-  };
-};
-
-/**
- * Revenu mensuel de chaque produit lancé, par id. Sur chaque segment la demande
- * se répartit au prorata des attractivités — les nôtres, celles des
- * concurrents, et la concurrence diffuse qui garde sa part ; le pic de
- * lancement et la campagne s'appliquent ensuite produit par produit. Même
- * formule pour la facturation et les projections.
- */
-export const computeProductRevenues = (
-  products: Product[],
-  time: number,
-  campaign?: ActiveCampaign,
-  rivals: CompetitorProduct[] = [],
-  confidence?: MarketConfidence,
-): Record<number, number> => {
-  const campaignMult = campaignRevenueMultiplier(
-    isCampaignActive(campaign, time) ? campaign : undefined,
-  );
-  const revenues: Record<number, number> = {};
-  for (const genre of PRODUCT_GENRE_ORDER) {
-    const { demand, ours, appeals, total } = segmentSnapshot(
-      genre,
-      products,
-      rivals,
-      time,
-      confidence,
-    );
-    ours.forEach((p, i) => {
-      const share = total > 0 ? appeals[i] / total : 0;
-      revenues[p.id] = Math.round(
-        demand * share * launchSpikeMultiplier(p, time) * campaignMult,
-      );
-    });
-  }
-  return revenues;
-};
-
-/**
- * Part de segment de chaque produit lancé, par id (0..1) : son attractivité
- * rapportée à celle du segment, concurrents et concurrence diffuse compris.
- */
-export const computeProductShares = (
-  products: Product[],
-  time: number,
-  rivals: CompetitorProduct[] = [],
-): Record<number, number> => {
-  const shares: Record<number, number> = {};
-  for (const genre of PRODUCT_GENRE_ORDER) {
-    const { ours, appeals, total } = segmentSnapshot(
-      genre,
-      products,
-      rivals,
-      time,
-    );
-    ours.forEach((p, i) => {
-      shares[p.id] = total > 0 ? appeals[i] / total : 0;
-    });
-  }
-  return shares;
-};
-
-/** Somme des revenus produits du mois. */
-export const computeProductRevenue = (
-  products: Product[],
-  time: number,
-  campaign?: ActiveCampaign,
-  rivals: CompetitorProduct[] = [],
-  confidence?: MarketConfidence,
-): number =>
-  Object.values(
-    computeProductRevenues(products, time, campaign, rivals, confidence),
-  ).reduce((acc, r) => acc + r, 0);
-
-/** Lecture par segment : demande, nos produits, les concurrents, les parts. */
-export const segmentReports = (
-  products: Product[],
-  time: number,
-  rivals: CompetitorProduct[] = [],
-  confidence?: MarketConfidence,
-): SegmentReport[] =>
-  PRODUCT_GENRE_ORDER.map((genre) => {
-    const { def, demand, ours, theirs, appeal, rivalTotal, total } =
-      segmentSnapshot(genre, products, rivals, time, confidence);
-    const share = total > 0 ? appeal / total : 0;
-    return {
-      genre: def,
-      demand,
-      potential: potentialDemand(genre, time),
-      confidence: segmentConfidence(genre, confidence),
-      products: ours,
-      appeal,
-      share,
-      revenue: Math.round(demand * share),
-      rivals: theirs,
-      rivalAppeal: rivalTotal,
-      rivalShare: total > 0 ? rivalTotal / total : 0,
-    };
-  });
-
-// ── Vie du produit ───────────────────────────────────────────────────────────
 
 /** Maintenance mensuelle d'un produit lancé. */
 export const productMaintenance = (p: Product): number =>

@@ -1,7 +1,11 @@
 import { FC } from "react";
 
 import { formatPrice } from "@/data/utils";
-import { SegmentReport } from "@/data/utils/product";
+import {
+  AUDIENCE_UNIT,
+  SegmentReport,
+  formatUsers,
+} from "@/data/utils/audience";
 import { pct } from "@/components/product/productView";
 
 /**
@@ -21,7 +25,7 @@ export const SegmentBar: FC<{ reports: SegmentReport[] }> = ({ reports }) => (
         <div className="flex flex-row items-baseline justify-between gap-2 text-sm">
           <span className="font-medium truncate">{r.genre.genre}</span>
           <span className="tabular-nums opacity-60 text-xs whitespace-nowrap">
-            {formatPrice(r.demand)} €
+            {formatUsers(r.population)} {AUDIENCE_UNIT[r.genre.genre]}
           </span>
         </div>
         <div

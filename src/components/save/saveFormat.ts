@@ -21,6 +21,7 @@ export const INTEGRITY_LABEL: Record<Integrity, string> = {
   ok: "Occupé",
   corrupt: "Corrompu",
   outdated: "Version obsolète",
+  incompatible: "Incompatible",
 };
 
 /** Classe DaisyUI du badge selon l'intégrité. */
@@ -28,4 +29,5 @@ export const INTEGRITY_BADGE_CLASS: Record<Integrity, string> = {
   ok: "bg-white",
   corrupt: "badge-error",
   outdated: "badge-warning",
+  incompatible: "badge-warning",
 };

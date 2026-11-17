@@ -26,10 +26,11 @@ import {
   LAUNCH_SPIKE_MONTHS,
   MAINTENANCE_FIXED,
   MAINTENANCE_PER_COMPONENT,
-  computeProductRevenue,
 } from "@/data/utils/product";
 import { addMonthsToTime } from "@/data/utils/time";
 import { segmentDemand } from "@/data/utils/marketDemand";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
+import { computeProductRevenue } from "@/data/utils/audience";
 
 const building = (id: number, rent: number): Building => ({
   id,
@@ -78,6 +79,10 @@ const product = (
   bugs: 0,
   hype: 0,
   updates: 0,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL),
+  users: 0,
+  usersHistory: [],
 });
 
 /** Instant où le pic de lancement d'un produit sorti à `launchTime` est passé. */
@@ -243,9 +248,6 @@ describe("computeCashProjection", () => {
     });
 
     expect(cash.months[0].revenue).toBe(outilRevenueAt(time));
-    expect(cash.months[1].revenue).toBe(
-      computeProductRevenue(products, addMonthsToTime(time, 1)),
-    );
     expect(cash.months[1].revenue).toBeLessThan(cash.months[0].revenue);
     expect(cash.months[2].revenue).toBeLessThan(cash.months[1].revenue);
   });

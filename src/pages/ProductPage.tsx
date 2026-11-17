@@ -41,18 +41,22 @@ import {
 import {
   LAUNCH_SPIKE_MONTHS,
   PATCH_CODE_PER_BUG,
-  SegmentReport,
   bugPenalty,
   computeMaintenanceCost,
-  computeProductRevenues,
-  computeProductShares,
   launchSpikeMultiplier,
   monthsSinceLaunch,
   productBugs,
   productFreshness,
   productMaintenance,
-  segmentReports,
 } from "@/data/utils/product";
+import {
+  SegmentReport,
+  computeProductRevenues,
+  computeProductShares,
+  segmentReports,
+  AUDIENCE_UNIT,
+  formatUsers,
+} from "@/data/utils/audience";
 import {
   addFeatureThunk,
   createProductThunk,
@@ -65,7 +69,7 @@ import { CostBadges } from "@/components/product/CostBadges";
 import { PromotionPanel } from "@/components/product/PromotionPanel";
 import { TrendBadge, TrendsBar } from "@/components/product/Trends";
 import { useTrends } from "@/data/hooks/useTrends";
-import { useMarketConfidence } from "@/data/hooks/useMarket";
+import { useDiffuseUsers, useMarketConfidence } from "@/data/hooks/useMarket";
 import { MarketTrend } from "@/data/utils/trends";
 import {
   MarketConfidence,
@@ -133,7 +137,7 @@ const SegmentStrip = ({
                 ))}
             </span>
             <span className="text-xs font-extrabold tabular-nums text-base-content/70">
-              {formatPrice(r.demand)} € / mois
+              {formatUsers(r.population)} {AUDIENCE_UNIT[r.genre.genre]}
             </span>
           </div>
           {/* Nous, puis les concurrents, sur la même jauge : ce qui reste
@@ -809,6 +813,7 @@ export const ProductPage: React.FC = (): ReactElement => {
   const campaign = useAppSelector((s) => s.company.activeCampaign);
   const rivals = useAppSelector((s) => s.competitor.products);
   const confidence = useMarketConfidence();
+  const diffuse = useDiffuseUsers();
   const techWatch = useFounderSkill("tech_watch");
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -830,16 +835,25 @@ export const ProductPage: React.FC = (): ReactElement => {
   };
 
   const revenues = useMemo(
-    () => computeProductRevenues(products, time, campaign, rivals, confidence),
-    [products, time, campaign, rivals, confidence],
+    () =>
+      computeProductRevenues(
+        products,
+        time,
+        campaign,
+        rivals,
+        confidence,
+        diffuse,
+      ),
+    [products, time, campaign, rivals, confidence, diffuse],
   );
   const segments = useMemo(
-    () => segmentReports(products, time, rivals, confidence),
-    [products, time, rivals, confidence],
+    () =>
+      segmentReports(products, time, rivals, confidence, diffuse, campaign),
+    [products, time, rivals, confidence, diffuse, campaign],
   );
   const shares = useMemo(
-    () => computeProductShares(products, time, rivals),
-    [products, time, rivals],
+    () => computeProductShares(products, time, confidence),
+    [products, time, confidence],
   );
 
   const totalRevenue = Object.values(revenues).reduce((acc, r) => acc + r, 0);

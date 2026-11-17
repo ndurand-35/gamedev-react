@@ -26,7 +26,6 @@ import { AppDispatch, RootState } from "@/data/redux/store";
 import { formatPrice } from "@/data/utils";
 import {
   computeMaintenanceCost,
-  computeProductRevenue,
 } from "@/data/utils/product";
 import {
   ActiveCampaign,
@@ -42,6 +41,16 @@ import {
   isCampaignActive,
 } from "@/data/utils/economy";
 import { getTimeAsDate } from "@/data/utils/time";
+import {
+  AudienceStep,
+  productKey,
+  rivalKey,
+  stepMarketAudience,
+  totalProductRevenue,
+} from "@/data/utils/audience";
+import { applyAudienceStep } from "@/data/redux/productSlice";
+import { applyRivalAudience } from "@/data/redux/competitorSlice";
+import { PRODUCT_GENRE_ORDER, ProductStatus } from "@/data/interface";
 import { DEFAULT_ENGINE_STATE } from "@/data/utils/constant";
 
 interface LoanRepaymentPass {
@@ -145,6 +154,8 @@ export interface MonthlyBillingPlan {
   maintenance: number;
   /** Campagne marketing active au moment de la clôture, si elle tourne. */
   campaign?: ActiveCampaign;
+  /** Mois d'audience de la clôture : utilisateurs et revenus des produits. */
+  audience: AudienceStep;
   /** Trésorerie projetée après clôture ; < 0 ⇒ le mois n'est pas finançable. */
   moneyAfter: number;
 }
@@ -173,13 +184,15 @@ export const planMonthlyBilling = (state: RootState): MonthlyBillingPlan => {
   )
     ? state.company.activeCampaign
     : undefined;
-  const totalRevenue = computeProductRevenue(
-    state.product.products,
-    state.engine.time,
+  const audience = stepMarketAudience({
+    products: state.product.products,
+    rivals: state.competitor?.products ?? [],
+    diffuse: state.product.diffuseUsers,
+    time: state.engine.time,
+    confidence: state.product.confidence,
     campaign,
-    state.competitor?.products ?? [],
-    state.product.confidence,
-  );
+  });
+  const totalRevenue = totalProductRevenue(audience, state.product.products);
   const maintenance = computeMaintenanceCost(state.product.products);
 
   const loans = state.loan?.loans ?? [];
@@ -205,6 +218,7 @@ export const planMonthlyBilling = (state: RootState): MonthlyBillingPlan => {
     payroll,
     maintenance,
     campaign,
+    audience,
     moneyAfter:
       state.company.money -
       totalCharges -
@@ -358,6 +372,7 @@ export const runMonthlyBilling = (
   );
 
   dispatch(setMoney(money));
+  commitAudience(dispatch, state, plan.audience, label);
 
   // Moral du mois : la paie versée, moins ce dont chacun a à se plaindre
   // (salaire, bureaux pleins, désœuvrement) — cf. `utils/morale`.
@@ -513,5 +528,76 @@ export const processMoraleTick = (dispatch: AppDispatch, state: RootState) => {
         }),
       );
     }
+  }
+};
+
+/**
+ * Commite le mois d'audience de la clôture : utilisateurs de nos produits
+ * (bilan dans leur historique), des concurrents et de la concurrence diffuse,
+ * puis une ligne au journal par produit lancé.
+ */
+const commitAudience = (
+  dispatch: AppDispatch,
+  state: RootState,
+  audience: AudienceStep,
+  label: string,
+) => {
+  const time = state.engine.time;
+  if (state.product.lastAudienceTime === time) return;
+  const launched = state.product.products.filter(
+    (p) => p.status === ProductStatus.LAUNCHED,
+  );
+  dispatch(
+    applyAudienceStep({
+      time,
+      products: Object.fromEntries(
+        launched
+          .filter((p) => audience.entries[productKey(p.id)])
+          .map((p) => [p.id, audience.entries[productKey(p.id)]]),
+      ),
+      diffuse: Object.fromEntries(
+        PRODUCT_GENRE_ORDER.map((g) => [g, audience.segments[g].diffuse]),
+      ),
+    }),
+  );
+  dispatch(
+    applyRivalAudience(
+      Object.fromEntries(
+        (state.competitor?.products ?? [])
+          .filter((r) => audience.entries[rivalKey(r.id)])
+          .map((r) => [r.id, audience.entries[rivalKey(r.id)].users]),
+      ),
+    ),
+  );
+
+  if (launched.length === 0) return;
+  const fmt = (n: number) => Math.round(n).toLocaleString("fr-FR");
+  const lines = launched.map((p) => {
+    const r = audience.entries[productKey(p.id)];
+    if (!r) return `${p.name} : —`;
+    const net = r.arrivals - r.departures;
+    return `${p.name} ${net >= 0 ? "+" : "−"}${fmt(Math.abs(net))} (+${fmt(
+      r.arrivals,
+    )}, −${fmt(r.departures)}) → ${fmt(r.users)} utilisateurs, ${formatPrice(
+      Math.round(r.revenue),
+    )} €`;
+  });
+  dispatch(
+    pushNotification({
+      message: `Produits ${label} : ${lines.join(" ; ")}.`,
+      type: "info",
+    }),
+  );
+  for (const p of launched) {
+    const r = audience.entries[productKey(p.id)];
+    if (!r || !p.pendingShock) continue;
+    const lost = Math.round((p.users ?? 0) * p.pendingShock);
+    if (lost <= 0) continue;
+    dispatch(
+      pushNotification({
+        message: `Hausse sur « ${p.name} » : environ ${fmt(lost)} utilisateurs sont partis.`,
+        type: "warning",
+      }),
+    );
   }
 };

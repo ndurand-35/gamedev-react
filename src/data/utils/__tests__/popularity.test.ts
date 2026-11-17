@@ -39,6 +39,7 @@ import {
   startPromotionThunk,
 } from "@/data/utils/productLifecycle";
 import type { RootState } from "@/data/redux/store";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
 
 const launched = (over: Partial<Product> = {}): Product => ({
   id: 1,
@@ -57,6 +58,10 @@ const launched = (over: Partial<Product> = {}): Product => ({
   bugs: 0,
   hype: 0,
   updates: 0,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL),
+  users: 0,
+  usersHistory: [],
   popularity: 0,
   ...over,
 });

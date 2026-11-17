@@ -13,6 +13,14 @@ import {
   clientTier,
 } from "@/data/interface";
 import { capitalize } from "@/data/utils";
+import {
+  AD_PRESSURE_MAX,
+  AD_PRESSURE_MIN,
+  BusinessModel,
+  availableModels,
+  defaultPrice,
+  modelDef,
+} from "@/data/utils/businessModel";
 import { productGenre } from "@/data/utils/product";
 import { TREND_RIVAL_WEIGHT } from "@/data/utils/trends";
 
@@ -20,8 +28,9 @@ import { TREND_RIVAL_WEIGHT } from "@/data/utils/trends";
 // Les studios concurrents lancent des produits.
 //
 // Chaque mois, chaque studio du marché peut sortir un produit sur un segment ;
-// il y pèse comme les nôtres (`rivalAppeal`) et se retire au bout d'un à deux
-// ans. Le marché s'anime avec notre réputation : un studio inconnu n'attire
+// il y gagne et perd des utilisateurs comme les nôtres (`utils/audience`),
+// avec un modèle économique et un prix tirés au lancement, et se retire au
+// bout d'une durée qui dépend du genre. Le marché s'anime avec notre réputation : un studio inconnu n'attire
 // pas la concurrence, un studio en vue la provoque. Et la relation compte :
 // un partenaire (carnet d'adresses) évite les créneaux où nous sommes déjà.
 // Tout ici est pur ; le tick mensuel est dans `competitorMarket.ts`.
@@ -33,9 +42,22 @@ export const RIVAL_LAUNCH_BASE_CHANCE = 0.03;
 export const RIVAL_LAUNCH_REPUTATION_CHANCE = 0.05;
 /** Produits simultanés par studio concurrent. */
 export const RIVAL_MAX_PRODUCTS = 2;
-/** Durée de vie d'un produit concurrent (mois), tirée entre ces bornes. */
-export const RIVAL_LIFETIME_MIN_MONTHS = 12;
-export const RIVAL_LIFETIME_MAX_MONTHS = 24;
+/**
+ * Durée de vie d'un produit concurrent (mois), tirée entre ces bornes selon
+ * le genre : une plateforme garde ses utilisateurs des années, un jeu non.
+ */
+export const RIVAL_LIFETIME_MONTHS: Record<ProductGenre, [number, number]> = {
+  [ProductGenre.JEU]: [12, 24],
+  [ProductGenre.OUTIL]: [24, 48],
+  [ProductGenre.SERVICE]: [36, 60],
+  [ProductGenre.PLATEFORME]: [48, 96],
+};
+/** Prix d'un concurrent : entre 80 % et 120 % de la référence. */
+export const RIVAL_PRICE_MIN_RATIO = 0.8;
+export const RIVAL_PRICE_MAX_RATIO = 1.2;
+/** Pression publicitaire d'un concurrent : de 2 à 4. */
+export const RIVAL_AD_PRESSURE_MIN = 2;
+export const RIVAL_AD_PRESSURE_MAX = 4;
 /** Taille : entre 1× et 1,8× le minimum du genre. */
 export const RIVAL_SIZE_MIN_RATIO = 1;
 export const RIVAL_SIZE_MAX_RATIO = 1.8;
@@ -63,14 +85,39 @@ const ourGenres = (products: Product[]): Set<ProductGenre> =>
   );
 
 /**
- * Attrait d'un segment pour un studio : la demande qu'il reste à prendre par
- * produit déjà présent (les nôtres et ceux des concurrents). Un segment qui
- * grossit attire, un segment saturé fait fuir.
+ * Attrait d'un segment pour un studio : la valeur du public libre (demande
+ * en euros × part libre de la population) par produit déjà présent, les
+ * nôtres et ceux des concurrents. Un segment qui grossit attire, un segment
+ * conquis fait fuir.
  */
 export const segmentAttraction = (
   demand: number,
   presentProducts: number,
-): number => Math.max(0, demand) / (1 + Math.max(0, presentProducts));
+  freeShare = 1,
+): number =>
+  (Math.max(0, demand) * Math.max(0, Math.min(1, freeShare))) /
+  (1 + Math.max(0, presentProducts));
+
+/**
+ * Modèle d'un produit concurrent : tiré parmi ceux que le genre propose à la
+ * date, chacun pesant deux fois plus que le précédent — les studios suivent
+ * la mode.
+ */
+export const pickRivalModel = (
+  genre: ProductGenre,
+  time: number,
+  random: () => number = Math.random,
+): BusinessModel => {
+  const models = availableModels(genre, time);
+  const weights = models.map((_, i) => Math.pow(2, i));
+  const total = weights.reduce((a, w) => a + w, 0);
+  let r = random() * total;
+  for (let i = 0; i < models.length; i++) {
+    if (r < weights[i]) return models[i];
+    r -= weights[i];
+  }
+  return models[models.length - 1] ?? BusinessModel.SALE;
+};
 
 /**
  * Segment visé par un studio. Un partenaire (relation au plus haut palier)
@@ -157,9 +204,24 @@ export const rollRivalLaunch = ({
     random() * (RIVAL_SIZE_MAX_RATIO - RIVAL_SIZE_MIN_RATIO);
   const quality =
     RIVAL_QUALITY_MIN + random() * (RIVAL_QUALITY_MAX - RIVAL_QUALITY_MIN);
-  const lifetimeMonths =
-    RIVAL_LIFETIME_MIN_MONTHS +
-    random() * (RIVAL_LIFETIME_MAX_MONTHS - RIVAL_LIFETIME_MIN_MONTHS);
+  const [minLife, maxLife] = RIVAL_LIFETIME_MONTHS[genre];
+  const lifetimeMonths = minLife + random() * (maxLife - minLife);
+  const model = pickRivalModel(genre, time, random);
+  const priceRatio =
+    RIVAL_PRICE_MIN_RATIO +
+    random() * (RIVAL_PRICE_MAX_RATIO - RIVAL_PRICE_MIN_RATIO);
+  const adPressure = Math.min(
+    AD_PRESSURE_MAX,
+    Math.max(
+      AD_PRESSURE_MIN,
+      RIVAL_AD_PRESSURE_MIN +
+        Math.floor(
+          random() * (RIVAL_AD_PRESSURE_MAX - RIVAL_AD_PRESSURE_MIN + 1),
+        ),
+    ),
+  );
+  const lever = modelDef(model).lever;
+  const reference = defaultPrice(model, genre);
 
   return {
     competitorId: competitor.id,
@@ -169,6 +231,13 @@ export const rollRivalLaunch = ({
     quality: Math.round(quality * 10) / 10,
     launchTime: time,
     retireAt: time + Math.round(lifetimeMonths * HOURS_PER_MONTH),
+    model,
+    price:
+      lever === "price"
+        ? Math.round(reference * priceRatio * 100) / 100
+        : 0,
+    adPressure: lever === "adPressure" ? adPressure : undefined,
+    users: 0,
   };
 };
 

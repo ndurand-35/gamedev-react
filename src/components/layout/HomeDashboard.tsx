@@ -3,8 +3,11 @@ import { Coins, Group, ReceiveEuros, SendEuros } from "iconoir-react";
 
 import { getBuildingMonthlyCharges } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
+import { useDiffuseUsers, useMarketConfidence } from "@/data/hooks/useMarket";
 import { formatPrice } from "@/data/utils";
-import { computeProductRevenue } from "@/data/utils/product";
+import {
+  computeProductRevenue,
+} from "@/data/utils/audience";
 
 const MoneyChart = ({ history }: { history: number[] }) => {
   if (history.length < 2) {
@@ -106,6 +109,10 @@ export const HomeDashboard = () => {
   const buildings = useAppSelector((s) => s.company.buildingList);
   const employes = useAppSelector((s) => s.employe.employeList);
   const products = useAppSelector((s) => s.product.products);
+  const rivals = useAppSelector((s) => s.competitor.products);
+  const campaign = useAppSelector((s) => s.company.activeCampaign);
+  const confidence = useMarketConfidence();
+  const diffuse = useDiffuseUsers();
   const time = useAppSelector((s) => s.engine.time);
   const moneyHistory = useAppSelector((s) => s.engine.moneyHistory);
 
@@ -115,7 +122,14 @@ export const HomeDashboard = () => {
       0,
     );
     const monthlyPayroll = employes.reduce((acc, e) => acc + e.salary, 0);
-    const monthlyRevenue = computeProductRevenue(products, time);
+    const monthlyRevenue = computeProductRevenue(
+      products,
+      time,
+      campaign,
+      rivals,
+      confidence,
+      diffuse,
+    );
     const netMonthly = monthlyRevenue - monthlyCharges - monthlyPayroll;
 
     return {
@@ -124,7 +138,7 @@ export const HomeDashboard = () => {
       monthlyRevenue,
       netMonthly,
     };
-  }, [buildings, employes, products, time]);
+  }, [buildings, employes, products, time, rivals, campaign, confidence, diffuse]);
 
   return (
     <div className="space-y-4">

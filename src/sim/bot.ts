@@ -110,10 +110,12 @@ import {
 import {
   PATCH_CODE_PER_BUG,
   PRODUCT_CREATION_COST,
-  computeProductRevenues,
   productFreshness,
   productMaintenance,
 } from "@/data/utils/product";
+import {
+  computeProductRevenues,
+} from "@/data/utils/audience";
 import {
   PROMOTION_COST,
   busyMarketerIds,

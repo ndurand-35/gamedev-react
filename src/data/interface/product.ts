@@ -5,6 +5,7 @@ import {
   recipeEntries,
   recipeValue,
 } from "@/data/interface/component";
+import type { BusinessModel } from "@/data/utils/businessModel";
 import type { ProductPromotion } from "@/data/utils/popularity";
 
 export enum ProductStatus {
@@ -153,6 +154,31 @@ export interface Product {
   popularity?: number;
   /** Promotion en cours, menée par un marketeur. */
   promotion?: ProductPromotion;
+  /** Modèle économique, choisi à la création et figé. */
+  model: BusinessModel;
+  /** Prix fixé par le joueur (€), modifiable à tout moment. */
+  price: number;
+  /** Pression publicitaire 1–5 (modèle Publicité seulement). */
+  adPressure?: number;
+  /** Utilisateurs actuels (réel, arrondi à l'affichage). */
+  users: number;
+  /** Bilans des derniers mois, du plus ancien au plus récent (24 au plus). */
+  usersHistory: AudienceMonth[];
+  /**
+   * Départ ponctuel (part des utilisateurs) dû à une hausse du prix ou de la
+   * pression publicitaire, appliqué à la prochaine clôture.
+   */
+  pendingShock?: number;
+}
+
+/** Bilan d'audience d'un mois clôturé. */
+export interface AudienceMonth {
+  /** Heure de la clôture. */
+  time: number;
+  users: number;
+  arrivals: number;
+  departures: number;
+  revenue: number;
 }
 
 /** Finition d'un produit (0 à 5) : la moyenne des pièces qui le composent. */

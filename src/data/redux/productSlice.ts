@@ -29,6 +29,17 @@ import {
   updateRewindHours,
 } from "@/data/utils/product";
 import { MarketTrend, trendReachFactor } from "@/data/utils/trends";
+import {
+  AD_PRESSURE_REFERENCE,
+  BusinessModel,
+  availableModels,
+  clampAdPressure,
+  defaultPrice,
+  leverShock,
+  modelDef,
+  modelsForGenre,
+} from "@/data/utils/businessModel";
+import { AUDIENCE_HISTORY_MONTHS, EntryResult } from "@/data/utils/audience";
 import type { MarketConfidence } from "@/data/utils/marketDemand";
 import {
   PROMOTION_DURATION_HOURS,
@@ -58,6 +69,13 @@ export interface ProductState {
   confidence?: MarketConfidence;
   /** Dernier tick mensuel du marché : garde anti-doublon. */
   lastMarketTime?: number | null;
+  /**
+   * Utilisateurs de la concurrence diffuse par segment (cf. `utils/audience`).
+   * Absents en début de partie : le moteur part de l'équilibre.
+   */
+  diffuseUsers?: Partial<Record<ProductGenre, number>>;
+  /** Dernière clôture d'audience : garde anti-doublon (clôture rejouée). */
+  lastAudienceTime?: number | null;
 }
 
 const initialState: ProductState = {
@@ -69,7 +87,12 @@ const initialState: ProductState = {
   nextTrendId: 1,
   confidence: {},
   lastMarketTime: null,
+  diffuseUsers: {},
+  lastAudienceTime: null,
 };
+
+/** Départs ponctuels cumulés : 1 − (1 − a)(1 − b). */
+const combineShocks = (a = 0, b = 0): number => 1 - (1 - a) * (1 - b);
 
 /**
  * Verse des pièces dans un produit : elles comptent dans son avancement, et
@@ -97,6 +120,8 @@ export const productSlice = createSlice({
       state.nextTrendId = 1;
       state.confidence = {};
       state.lastMarketTime = null;
+      state.diffuseUsers = {};
+      state.lastAudienceTime = null;
     },
     /** État du marché après le tick mensuel (cf. `utils/market`). */
     setMarketState(
@@ -132,11 +157,22 @@ export const productSlice = createSlice({
         features: string[];
         /** Heure de jeu : refuse une fonctionnalité pas encore inventée. */
         time?: number;
+        /** Modèle économique ; vente unitaire par défaut. */
+        model?: BusinessModel;
+        /** Prix (€) ; la référence par défaut. */
+        price?: number;
+        /** Pression publicitaire 1–5 (publicité). */
+        adPressure?: number;
       }>,
     ) {
       const { name, genre, features, time } = action.payload;
       if (!isValidAssembly(genre, features)) return;
       if (time !== undefined && !isAssemblyUnlocked(features, time)) return;
+      const model = action.payload.model ?? BusinessModel.SALE;
+      const allowed =
+        time !== undefined ? availableModels(genre, time) : modelsForGenre(genre);
+      if (!allowed.includes(model)) return;
+      const price = Math.max(0, action.payload.price ?? defaultPrice(model, genre));
       state.products.push({
         id: state.nextProductId++,
         name,
@@ -151,7 +187,85 @@ export const productSlice = createSlice({
         hype: 0,
         updates: 0,
         popularity: 0,
+        model,
+        price,
+        adPressure:
+          modelDef(model).lever === "adPressure"
+            ? clampAdPressure(action.payload.adPressure ?? AD_PRESSURE_REFERENCE)
+            : undefined,
+        users: 0,
+        usersHistory: [],
       });
+    },
+    /**
+     * Nouveau prix. Sur un produit lancé, une hausse d'un modèle récurrent
+     * provoque un départ ponctuel à la prochaine clôture.
+     */
+    setProductPrice(
+      state,
+      action: PayloadAction<{ productId: number; price: number }>,
+    ) {
+      const p = state.products.find((p) => p.id === action.payload.productId);
+      if (!p || p.status === ProductStatus.RETIRED) return;
+      if (modelDef(p.model).lever !== "price") return;
+      const price = Math.max(0, action.payload.price);
+      if (p.status === ProductStatus.LAUNCHED) {
+        p.pendingShock = combineShocks(
+          p.pendingShock,
+          leverShock(p.model, p.genre, p.price, price),
+        );
+      }
+      p.price = price;
+    },
+    /** Nouvelle pression publicitaire ; une hausse provoque un départ ponctuel. */
+    setAdPressure(
+      state,
+      action: PayloadAction<{ productId: number; level: number }>,
+    ) {
+      const p = state.products.find((p) => p.id === action.payload.productId);
+      if (!p || p.status === ProductStatus.RETIRED) return;
+      if (modelDef(p.model).lever !== "adPressure") return;
+      const level = clampAdPressure(action.payload.level);
+      const before = p.adPressure ?? AD_PRESSURE_REFERENCE;
+      if (p.status === ProductStatus.LAUNCHED) {
+        p.pendingShock = combineShocks(
+          p.pendingShock,
+          leverShock(p.model, p.genre, before, level),
+        );
+      }
+      p.adPressure = level;
+    },
+    /**
+     * Clôture d'audience du mois (cf. `stepMarketAudience`) : utilisateurs,
+     * bilan du mois dans l'historique, concurrence diffuse. Idempotente.
+     */
+    applyAudienceStep(
+      state,
+      action: PayloadAction<{
+        time: number;
+        products: Record<number, EntryResult>;
+        diffuse: Partial<Record<ProductGenre, number>>;
+      }>,
+    ) {
+      const { time, products, diffuse } = action.payload;
+      if (state.lastAudienceTime === time) return;
+      state.lastAudienceTime = time;
+      state.diffuseUsers = { ...diffuse };
+      for (const p of state.products) {
+        const r = products[p.id];
+        if (!r || p.status !== ProductStatus.LAUNCHED) continue;
+        p.users = r.users;
+        p.pendingShock = undefined;
+        const history = [...(p.usersHistory ?? [])];
+        history.push({
+          time,
+          users: r.users,
+          arrivals: r.arrivals,
+          departures: r.departures,
+          revenue: Math.round(r.revenue),
+        });
+        p.usersHistory = history.slice(-AUDIENCE_HISTORY_MONTHS);
+      }
     },
     investInProduct(
       state,
@@ -312,6 +426,9 @@ export const productSlice = createSlice({
       p.status = ProductStatus.RETIRED;
       // Le marketeur qui le soutenait est libéré.
       p.promotion = undefined;
+      // Ses utilisateurs redeviennent libres.
+      p.users = 0;
+      p.pendingShock = undefined;
     },
   },
 });
@@ -331,6 +448,9 @@ export const {
   stopPromotion,
   normalizeProducts,
   retireProduct,
+  setProductPrice,
+  setAdPressure,
+  applyAudienceStep,
 } = productSlice.actions;
 
 export default productSlice.reducer;

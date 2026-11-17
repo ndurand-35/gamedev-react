@@ -44,7 +44,16 @@ export const GAME_VERSION = "0.0.0";
 // 10 : stats de métier sur 0..200 (au lieu de 0..20).
 // 11 : composants au grain fin (`COMPONENT_GRAIN`).
 // 12 : composants à recettes (`kind`), sans qualité ; postes et réservations.
-export const SAVE_SCHEMA_VERSION = 12;
+// 13 : produits à audience (utilisateurs, modèle économique, prix) — sans
+//      conversion : les parties antérieures sont incompatibles.
+export const SAVE_SCHEMA_VERSION = 13;
+
+/**
+ * Plus ancienne version de schéma que le jeu sait encore charger. En dessous,
+ * la sauvegarde est « incompatible » : le marché a changé de nature (demande
+ * en euros → utilisateurs) et aucune conversion fidèle n'existe.
+ */
+export const MIN_COMPATIBLE_SCHEMA_VERSION = 13;
 
 // Slots manuels exposés au joueur (wireframe §4 : 3 slots).
 export const MANUAL_SLOT_IDS = ["slot_1", "slot_2", "slot_3"] as const;
@@ -67,7 +76,7 @@ const RUNTIME_BLACKLIST = ["events"] as const;
 // --- Types ----------------------------------------------------------------
 
 export type SlotType = "manual" | "auto";
-export type Integrity = "ok" | "corrupt" | "outdated";
+export type Integrity = "ok" | "corrupt" | "outdated" | "incompatible";
 
 /** En-tête léger d'un slot (aperçu + métadonnées d'intégrité). */
 export interface SaveMeta {
@@ -450,6 +459,10 @@ export const validateLoaded = (meta: SaveMeta, json: string): LoadedPayload => {
   if (meta.schemaVersion > SAVE_SCHEMA_VERSION) {
     return { integrity: "outdated", state: null, meta };
   }
+  // Partie d'une version antérieure sans conversion possible.
+  if (meta.schemaVersion < MIN_COMPATIBLE_SCHEMA_VERSION) {
+    return { integrity: "incompatible", state: null, meta };
+  }
 
   // Corruption : le checksum recalculé ne correspond plus.
   if (fnv1a(json) !== meta.checksum) {
@@ -634,13 +647,27 @@ export interface SaveSlotsSnapshot {
   manual: Array<SaveMeta | null>;
 }
 
+/**
+ * Intégrité d'un en-tête telle qu'on peut la juger sans lire le payload : une
+ * version de schéma trop ancienne rend la sauvegarde incompatible.
+ */
+export const withSchemaIntegrity = (meta: SaveMeta | null): SaveMeta | null =>
+  meta &&
+  meta.integrity === "ok" &&
+  meta.schemaVersion < MIN_COMPATIBLE_SCHEMA_VERSION
+    ? { ...meta, integrity: "incompatible" }
+    : meta;
+
 /** Reconstruit la vue joueur (1 auto logique + 3 slots manuels ordonnés). */
 export const listSaves = async (): Promise<SaveSlotsSnapshot> => {
   const [auto, ...manual] = await Promise.all([
     readAutoMeta(),
     ...MANUAL_SLOT_IDS.map((id) => readMeta(id)),
   ]);
-  return { auto, manual };
+  return {
+    auto: withSchemaIntegrity(auto),
+    manual: manual.map(withSchemaIntegrity),
+  };
 };
 
 /**

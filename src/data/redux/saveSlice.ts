@@ -102,6 +102,8 @@ const INTEGRITY_MESSAGE: Record<Integrity, string> = {
   corrupt: "Sauvegarde corrompue : chargement impossible.",
   outdated:
     "Sauvegarde issue d'une version plus récente du jeu : chargement bloqué.",
+  incompatible:
+    "Partie d'une version antérieure, incompatible : le marché fonctionne désormais en utilisateurs.",
 };
 
 /** Recharge la vue joueur (auto logique + 3 slots manuels) depuis IndexedDB. */

@@ -20,7 +20,7 @@ import {
 } from "@/data/utils/alertCost";
 import { isProductionPerson } from "@/data/utils/component";
 import { computeCashProjection } from "@/data/utils/finance";
-import { useMarketConfidence } from "@/data/hooks/useMarket";
+import { useDiffuseUsers, useMarketConfidence } from "@/data/hooks/useMarket";
 import { FOUNDER_ID, hasFounderSkill } from "@/data/utils/research";
 
 export interface Alert extends CostedAlert {
@@ -62,6 +62,7 @@ export const useAlerts = (): Alert[] => {
   const products = useAppSelector((s) => s.product.products);
   const rivals = useAppSelector((s) => s.competitor.products);
   const confidence = useMarketConfidence();
+  const diffuse = useDiffuseUsers();
   const loans = useAppSelector((s) => s.loan.loans);
   const tasks = useAppSelector((s) => s.task.taskList);
   const stock = useAppSelector((s) => s.component.stock);
@@ -96,6 +97,7 @@ export const useAlerts = (): Alert[] => {
           money,
           rivals,
           confidence,
+          diffuse,
         }).breach
       : null;
     if (breach) {
@@ -244,6 +246,7 @@ export const useAlerts = (): Alert[] => {
 
     return out.sort(byMonthlyCostDesc);
   }, [
+    diffuse,
     employes,
     reputation,
     buildings,

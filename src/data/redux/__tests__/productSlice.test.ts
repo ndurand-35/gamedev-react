@@ -20,7 +20,12 @@ import productReducer, {
   launchProduct,
   patchProduct,
   retireProduct,
+  setAdPressure,
+  setProductPrice,
+  applyAudienceStep,
 } from "@/data/redux/productSlice";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
+import { timeOfYear } from "@/data/utils/technology";
 import { FEATURE_BY_ID, featureCost } from "@/data/utils/feature";
 import { UPDATE_REWIND_MONTHS } from "@/data/utils/product";
 
@@ -314,5 +319,148 @@ describe("productSlice", () => {
     );
     state = productReducer(state, retireProduct(1));
     expect(state.products[0].status).toBe(ProductStatus.RETIRED);
+  });
+});
+
+describe("productSlice — audience", () => {
+  const launched = () =>
+    productReducer(
+      readyToLaunch(),
+      launchProduct({ productId: 1, time: 100, hype: 0 }),
+    );
+
+  it("un produit naît en vente unitaire au prix de référence, sans utilisateur", () => {
+    const [p] = created().products;
+    expect(p.model).toBe(BusinessModel.SALE);
+    expect(p.price).toBe(defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL));
+    expect(p.users).toBe(0);
+    expect(p.usersHistory).toEqual([]);
+    expect(p.adPressure).toBeUndefined();
+  });
+
+  it("refuse un modèle pas encore inventé ou hors du genre", () => {
+    const at1970 = productReducer(
+      undefined,
+      createProduct({
+        name: "Outil",
+        genre: ProductGenre.OUTIL,
+        features: ["core_tool"],
+        time: 0,
+        model: BusinessModel.SUBSCRIPTION,
+      }),
+    );
+    expect(at1970.products).toEqual([]);
+    const wrongGenre = productReducer(
+      undefined,
+      createProduct({
+        name: "Outil",
+        genre: ProductGenre.OUTIL,
+        features: ["core_tool"],
+        model: BusinessModel.FREEMIUM,
+      }),
+    );
+    expect(wrongGenre.products).toEqual([]);
+  });
+
+  it("accepte un modèle disponible et son prix", () => {
+    const state = productReducer(
+      undefined,
+      createProduct({
+        name: "Outil",
+        genre: ProductGenre.OUTIL,
+        features: ["core_tool"],
+        time: timeOfYear(1990),
+        model: BusinessModel.ANNUAL_LICENSE,
+        price: 500,
+      }),
+    );
+    expect(state.products[0].model).toBe(BusinessModel.ANNUAL_LICENSE);
+    expect(state.products[0].price).toBe(500);
+  });
+
+  it("une hausse de prix d'un modèle récurrent prépare un départ ponctuel", () => {
+    let state = productReducer(
+      undefined,
+      createProduct({
+        name: "Outil",
+        genre: ProductGenre.OUTIL,
+        features: ["core_tool"],
+        model: BusinessModel.ANNUAL_LICENSE,
+        price: 600,
+      }),
+    );
+    // Avant le lancement : pas de départ.
+    state = productReducer(state, setProductPrice({ productId: 1, price: 700 }));
+    expect(state.products[0].pendingShock ?? 0).toBe(0);
+    state = {
+      ...state,
+      products: [{ ...state.products[0], status: ProductStatus.LAUNCHED }],
+    };
+    state = productReducer(state, setProductPrice({ productId: 1, price: 770 }));
+    expect(state.products[0].price).toBe(770);
+    expect(state.products[0].pendingShock).toBeCloseTo(0.05);
+    // Une baisse n'efface pas le départ annoncé.
+    state = productReducer(state, setProductPrice({ productId: 1, price: 500 }));
+    expect(state.products[0].pendingShock).toBeCloseTo(0.05);
+  });
+
+  it("en vente unitaire, changer le prix ne fait partir personne", () => {
+    let state = launched();
+    state = productReducer(state, setProductPrice({ productId: 1, price: 5000 }));
+    expect(state.products[0].price).toBe(5000);
+    expect(state.products[0].pendingShock ?? 0).toBe(0);
+  });
+
+  it("la pression publicitaire ne s'applique qu'à la publicité", () => {
+    const state = productReducer(launched(), setAdPressure({ productId: 1, level: 5 }));
+    expect(state.products[0].adPressure).toBeUndefined();
+  });
+
+  it("la clôture d'audience met à jour utilisateurs et historique, une seule fois", () => {
+    let state = launched();
+    const step = {
+      time: 1000,
+      products: { 1: { users: 12.5, arrivals: 14, departures: 1.5, revenue: 28000.4 } },
+      diffuse: { [ProductGenre.OUTIL]: 300 },
+    };
+    state = productReducer(state, applyAudienceStep(step));
+    state = productReducer(state, applyAudienceStep(step));
+    const p = state.products[0];
+    expect(p.users).toBe(12.5);
+    expect(p.usersHistory).toEqual([
+      { time: 1000, users: 12.5, arrivals: 14, departures: 1.5, revenue: 28000 },
+    ]);
+    expect(state.diffuseUsers).toEqual({ [ProductGenre.OUTIL]: 300 });
+    expect(state.lastAudienceTime).toBe(1000);
+  });
+
+  it("l'historique garde 24 mois", () => {
+    let state = launched();
+    for (let m = 1; m <= 30; m++) {
+      state = productReducer(
+        state,
+        applyAudienceStep({
+          time: m * 720,
+          products: { 1: { users: m, arrivals: 1, departures: 0, revenue: 1 } },
+          diffuse: {},
+        }),
+      );
+    }
+    expect(state.products[0].usersHistory).toHaveLength(24);
+    expect(state.products[0].usersHistory[0].users).toBe(7);
+  });
+
+  it("un produit retiré rend ses utilisateurs", () => {
+    let state = launched();
+    state = productReducer(
+      state,
+      applyAudienceStep({
+        time: 1,
+        products: { 1: { users: 50, arrivals: 50, departures: 0, revenue: 0 } },
+        diffuse: {},
+      }),
+    );
+    state = productReducer(state, retireProduct(1));
+    expect(state.products[0].users).toBe(0);
   });
 });

@@ -12,6 +12,7 @@ import employeReducer, {
 import type { RootState } from "@/data/redux/store";
 import { processMarketTick } from "@/data/utils/market";
 import { timeOfYear } from "@/data/utils/technology";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
 
 const rival = (id: number, launchTime: number): CompetitorProduct => ({
   id,
@@ -22,6 +23,9 @@ const rival = (id: number, launchTime: number): CompetitorProduct => ({
   quality: 1,
   launchTime,
   retireAt: launchTime + 100_000,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.JEU),
+  users: 0,
 });
 
 const stateAt = (

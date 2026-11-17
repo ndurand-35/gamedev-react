@@ -7,6 +7,7 @@ import competitorReducer, {
   initializeCompetitorState,
 } from "@/data/redux/competitorSlice";
 import { COMPETITOR_ROSTER_MAX } from "@/data/utils/competitor";
+import { BusinessModel } from "@/data/utils/businessModel";
 
 const acme = { id: "acme", name: "Acme", image: "" };
 const bravo = { id: "bravo", name: "Bravo", image: "" };
@@ -52,6 +53,9 @@ describe("competitorSlice", () => {
       quality: 3,
       launchTime: 0,
       retireAt: 5000,
+      model: BusinessModel.SALE,
+      price: 0,
+      users: 0,
     });
     let state = competitorReducer(undefined, initializeCompetitorState([acme]));
     state = competitorReducer(
@@ -96,6 +100,9 @@ describe("competitorSlice", () => {
             quality: 3,
             launchTime: 0,
             retireAt: 9,
+            model: BusinessModel.SALE,
+            price: 0,
+            users: 0,
           },
         ],
         retired: [],

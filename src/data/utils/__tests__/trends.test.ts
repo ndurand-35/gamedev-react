@@ -28,6 +28,7 @@ import {
   trendingGenres,
 } from "@/data/utils/trends";
 import { TECHNOLOGY_BY_ID, isFeatureUnlocked } from "@/data/utils/technology";
+import { BusinessModel, defaultPrice } from "@/data/utils/businessModel";
 
 const product = (over: Partial<Product> = {}): Product => ({
   id: 1,
@@ -46,6 +47,10 @@ const product = (over: Partial<Product> = {}): Product => ({
   bugs: 0,
   hype: 0,
   updates: 0,
+  model: BusinessModel.SALE,
+  price: defaultPrice(BusinessModel.SALE, ProductGenre.JEU),
+  users: 0,
+  usersHistory: [],
   popularity: 0,
   ...over,
 });

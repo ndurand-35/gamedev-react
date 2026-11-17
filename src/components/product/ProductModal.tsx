@@ -7,6 +7,7 @@ import {
   productSize,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
+import { useDiffuseUsers, useMarketConfidence } from "@/data/hooks/useMarket";
 import { formatPrice } from "@/data/utils";
 import {
   affinityLabel,
@@ -16,7 +17,6 @@ import {
 import {
   LAUNCH_SPIKE_MONTHS,
   bugPenalty,
-  computeProductRevenues,
   launchSpikeMultiplier,
   monthsSinceLaunch,
   productBugs,
@@ -24,8 +24,13 @@ import {
   productGenre,
   productMaintenance,
   rivalAppeal,
-  segmentReports,
 } from "@/data/utils/product";
+import {
+  computeProductRevenues,
+  segmentReports,
+  AUDIENCE_UNIT,
+  formatUsers,
+} from "@/data/utils/audience";
 import { getTimeAsDate } from "@/data/utils/time";
 import { CostBadges } from "@/components/product/CostBadges";
 import { ProductActions } from "@/components/product/ProductActions";
@@ -65,24 +70,38 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
   const roster = useAppSelector((s) => s.competitor.roster);
   const time = useAppSelector((s) => s.engine.time);
   const campaign = useAppSelector((s) => s.company.activeCampaign);
+  const confidence = useMarketConfidence();
+  const diffuse = useDiffuseUsers();
 
   const p = products.find((x) => x.id === productId);
 
   const revenue = useMemo(
     () =>
       p
-        ? (computeProductRevenues(products, time, campaign, rivals)[p.id] ?? 0)
+        ? (computeProductRevenues(
+            products,
+            time,
+            campaign,
+            rivals,
+            confidence,
+            diffuse,
+          )[p.id] ?? 0)
         : 0,
-    [p, products, time, campaign, rivals],
+    [p, products, time, campaign, rivals, confidence, diffuse],
   );
   const segment = useMemo(
     () =>
       p
-        ? segmentReports(products, time, rivals).find(
-            (r) => r.genre.genre === productGenre(p).genre,
-          )
+        ? segmentReports(
+            products,
+            time,
+            rivals,
+            confidence,
+            diffuse,
+            campaign,
+          ).find((r) => r.genre.genre === productGenre(p).genre)
         : undefined,
-    [p, products, time, rivals],
+    [p, products, time, rivals, confidence, diffuse, campaign],
   );
   const studioName = useMemo(
     () => new Map(roster.map((c) => [c.id, c.name])),
@@ -95,11 +114,6 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
   const features = p ? productFeatures(p) : [];
   const bugs = p ? productBugs(p) : 0;
   const spike = p && launched ? launchSpikeMultiplier(p, time) : 1;
-  const myShare =
-    segment && p && launched && segment.appeal > 0
-      ? segment.share * (productBaseAppeal(p) > 0 ? 1 : 0)
-      : 0;
-  void myShare;
 
   return (
     <Modal
@@ -253,7 +267,8 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
               <section className="flex flex-col gap-1.5">
                 <h4 className="font-display text-base font-semibold">
                   Son segment — {segment.genre.genre},{" "}
-                  {formatPrice(segment.demand)} € / mois
+                  {formatUsers(segment.population)}{" "}
+                  {AUDIENCE_UNIT[segment.genre.genre]}
                 </h4>
                 <div className="toy-tile flex flex-col gap-2 px-4 py-3">
                   <div className="flex h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-base-300">

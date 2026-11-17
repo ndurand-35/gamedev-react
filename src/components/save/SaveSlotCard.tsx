@@ -91,6 +91,11 @@ export const SaveSlotCard: FC<SaveSlotCardProps> = ({
                 Sauvegarde plus récente que le jeu : chargement bloqué.
               </p>
             )}
+            {integrity === "incompatible" && (
+              <p className="text-xs font-bold text-warning">
+                Partie d'une version antérieure, incompatible.
+              </p>
+            )}
           </>
         ) : (
           <p className="text-sm font-semibold text-base-content/60">

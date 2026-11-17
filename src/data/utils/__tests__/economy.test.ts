@@ -1,7 +1,12 @@
+import {
+  ACQUISITION_APPEAL_BONUS,
+  RETENTION_CHURN_REDUCTION,
+  acquisitionAppealMultiplier,
+  retentionChurnMultiplier,
+} from "@/data/utils/audience";
 import { describe, it, expect } from "vitest";
 
 import {
-  ACQUISITION_MAX_REVENUE_BONUS,
   BANKRUPTCY_CONSECUTIVE_MONTHS,
   BANKRUPTCY_HARD_FLOOR,
   BUG_BASE_PROGRESSION_LOSS,
@@ -26,7 +31,6 @@ import {
   buildAmortizationSchedule,
   campaignEffectiveness,
   campaignMonthlyReputation,
-  campaignRevenueMultiplier,
   computeMonthlyPayment,
   computeQaBugOutcome,
   createLoanFromOffer,
@@ -214,29 +218,34 @@ const campaign = (
   effectiveness: number,
 ): ActiveCampaign => ({ type, effectiveness, startTime: 0, endTime: 720 });
 
-describe("campaignRevenueMultiplier", () => {
-  it("vaut 1 sans campagne (aucune régression Phase 1)", () => {
-    expect(campaignRevenueMultiplier(undefined)).toBe(1);
+describe("campagnes et audience", () => {
+  it("sans campagne, rien ne bouge", () => {
+    expect(acquisitionAppealMultiplier(undefined, 0)).toBe(1);
+    expect(retentionChurnMultiplier(undefined, 0)).toBe(1);
   });
 
-  it("Acquisition booste le revenu jusqu'à +50%", () => {
+  it("Acquisition rend nos produits plus attrayants, jusqu'à +50 %", () => {
     expect(
-      campaignRevenueMultiplier(campaign(CampaignType.ACQUISITION, 1)),
-    ).toBeCloseTo(1 + ACQUISITION_MAX_REVENUE_BONUS, 5);
-  });
-
-  it("Notoriété n'affecte pas le revenu", () => {
-    expect(campaignRevenueMultiplier(campaign(CampaignType.NOTORIETY, 1))).toBe(
-      1,
-    );
-  });
-
-  it("Rétention booste moins qu'Acquisition à efficacité égale", () => {
+      acquisitionAppealMultiplier(campaign(CampaignType.ACQUISITION, 1), 0),
+    ).toBeCloseTo(1 + ACQUISITION_APPEAL_BONUS, 5);
     expect(
-      campaignRevenueMultiplier(campaign(CampaignType.RETENTION, 1)),
-    ).toBeLessThan(
-      campaignRevenueMultiplier(campaign(CampaignType.ACQUISITION, 1)),
-    );
+      retentionChurnMultiplier(campaign(CampaignType.ACQUISITION, 1), 0),
+    ).toBe(1);
+  });
+
+  it("Rétention réduit l'attrition, jusqu'à moitié", () => {
+    expect(
+      retentionChurnMultiplier(campaign(CampaignType.RETENTION, 1), 0),
+    ).toBeCloseTo(1 - RETENTION_CHURN_REDUCTION, 5);
+  });
+
+  it("Notoriété ne touche pas l'audience ; une campagne finie non plus", () => {
+    expect(
+      acquisitionAppealMultiplier(campaign(CampaignType.NOTORIETY, 1), 0),
+    ).toBe(1);
+    expect(
+      acquisitionAppealMultiplier(campaign(CampaignType.ACQUISITION, 1), 720),
+    ).toBe(1);
   });
 });
 

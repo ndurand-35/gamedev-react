@@ -61,10 +61,21 @@ export const competitorSlice = createSlice({
         state.products.push({ ...launch, id: state.nextProductId++ });
       }
     },
+    /** Clôture d'audience : utilisateurs de chaque produit concurrent, par id. */
+    applyRivalAudience(state, action: PayloadAction<Record<number, number>>) {
+      for (const p of state.products ?? []) {
+        const users = action.payload[p.id];
+        if (users !== undefined) p.users = users;
+      }
+    },
   },
 });
 
-export const { initializeCompetitorState, ensureCompetitor, applyMarketTick } =
-  competitorSlice.actions;
+export const {
+  initializeCompetitorState,
+  ensureCompetitor,
+  applyMarketTick,
+  applyRivalAudience,
+} = competitorSlice.actions;
 
 export default competitorSlice.reducer;
