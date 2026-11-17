@@ -7,6 +7,7 @@ import { formatPrice } from "@/data/utils";
 import { SENIORITY_LABEL } from "@/data/utils/recruitment";
 import { CandidateStatBars } from "@/components/employe/CandidateStatBars";
 import { TraitBadges } from "@/components/employe/TraitBadges";
+import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 
 // Temps restant avant qu'un candidat ne quitte le vivier (heures de jeu).
 const remainingLabel = (hours: number): string => {
@@ -37,6 +38,8 @@ export const CandidateCvCard: FC<Props> = ({
   onOpen,
 }) => {
   const revealed = !!candidate.revealedStats;
+  // Caractère et traits : après entretien, ou sur dossier avec la formation.
+  const knowsPersonality = useFounderSkill("character_reading") || revealed;
   const name = `${candidate.firstName} ${candidate.lastName}`;
   const salary = candidate.expectedSalary ?? candidate.salary;
   const left = candidate.expiresAt == null ? null : candidate.expiresAt - now;
@@ -88,7 +91,7 @@ export const CandidateCvCard: FC<Props> = ({
         </header>
 
         <CandidateStatBars candidate={candidate} />
-        {revealed && <TraitBadges person={candidate} />}
+        {knowsPersonality && <TraitBadges person={candidate} />}
 
         <footer className="flex items-center justify-between gap-2">
           <span className="text-sm tabular-nums">

@@ -134,6 +134,8 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
   // demandent toujours l'entretien.
   const hasCvReading = useFounderSkill("cv_reading");
   const knowsProfile = revealed || hasCvReading;
+  // Caractère et traits : après entretien, ou sur dossier avec la formation.
+  const knowsPersonality = useFounderSkill("character_reading") || revealed;
 
   const [offer, setOffer] = useState<number>(
     knowsProfile ? expected : BLIND_OFFER,
@@ -314,7 +316,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
                   {candidate.seniority &&
                     ` · ${SENIORITY_LABEL[candidate.seniority]}`}
                 </span>
-                {revealed ? (
+                {knowsPersonality ? (
                   <TraitBadges person={candidate} size="sm" />
                 ) : (
                   <span className="rounded-full bg-base-200 px-2.5 py-0.5 text-xs font-extrabold text-base-content/70">
@@ -386,7 +388,7 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
               </div>
             )}
 
-            {revealed && <HireAmbiancePreview candidate={candidate} />}
+            {knowsPersonality && <HireAmbiancePreview candidate={candidate} />}
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* Profil */}

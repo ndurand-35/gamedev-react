@@ -262,7 +262,7 @@ export const TEAM_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "Chaque salarié, fondateur compris, a un **type de caractère** : Organisateur, Chef de file, Artisan, Stratège, Animateur, Fonceur, Rêveur ou Franc-tireur. Comme les traits, il se révèle à l'**entretien** ou par le process RH.",
+        text: "Chaque salarié, fondateur compris, a un **type de caractère** : Organisateur, Chef de file, Artisan, Stratège, Animateur, Fonceur, Rêveur ou Franc-tireur. Comme les traits, il se révèle à l'**entretien** ou par le process RH, ou dès le dossier avec la formation **Lecture des caractères** du fondateur.",
       },
       {
         type: "p",

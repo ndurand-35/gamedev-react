@@ -51,6 +51,7 @@ describe("catalogue des compétences du fondateur", () => {
   it("calcule le palier depuis la profondeur des prérequis", () => {
     expect(skillTier(advisor)).toBe(0);
     expect(skillTier(estimate)).toBe(1);
+    expect(skillTier(getFounderSkill("character_reading"))).toBe(2);
   });
 });
 

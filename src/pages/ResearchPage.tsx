@@ -19,6 +19,7 @@ import {
   Reports,
   StatsUpSquare,
   Truck,
+  UserBadgeCheck,
   Xmark,
 } from "iconoir-react";
 
@@ -69,6 +70,7 @@ const SKILL_ICON: Record<FounderSkillId, typeof Truck> = {
   tech_watch: AntennaSignal,
   cv_reading: Page,
   social_climate: Community,
+  character_reading: UserBadgeCheck,
 };
 
 /** Couleur de la branche, exposée en `--c` aux classes du nœud. */

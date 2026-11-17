@@ -25,6 +25,7 @@ export type FounderSkillId =
   | "market_study"
   | "cv_reading"
   | "social_climate"
+  | "character_reading"
   | "tech_watch";
 
 /**
@@ -143,6 +144,18 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
     cost: 4000,
     durationHours: 12 * 24,
     requires: "cv_reading",
+  },
+  {
+    id: "character_reading",
+    name: "Lecture des caractères",
+    branch: "equipe",
+    description:
+      "Deviner une personnalité sur dossier : le caractère d'un candidat et ses traits, avant même de le recevoir.",
+    unlocks:
+      "Le caractère et les traits des candidats sont visibles sans entretien ; avec « Climat social », leur entente prévue avec chaque bâtiment aussi.",
+    cost: 6000,
+    durationHours: 18 * 24,
+    requires: "social_climate",
   },
   {
     id: "tech_watch",
