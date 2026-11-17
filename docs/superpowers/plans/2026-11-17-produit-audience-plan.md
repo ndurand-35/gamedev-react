@@ -160,3 +160,31 @@ constantes des étapes 1–2.
 ## Fin
 
 Revue du diff complet, puis proposition de fusion dans `main` à l'utilisateur.
+
+## Bilan de l'étape 8 (2026-11-17)
+
+Simulations de 40 ans, 3 graines (`npm run sim`), médianes :
+
+| Variante | Trésorerie 2009 | Produits / an (1990-2009) | Garde-fous |
+|---|---|---|---|
+| `main` (référence) | 150 M€ | 1,9 à 2,6 M€ | tous tiennent |
+| Branche, vente unitaire (défaut du bot) | 171 M€ | 2,2 à 3,4 M€ | tous tiennent |
+| Branche, modèle le plus récent (`SIM_MODEL=latest`) | 152 M€ | 1,2 à 2,1 M€ | part produits < 25 % certaines années |
+| Prix −30 % (`SIM_PRICE=0.7`, latest) | 91 M€ | — | idem |
+| Prix +30 % (`SIM_PRICE=1.3`, latest) | 132 M€ | — | idem |
+
+Réglages issus de la simulation :
+
+- prix de référence : règle d'équivalence + remboursement en 36 mois (cf. spec §3) ;
+- courbe de prix `exp(−(r^s − 1) ÷ s)` : le prix de référence maximise le revenu
+  (l'élasticité constante rendait la hausse de prix toujours rentable) ;
+- équilibre exact de la concurrence diffuse : `a ÷ (a + c − a·c)`.
+
+Limite connue : le bot n'ajoute jamais de fonctionnalité et ne corrige jamais
+de bug (`featuresAdded` et `patches` à 0, déjà sur `main`). Il relance ses
+produits au lieu de les entretenir, ce qui condamne les modèles récurrents ;
+il joue donc la vente unitaire par défaut. Les modèles récurrents ne seront
+validés en simulation qu'une fois l'entretien du bot réparé.
+
+Test `simulation.test.ts` (« premier produit la deuxième année ») : en échec
+déjà sur `main`, indépendant de ce chantier.

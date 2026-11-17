@@ -30,14 +30,8 @@ import {
 import { timeOfYear } from "@/data/utils/technology";
 
 const { OUTIL, SERVICE, JEU, PLATEFORME } = ProductGenre;
-const {
-  SALE,
-  PER_PLAY,
-  ANNUAL_LICENSE,
-  SUBSCRIPTION,
-  ADVERTISING,
-  FREEMIUM,
-} = BusinessModel;
+const { SALE, PER_PLAY, ANNUAL_LICENSE, SUBSCRIPTION, ADVERTISING, FREEMIUM } =
+  BusinessModel;
 
 const at = (year: number) => timeOfYear(year);
 
@@ -114,21 +108,34 @@ describe("facteur prix (acquisition)", () => {
     expect(defaultPrice(SALE, JEU)).toBe(40);
   });
 
-  it("suit l'élasticité du genre", () => {
-    // Jeu : 1,5 — deux fois moins cher attire 2^1,5 ≈ 2,83 fois plus.
-    expect(priceFactor(SALE, JEU, 20)).toBeCloseTo(Math.pow(2, 1.5));
-    // Plateforme : 0,5 — deux fois plus cher n'attire que 2^-0,5 ≈ 0,71.
-    expect(priceFactor(SALE, PLATEFORME, 40000)).toBeCloseTo(
-      Math.pow(0.5, 0.5),
+  it("suit la sensibilité du genre", () => {
+    // Jeu (s = 1,5), deux fois moins cher : exp((1 − 0,5^1,5) / 1,5).
+    expect(priceFactor(SALE, JEU, 20)).toBeCloseTo(
+      Math.exp((1 - Math.pow(0.5, 1.5)) / 1.5),
     );
-    // 20 % sous la référence d'une partie : ×1,40.
-    expect(priceFactor(PER_PLAY, JEU, 0.12)).toBeCloseTo(1.398, 2);
+    // Plateforme (s = 0,5), deux fois plus chère : exp(−(2^0,5 − 1) / 0,5).
+    expect(priceFactor(SALE, PLATEFORME, 40000)).toBeCloseTo(
+      Math.exp(-(Math.SQRT2 - 1) / 0.5),
+    );
+    // 20 % sous la référence d'une partie : ×1,21.
+    expect(priceFactor(PER_PLAY, JEU, 0.2)).toBeCloseTo(1.209, 2);
+  });
+
+  it("le prix de référence maximise le revenu, quel que soit le genre", () => {
+    for (const genre of [OUTIL, SERVICE, JEU, PLATEFORME]) {
+      const ref = defaultPrice(SALE, genre);
+      const revenue = (r: number) => r * priceFactor(SALE, genre, ref * r);
+      for (const r of [0.5, 0.7, 0.9, 1.1, 1.3, 2]) {
+        expect(revenue(r), `${genre} ×${r}`).toBeLessThan(revenue(1));
+      }
+    }
   });
 
   it("est borné", () => {
-    expect(priceFactor(SALE, JEU, 1)).toBe(PRICE_FACTOR_MAX);
     expect(priceFactor(SALE, JEU, 0)).toBe(PRICE_FACTOR_MAX);
     expect(priceFactor(SALE, JEU, 10000)).toBe(PRICE_FACTOR_MIN);
+    // Gratuit ou presque : la demande plafonne d'elle-même, sans s'envoler.
+    expect(priceFactor(SALE, JEU, 0.01)).toBeLessThanOrEqual(PRICE_FACTOR_MAX);
   });
 
   it("les modèles gratuits ont un facteur fixe", () => {
@@ -140,9 +147,9 @@ describe("facteur prix (acquisition)", () => {
 
 describe("conversion freemium", () => {
   it("vaut la base au prix de référence et baisse quand le prix monte", () => {
-    expect(freemiumConversion(JEU, 30)).toBeCloseTo(FREEMIUM_BASE_CONVERSION);
-    expect(freemiumConversion(JEU, 60)).toBeLessThan(FREEMIUM_BASE_CONVERSION);
-    expect(freemiumConversion(JEU, 15)).toBeGreaterThan(
+    expect(freemiumConversion(JEU, 45)).toBeCloseTo(FREEMIUM_BASE_CONVERSION);
+    expect(freemiumConversion(JEU, 90)).toBeLessThan(FREEMIUM_BASE_CONVERSION);
+    expect(freemiumConversion(JEU, 20)).toBeGreaterThan(
       FREEMIUM_BASE_CONVERSION,
     );
   });
@@ -213,8 +220,8 @@ describe("revenu du mois", () => {
 
   it("paiement à la partie : utilisateurs × parties × prix", () => {
     expect(
-      monthlyRevenue({ ...base, genre: JEU, model: PER_PLAY, price: 0.15 }),
-    ).toBeCloseTo(124 * PLAYS_PER_MONTH * 0.15);
+      monthlyRevenue({ ...base, genre: JEU, model: PER_PLAY, price: 0.25 }),
+    ).toBeCloseTo(124 * PLAYS_PER_MONTH * 0.25);
   });
 
   it("licence annuelle : utilisateurs × prix ÷ 12", () => {
@@ -249,8 +256,28 @@ describe("revenu du mois", () => {
         users: 10000,
         arrivals: 0,
         model: FREEMIUM,
-        price: 30,
+        price: 45,
       }),
-    ).toBeCloseTo(10000 * FREEMIUM_BASE_CONVERSION * 30);
+    ).toBeCloseTo(10000 * FREEMIUM_BASE_CONVERSION * 45);
+  });
+});
+
+describe("calage des prix de référence", () => {
+  it("un utilisateur récurrent rembourse la vente en 36 mois au plus", () => {
+    const monthly: [BusinessModel, ProductGenre, number][] = [
+      [ANNUAL_LICENSE, OUTIL, 650 / 12],
+      [ANNUAL_LICENSE, PLATEFORME, 6700 / 12],
+      [SUBSCRIPTION, OUTIL, 60],
+      [SUBSCRIPTION, SERVICE, 25],
+      [SUBSCRIPTION, PLATEFORME, 550],
+      [PER_PLAY, JEU, 0.25 * PLAYS_PER_MONTH],
+    ];
+    for (const [model, genre, perMonth] of monthly) {
+      expect(referencePrice(model, genre)).toBeGreaterThan(0);
+      expect(
+        defaultPrice(SALE, genre) / perMonth,
+        `${model} ${genre}`,
+      ).toBeLessThanOrEqual(37);
+    }
   });
 });

@@ -37,6 +37,12 @@ const year = (y: number, over: Partial<YearRecord> = {}): YearRecord => ({
   rescueLoans: 0,
   demand: perGenre(10_000),
   confidence: perGenre(1),
+  audience: Object.fromEntries(
+    PRODUCT_GENRE_ORDER.map((g) => [
+      g,
+      { population: 1000, ours: 200, rivals: 200, diffuse: 300, free: 300 },
+    ]),
+  ) as YearRecord["audience"],
   salaryIndex: 1,
   productivity: 1,
   studios: 10,
@@ -84,5 +90,29 @@ describe("garde-fous de l'équilibre", () => {
     ]);
     expect(violations.some((v) => v.includes("Trésorerie"))).toBe(true);
     expect(violations.some((v) => v.includes("méfiant"))).toBe(true);
+  });
+});
+
+describe("garde-fous de l'audience", () => {
+  it("signale un segment qui compte plus d'utilisateurs que sa population", () => {
+    const over = year(1980);
+    over.audience = {
+      ...over.audience,
+      [ProductGenre.JEU]: {
+        population: 1000,
+        ours: 800,
+        rivals: 300,
+        diffuse: 300,
+        free: 0,
+      },
+    };
+    const result = {
+      seed: 1,
+      bankruptAt: null,
+      years: [over],
+    } as unknown as SimulationResult;
+    expect(balanceViolations([result]).join(" ")).toMatch(
+      /plus d'utilisateurs que sa population/,
+    );
   });
 });

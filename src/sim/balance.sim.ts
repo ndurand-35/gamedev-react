@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { balanceViolations } from "@/sim/guardrails";
 import { renderReport } from "@/sim/report";
 import { simulate } from "@/sim/simulate";
-import type { SchedulePolicy } from "@/sim/bot";
+import type { ModelPolicy, SchedulePolicy } from "@/sim/bot";
 
 // Lancement : `npm run sim` (3 parties de 40 ans, ~10 min). Réglages :
 //   SIM_YEARS=15 SIM_SEEDS=1,2,3,4,5 npm run sim
@@ -21,6 +21,10 @@ const SEEDS = (process.env.SIM_SEEDS ?? "1,2,3")
   .map((s) => Number(s.trim()))
   .filter((n) => Number.isFinite(n));
 const SCHEDULE = (process.env.SIM_SCHEDULE ?? "NORMAL") as SchedulePolicy;
+// SIM_PRICE=0.7 : le bot joue 30 % sous la référence (1,3 : au-dessus).
+const PRICE_RATIO = Number(process.env.SIM_PRICE ?? 1);
+// SIM_MODEL=latest : le bot joue le modèle le plus récent (défaut : la vente).
+const MODEL_POLICY = (process.env.SIM_MODEL ?? "sale") as ModelPolicy;
 // SIM_AMENITIES=0 : le bot n'achète aucun aménagement (comparaison).
 const AMENITIES = process.env.SIM_AMENITIES !== "0";
 // Suffixe des fichiers de sortie : plusieurs simulations en parallèle.
@@ -40,6 +44,8 @@ it(`simule ${SEEDS.length} partie(s) sur ${YEARS} ans`, () => {
       years: YEARS,
       schedule: SCHEDULE,
       amenities: AMENITIES,
+      priceRatio: PRICE_RATIO,
+      modelPolicy: MODEL_POLICY,
       onYear: (y) =>
         appendFileSync(
           progress,

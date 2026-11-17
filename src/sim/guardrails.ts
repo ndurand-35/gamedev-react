@@ -1,4 +1,5 @@
-import { PRODUCT_GENRE_ORDER } from "@/data/interface";
+import { PRODUCT_GENRE_ORDER, ProductGenre } from "@/data/interface";
+import { BASE_CHURN } from "@/data/utils/audience";
 import { COMPETITOR_ROSTER_MAX } from "@/data/utils/competitor";
 import { CONFIDENCE_WARNING } from "@/data/utils/marketConfidence";
 import { productShare } from "@/sim/report";
@@ -44,6 +45,38 @@ export const balanceViolations = (results: SimulationResult[]): string[] => {
   for (const r of results) {
     if (r.bankruptAt !== null) {
       out.push(`Graine ${r.seed} : faillite en ${r.bankruptAt}.`);
+    }
+    // Audience : jamais plus d'utilisateurs que la population, jamais négatif.
+    for (const y of r.years) {
+      for (const g of PRODUCT_GENRE_ORDER) {
+        const a = y.audience?.[g];
+        if (!a) continue;
+        const parts = [a.ours, a.rivals, a.diffuse, a.free];
+        if (parts.some((n) => n < 0)) {
+          out.push(`Graine ${r.seed}, ${y.year} : audience négative sur ${g}.`);
+        }
+        // Tolérance d'arrondi : un utilisateur par réservoir.
+        if (a.ours + a.rivals + a.diffuse > a.population + 3) {
+          out.push(
+            `Graine ${r.seed}, ${y.year} : ${g} compte plus d'utilisateurs que sa population.`,
+          );
+        }
+      }
+    }
+  }
+
+  // Ordre des départs : une règle de conception, pas un réglage.
+  const order: ProductGenre[] = [
+    ProductGenre.PLATEFORME,
+    ProductGenre.SERVICE,
+    ProductGenre.OUTIL,
+    ProductGenre.JEU,
+  ];
+  for (let i = 1; i < order.length; i++) {
+    if (BASE_CHURN[order[i - 1]] >= BASE_CHURN[order[i]]) {
+      out.push(
+        `Attrition : ${order[i - 1]} doit garder ses utilisateurs plus longtemps que ${order[i]}.`,
+      );
     }
   }
 

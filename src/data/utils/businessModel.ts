@@ -163,12 +163,18 @@ export const modelsUnlockedBy = (tech: TechnologyId): BusinessModel[] =>
 /**
  * Prix de référence (€) par modèle et genre. La publicité n'en a pas.
  *
- * Calés pour qu'au prix de référence, un utilisateur rapporte à peu près
- * autant par mois d'un modèle à l'autre sur un même genre (en vente unitaire :
- * prix × attrition de base, puisque chaque départ est remplacé par un achat).
- * Les modèles se distinguent par leur dynamique, pas par un rendement
- * supérieur : la vente encaisse dès le lancement, les modèles récurrents
- * bâtissent une base qui dure.
+ * Deux règles, la plus généreuse l'emporte :
+ *   • équivalence : à l'équilibre, un produit rapporte autant d'un modèle à
+ *     l'autre. En vente unitaire, un utilisateur rapporte en moyenne prix ×
+ *     attrition de base (chaque départ est remplacé par un achat) ; un modèle
+ *     récurrent par tête vaut ce montant × son multiplicateur d'attrition
+ *     (qui retient mieux garde plus d'utilisateurs), la moitié s'il est
+ *     gratuit (il en attire deux fois plus) ;
+ *   • remboursement : un utilisateur récurrent rapporte le prix de vente
+ *     équivalent en 36 mois au plus. Sans elle, une plateforme sous licence
+ *     mettrait une décennie à rattraper la vente (constaté en simulation).
+ * La vente encaisse dès le lancement ; un modèle récurrent rapporte moins les
+ * premières années, puis davantage une fois sa base bâtie.
  */
 export const REFERENCE_PRICE: Partial<
   Record<BusinessModel, Partial<Record<ProductGenre, number>>>
@@ -179,18 +185,26 @@ export const REFERENCE_PRICE: Partial<
     [JEU]: 40,
     [PLATEFORME]: 20000,
   },
-  [BusinessModel.PER_PLAY]: { [JEU]: 0.15 },
-  [BusinessModel.ANNUAL_LICENSE]: { [OUTIL]: 650, [PLATEFORME]: 2200 },
+  // Équivalence : 40 € × 12 % × 1,5 ÷ 30 parties.
+  [BusinessModel.PER_PLAY]: { [JEU]: 0.25 },
+  // Remboursement : 2 000 € ÷ 36 × 12 ; 20 000 € ÷ 36 × 12.
+  [BusinessModel.ANNUAL_LICENSE]: { [OUTIL]: 650, [PLATEFORME]: 6700 },
+  // Outil : équivalence (2 000 € × 3 %) ; Service et Plateforme :
+  // remboursement (900 € ÷ 36, 20 000 € ÷ 36).
   [BusinessModel.SUBSCRIPTION]: {
-    [OUTIL]: 55,
-    [SERVICE]: 17,
-    [PLATEFORME]: 190,
+    [OUTIL]: 60,
+    [SERVICE]: 25,
+    [PLATEFORME]: 550,
   },
-  [BusinessModel.FREEMIUM]: { [JEU]: 30 },
+  // 40 € × 12 % × 1,5 ÷ 2 ÷ 8 % de payeurs.
+  [BusinessModel.FREEMIUM]: { [JEU]: 45 },
 };
 
-/** Recette publicitaire par utilisateur et par mois, à la pression 3 (€). */
-export const AD_REFERENCE_REVENUE = 6;
+/**
+ * Recette publicitaire par utilisateur et par mois, à la pression 3 (€) :
+ * 900 € × 2 % × 1,3 ÷ 2.
+ */
+export const AD_REFERENCE_REVENUE = 12;
 
 /** Parties jouées par mois et par joueur (paiement à la partie). */
 export const PLAYS_PER_MONTH = 30;
@@ -215,7 +229,12 @@ export const AD_PRESSURE_MIN = 1;
 export const AD_PRESSURE_MAX = 5;
 export const AD_PRESSURE_REFERENCE = 3;
 
-/** Sensibilité au prix par genre : le Jeu y est le plus sensible. */
+/**
+ * Sensibilité au prix par genre (s) : le Jeu y est le plus sensible. Elle règle
+ * la courbure de la demande autour du prix de référence (cf.
+ * `priceRatioFactor`), la force du départ ponctuel d'une hausse et l'effet du
+ * prix sur l'attrition.
+ */
 export const PRICE_ELASTICITY: Record<ProductGenre, number> = {
   [JEU]: 1.5,
   [OUTIL]: 1,
@@ -240,6 +259,12 @@ export const defaultPrice = (model: BusinessModel, genre: ProductGenre): number 
  * (référence ÷ prix)^élasticité, borné. Un prix nul ou négatif vaut le plafond ;
  * sans référence, neutre.
  */
+/**
+ * Demande relative à un prix : exp(−(r^s − 1) ÷ s), r = prix ÷ référence. Son
+ * élasticité vaut r^s : exactement 1 au prix de référence, qui est donc le prix
+ * qui maximise le revenu, quel que soit le genre. Plus s est grand, plus un
+ * écart (en baisse comme en hausse) coûte. Bornée.
+ */
 const priceRatioFactor = (
   model: BusinessModel,
   genre: ProductGenre,
@@ -248,8 +273,9 @@ const priceRatioFactor = (
   const ref = referencePrice(model, genre);
   if (ref === undefined) return 1;
   if (price <= 0) return PRICE_FACTOR_MAX;
+  const s = PRICE_ELASTICITY[genre];
   return clamp(
-    Math.pow(ref / price, PRICE_ELASTICITY[genre]),
+    Math.exp(-(Math.pow(price / ref, s) - 1) / s),
     PRICE_FACTOR_MIN,
     PRICE_FACTOR_MAX,
   );

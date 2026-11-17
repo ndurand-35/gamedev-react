@@ -28,6 +28,7 @@ import {
 } from "@/data/utils/product";
 import {
   computeProductRevenues,
+  segmentReports,
 } from "@/data/utils/audience";
 import { productSize } from "@/data/interface";
 import { segmentConfidence, segmentDemand } from "@/data/utils/marketDemand";
@@ -38,6 +39,7 @@ import { trainingCostPerTick } from "@/data/utils/training";
 import {
   Bot,
   BotCounters,
+  ModelPolicy,
   SchedulePolicy,
   emptyCounters,
 } from "@/sim/bot";
@@ -49,6 +51,15 @@ import { createSimStore, simDispatch, simState } from "@/sim/simStore";
 // heure, et le joueur automatique qui agit chaque jour et chaque mois. On en
 // tire un bilan par année.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Répartition de la population d'un segment au 31 décembre. */
+export interface YearAudience {
+  population: number;
+  ours: number;
+  rivals: number;
+  diffuse: number;
+  free: number;
+}
 
 export interface YearRecord {
   year: number;
@@ -82,6 +93,8 @@ export interface YearRecord {
   rescueLoans: number;
   demand: Record<ProductGenre, number>;
   confidence: Record<ProductGenre, number>;
+  /** Audience au 31 décembre, par segment. */
+  audience: Record<ProductGenre, YearAudience>;
   salaryIndex: number;
   productivity: number;
   /** Studios au marché et produits concurrents en vente au 31 décembre. */
@@ -192,6 +205,8 @@ export const simulate = ({
   schedule = "NORMAL",
   amenities = true,
   productsFromMonth = 0,
+  priceRatio = 1,
+  modelPolicy = "sale",
 }: {
   seed: number;
   years: number;
@@ -201,6 +216,10 @@ export const simulate = ({
   amenities?: boolean;
   /** Mois avant le premier projet produit du bot (joueur « contrats d'abord »). */
   productsFromMonth?: number;
+  /** Prix joué par le bot, en part de la référence. */
+  priceRatio?: number;
+  /** Modèle économique joué par le bot. */
+  modelPolicy?: ModelPolicy;
   /** Appelé à chaque année close : suivi de progression. */
   onYear?: (record: YearRecord) => void;
 }): SimulationResult => {
@@ -214,7 +233,14 @@ export const simulate = ({
     });
     const dispatch = store.dispatch as (a: unknown) => unknown;
     newGame(dispatch);
-    const bot = new Bot(store, schedule, amenities, productsFromMonth);
+    const bot = new Bot(
+      store,
+      schedule,
+      amenities,
+      productsFromMonth,
+      priceRatio,
+      modelPolicy,
+    );
 
     const records: YearRecord[] = [];
     const months: MonthRecord[] = [];
@@ -302,6 +328,24 @@ export const simulate = ({
               100,
           ]),
         ) as Record<ProductGenre, number>,
+        audience: Object.fromEntries(
+          segmentReports(
+            state.product.products,
+            time,
+            state.competitor.products,
+            state.product.confidence,
+            state.product.diffuseUsers,
+          ).map((r) => [
+            r.genre.genre,
+            {
+              population: Math.round(r.population),
+              ours: Math.round(r.users),
+              rivals: Math.round(r.rivalUsers),
+              diffuse: Math.round(r.diffuse),
+              free: Math.round(r.free),
+            },
+          ]),
+        ) as Record<ProductGenre, YearAudience>,
         salaryIndex: Math.round(techSalaryIndex(time) * 100) / 100,
         productivity: Math.round(techProductivity(time) * 100) / 100,
         studios: state.competitor.roster.length,
@@ -356,6 +400,7 @@ export const simulate = ({
           plan.campaign,
           before.competitor?.products ?? [],
           before.product.confidence,
+          before.product.diffuseUsers,
         );
         for (const p of before.product.products) {
           if (p.status !== ProductStatus.LAUNCHED) continue;

@@ -117,7 +117,12 @@ describe("attrition", () => {
   it("est plafonnée", () => {
     expect(
       churnBreakdown(
-        entry({ genre: JEU, model: BusinessModel.PER_PLAY, freshness: 0, bugs: 20 }),
+        entry({
+          genre: JEU,
+          model: BusinessModel.PER_PLAY,
+          freshness: 0,
+          bugs: 20,
+        }),
       ).rate,
     ).toBe(CHURN_CAP);
   });
@@ -157,8 +162,13 @@ describe("pas mensuel", () => {
 
   it("l'élan et la campagne Acquisition augmentent les arrivées", () => {
     const ref = stepAudience({ entries: [entry()], time: 0 });
-    const boosted = stepAudience({ entries: [entry({ launchBoost: 1.5 })], time: 0 });
-    expect(boosted.entries.p1.arrivals).toBeGreaterThan(ref.entries.p1.arrivals);
+    const boosted = stepAudience({
+      entries: [entry({ launchBoost: 1.5 })],
+      time: 0,
+    });
+    expect(boosted.entries.p1.arrivals).toBeGreaterThan(
+      ref.entries.p1.arrivals,
+    );
     const campaign = {
       type: CampaignType.ACQUISITION,
       effectiveness: 1,

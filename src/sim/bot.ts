@@ -111,6 +111,7 @@ import {
   PATCH_CODE_PER_BUG,
   PRODUCT_CREATION_COST,
   productFreshness,
+  monthsSinceLaunch,
   productMaintenance,
 } from "@/data/utils/product";
 import {
@@ -123,6 +124,21 @@ import {
   productPopularity,
 } from "@/data/utils/popularity";
 import { segmentDemand } from "@/data/utils/marketDemand";
+import {
+  BusinessModel,
+  availableModels,
+  defaultPrice,
+  modelDef,
+} from "@/data/utils/businessModel";
+
+/**
+ * Modèle économique joué par le bot. Par défaut, la vente unitaire : le bot
+ * relance ses produits plutôt que de les entretenir (il n'ajoute pas de
+ * fonctionnalités et ne corrige pas les bugs), ce qui condamne les modèles où
+ * l'on paie tant qu'on reste — leur base fond avec l'âge du produit.
+ * « latest » joue le modèle le plus récent de l'époque (SIM_MODEL=latest).
+ */
+export type ModelPolicy = "latest" | "sale";
 import { techProductivity, techSalaryIndex } from "@/data/utils/technology";
 import type { RootState } from "@/data/redux/store";
 import { SimStore, simDispatch, simState } from "@/sim/simStore";
@@ -146,6 +162,11 @@ const REFRESH_BELOW = 0.7;
 const EXPAND_BELOW_SHARE = 0.4;
 /** Mois de revenu sous la maintenance avant de retirer un produit. */
 const RETIRE_AFTER_MONTHS = 3;
+/**
+ * Un modèle où l'on paie tant qu'on reste part de zéro et bâtit sa base : le
+ * bot ne le juge pas avant ce délai (mois depuis le lancement).
+ */
+const RECURRING_GRACE_MONTHS = 36;
 /** Signatures de contrats au plus par jour. */
 const CONTRACTS_PER_DAY = 3;
 /** Profils demandés par recherche au pôle emploi. */
@@ -349,6 +370,10 @@ export class Bot {
      * un joueur qui vit d'abord des contrats, comme le tutoriel l'y invite.
      */
     private readonly productsFromMonth = 0,
+    /** Prix joué, en part de la référence (1 = au prix de référence). */
+    private readonly priceRatio = 1,
+    /** Modèle joué : le plus récent de l'époque, ou toujours la vente. */
+    private readonly modelPolicy: ModelPolicy = "sale",
   ) {}
 
   private get state(): RootState {
@@ -1097,9 +1122,16 @@ export class Bot {
       state.company.activeCampaign,
       state.competitor?.products ?? [],
       state.product.confidence,
+      state.product.diffuseUsers,
     );
     for (const p of state.product.products) {
       if (p.status !== ProductStatus.LAUNCHED) continue;
+      if (
+        modelDef(p.model).recurring &&
+        monthsSinceLaunch(p, state.engine.time) < RECURRING_GRACE_MONTHS
+      ) {
+        continue;
+      }
       const losing = (revenues[p.id] ?? 0) < productMaintenance(p);
       const months = losing ? (this.lowRevenueMonths.get(p.id) ?? 0) + 1 : 0;
       this.lowRevenueMonths.set(p.id, months);
@@ -1234,6 +1266,7 @@ export class Bot {
       state.company.activeCampaign,
       rivals,
       state.product.confidence,
+      state.product.diffuseUsers,
     );
     const open = PRODUCT_GENRE_ORDER.map((g) => {
       const demand = segmentDemand(g, time, state.product.confidence);
@@ -1271,12 +1304,19 @@ export class Bot {
     const cost = PRODUCT_CREATION_COST[genre];
     if (this.state.company.money < cost + creationReserve(this.state))
       return undefined;
+    const models = availableModels(genre, time);
+    const model =
+      this.modelPolicy === "sale"
+        ? BusinessModel.SALE
+        : (models[models.length - 1] ?? BusinessModel.SALE);
     const result = this.dispatch(
       createProductThunk({
         name: `${genre} ${++this.productSerial}`,
         genre,
         features,
         time,
+        model,
+        price: defaultPrice(model, genre) * this.priceRatio,
       }) as never,
     ) as unknown as { ok: boolean };
     if (!result.ok) return undefined;
@@ -1314,6 +1354,7 @@ export class Bot {
         state.company.activeCampaign,
         state.competitor?.products ?? [],
         state.product.confidence,
+        state.product.diffuseUsers,
       );
       target = state.product.products
         .filter(

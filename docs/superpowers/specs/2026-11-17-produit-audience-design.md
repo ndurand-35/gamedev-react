@@ -146,22 +146,53 @@ Modèles par genre :
 ### Prix de référence
 
 Un prix de référence par couple modèle × genre, **fixe** dans ce chantier
-(la croissance passe par la population). Ordres de grandeur, calibrés par
-simulation : jeu en boîte ~40 €, outil vendu ~2 000 €, partie 0,25 €,
-abonnement Service ~15 €/mois. La publicité a une recette de référence par
-utilisateur et par mois.
+(la croissance passe par la population). La publicité a une recette de
+référence par utilisateur et par mois.
+
+Règles de calage (étape 8), la plus généreuse l'emporte :
+
+- **équivalence** : à l'équilibre et au prix de référence, un produit rapporte
+  autant d'un modèle à l'autre. En vente unitaire, un utilisateur rapporte en
+  moyenne prix × attrition de base ; un modèle récurrent par tête vaut ce
+  montant × son multiplicateur d'attrition, divisé par 2 s'il est gratuit ;
+- **remboursement** : un utilisateur récurrent rapporte le prix de vente
+  équivalent en 36 mois au plus. Sans elle, un modèle récurrent mettait
+  jusqu'à 1 ÷ attrition mois (13 ans pour une plateforme sous licence) à
+  rattraper la vente : jamais un bon choix.
+
+La vente encaisse dès le lancement ; un modèle récurrent rapporte moins les
+premières années, puis davantage une fois sa base bâtie.
+
+| Modèle | Outil | Service | Jeu | Plateforme |
+|---|---|---|---|---|
+| Vente unitaire | 2 000 € | 900 € | 40 € | 20 000 € |
+| Paiement à la partie | — | — | 0,25 € la partie | — |
+| Licence annuelle | 650 €/an | — | — | 6 700 €/an |
+| Abonnement | 60 €/mois | 25 €/mois | — | 550 €/mois |
+| Freemium (8 % de payeurs) | — | — | 45 €/mois | — |
+| Publicité | — | 12 €/utilisateur/mois | — | — |
+
+La population de 1970 est déduite de la demande en euros de l'ancien marché :
+au prix de référence en vente unitaire, l'économie de départ est identique.
 
 ### Facteur prix (acquisition)
 
 ```
-facteur prix = clamp((référence ÷ prix)^élasticité, 0,1, 3)
+r = prix ÷ référence
+facteur prix = clamp(exp(−(r^s − 1) ÷ s), 0,1, 3)
 ```
 
-Élasticité par genre : Jeu 1,5 ; Outil 1,0 ; Service 0,8 ; Plateforme 0,5.
+Sensibilité `s` par genre : Jeu 1,5 ; Outil 1,0 ; Service 0,8 ; Plateforme 0,5.
+L'élasticité de cette courbe vaut `r^s` : 1 au prix de référence, qui est donc
+le prix qui maximise le revenu pour tous les genres (une élasticité constante
+inférieure à 1 rendait la hausse de prix toujours rentable — constaté en
+simulation). La sensibilité règle ce que coûte un écart.
 
 Modèles gratuits (publicité, freemium) : facteur prix fixe **×2**.
 Freemium : le prix des achats intégrés ne joue que sur la conversion,
-`conversion = 5 % × clamp((référence ÷ prix)^élasticité, 0,1, 3)`.
+`conversion = 8 % × facteur prix (même courbe)`.
+
+Effet du prix sur l'attrition des modèles récurrents borné entre ×0,5 et ×3.
 
 ### Pression publicitaire
 
