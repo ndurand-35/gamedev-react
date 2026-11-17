@@ -8,6 +8,10 @@ import { SortState, nextSort, sortBy } from "@/data/utils/sort";
 
 export const pct = (ratio: number): string => `${Math.round(ratio * 100)} %`;
 
+/** Largeur CSS d'une part (0..1) : sans espace, contrairement à `pct`. */
+export const cssWidth = (ratio: number): string =>
+  `${Math.max(0, Math.min(100, ratio * 100)).toFixed(2)}%`;
+
 export const formatScore = (score: number): string =>
   score.toFixed(1).replace(".", ",");
 

@@ -1,7 +1,7 @@
 import { FC } from "react";
 
 import { SegmentReport, formatUsers } from "@/data/utils/audience";
-import { pct } from "@/components/product/productView";
+import { cssWidth, pct } from "@/components/product/productView";
 
 /**
  * Répartition de la population d'un segment : notre studio, les concurrents,
@@ -20,11 +20,11 @@ export const PopulationBar: FC<{ report: SegmentReport; compact?: boolean }> = (
       (compact ? "h-2.5" : "h-3.5")
     }
   >
-    <div className="h-full bg-sun" style={{ width: pct(r.share) }} />
-    <div className="h-full bg-secondary" style={{ width: pct(r.rivalShare) }} />
+    <div className="h-full bg-sun" style={{ width: cssWidth(r.share) }} />
+    <div className="h-full bg-secondary" style={{ width: cssWidth(r.rivalShare) }} />
     <div
       className="h-full bg-base-content/35"
-      style={{ width: pct(r.diffuseShare) }}
+      style={{ width: cssWidth(r.diffuseShare) }}
     />
   </div>
 );
