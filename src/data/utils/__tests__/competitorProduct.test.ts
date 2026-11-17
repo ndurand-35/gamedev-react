@@ -26,6 +26,7 @@ import {
   pickRivalGenre,
   rivalLaunchChance,
   rollRivalLaunch,
+  segmentAttraction,
 } from "@/data/utils/competitorProduct";
 import {
   LAUNCH_SPIKE_MONTHS,
@@ -266,5 +267,17 @@ describe("expiredRivals", () => {
     const later = rival({ id: 2, retireAt: 200 });
     expect(expiredRivals([soon, later], 150).map((r) => r.id)).toEqual([1]);
     expect(expiredRivals([soon, later], 50)).toEqual([]);
+  });
+});
+
+describe("segmentAttraction", () => {
+  it("vaut la demande libre par produit présent", () => {
+    expect(segmentAttraction(12000, 0)).toBe(12000);
+    expect(segmentAttraction(12000, 2)).toBe(4000);
+    expect(segmentAttraction(12000, 0, 0.25)).toBe(3000);
+  });
+
+  it("un segment conquis n'attire plus", () => {
+    expect(segmentAttraction(12000, 0, 0)).toBe(0);
   });
 });

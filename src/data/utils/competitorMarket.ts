@@ -12,6 +12,7 @@ import { trendingGenres } from "@/data/utils/trends";
 import { PRODUCT_GENRE_ORDER, ProductStatus } from "@/data/interface";
 import { segmentDemand } from "@/data/utils/marketDemand";
 import { segmentAttraction } from "@/data/utils/competitorProduct";
+import { segmentFreeShare } from "@/data/utils/audience";
 
 /**
  * Tick mensuel du marché, à la première heure du mois : les produits
@@ -33,8 +34,9 @@ export const processCompetitorMarket = (
   const alive = rivals.filter((r) => !retiredIds.has(r.id));
   const clients = state.task.clients ?? {};
 
-  // Les studios suivent l'argent : demande réelle du segment (technologies et
-  // confiance du public) par produit déjà présent, les nôtres compris.
+  // Les studios suivent l'argent : la valeur du public encore libre sur le
+  // segment (demande réelle × part libre de la population), par produit déjà
+  // présent, les nôtres compris. Un segment conquis ne les attire plus.
   const genreWeights = Object.fromEntries(
     PRODUCT_GENRE_ORDER.map((g) => {
       const present =
@@ -47,6 +49,14 @@ export const processCompetitorMarket = (
         segmentAttraction(
           segmentDemand(g, time, state.product.confidence),
           present,
+          segmentFreeShare(
+            g,
+            state.product.products,
+            alive,
+            time,
+            state.product.confidence,
+            state.product.diffuseUsers,
+          ),
         ),
       ];
     }),
