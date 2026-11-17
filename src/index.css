@@ -73,6 +73,11 @@
   --color-visuel-soft: #e3a3bc;
   --color-ux-soft: #dcb68c;
   --color-role-fullstack: #cdb8f0;
+  /* Branches de l'arbre des formations (page Recherche). */
+  --color-branch-atelier: #2a63cc;
+  --color-branch-gestion: #b25e00;
+  --color-branch-marche: #c2336b;
+  --color-branch-equipe: #6b4fc2;
   --shadow-toy: 0 5px 0 var(--color-ink);
   --shadow-toy-sm: 0 3px 0 var(--color-ink);
 }

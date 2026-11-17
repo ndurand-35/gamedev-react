@@ -16,11 +16,13 @@ import { produceComponents } from "@/data/utils/component";
 import { estimateContractLeadTime } from "@/data/utils/deliveryAdvisor";
 import {
   FOUNDER_SKILLS,
+  RESEARCH_BRANCHES,
   checkResearchStart,
   getFounderSkill,
   processResearchTick,
   researchHoursLeft,
   researchProgress,
+  skillTier,
   startFounderResearch,
 } from "@/data/utils/research";
 
@@ -36,6 +38,19 @@ describe("catalogue des compétences du fondateur", () => {
       expect(s.durationHours).toBeGreaterThan(0);
       if (s.requires) expect(ids).toContain(s.requires);
     }
+  });
+
+  it("garde chaque prérequis dans la branche de la formation (liens verticaux de l'arbre)", () => {
+    const branches = RESEARCH_BRANCHES.map((b) => b.id);
+    for (const s of FOUNDER_SKILLS) {
+      expect(branches).toContain(s.branch);
+      if (s.requires) expect(getFounderSkill(s.requires).branch).toBe(s.branch);
+    }
+  });
+
+  it("calcule le palier depuis la profondeur des prérequis", () => {
+    expect(skillTier(advisor)).toBe(0);
+    expect(skillTier(estimate)).toBe(1);
   });
 });
 

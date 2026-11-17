@@ -26,9 +26,30 @@ export type FounderSkillId =
   | "cv_reading"
   | "tech_watch";
 
+/**
+ * Branches de l'arbre des formations : ce que la formation éclaire. Une
+ * formation et son prérequis sont toujours dans la même branche.
+ */
+export type ResearchBranchId = "atelier" | "gestion" | "marche" | "equipe";
+
+export interface ResearchBranchDef {
+  id: ResearchBranchId;
+  name: string;
+  /** Sous-titre court sous le nom de la branche. */
+  hint: string;
+}
+
+export const RESEARCH_BRANCHES: ResearchBranchDef[] = [
+  { id: "atelier", name: "Atelier", hint: "produire, livrer" },
+  { id: "gestion", name: "Gestion", hint: "l'argent" },
+  { id: "marche", name: "Marché", hint: "produits, techno" },
+  { id: "equipe", name: "Équipe", hint: "recruter" },
+];
+
 export interface FounderSkillDef {
   id: FounderSkillId;
   name: string;
+  branch: ResearchBranchId;
   /** Ce que le fondateur apprend, en une phrase. */
   description: string;
   /** Ce que ça débloque concrètement dans l'interface. */
@@ -45,6 +66,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "delivery_advisor",
     name: "Arbitrage de livraison",
+    branch: "atelier",
     description:
       "Projeter l'atelier dans le temps : ce que l'équipe va produire, recettes comprises, et quand chaque contrat sera livrable.",
     unlocks:
@@ -55,6 +77,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "contract_estimate",
     name: "Estimation de délai",
+    branch: "atelier",
     description:
       "Lire un contrat avant de le signer : combien de temps il faudra, avec le stock et l'effectif actuels, pour réunir les composants demandés.",
     unlocks:
@@ -66,6 +89,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "management_control",
     name: "Contrôle de gestion",
+    branch: "gestion",
     description:
       "Mettre un prix sur chaque problème : salaire versé pour rien, loyer d'un local vide, production perdue par un moral en berne.",
     unlocks:
@@ -76,6 +100,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "cash_forecast",
     name: "Prévision de trésorerie",
+    branch: "gestion",
     description:
       "Projeter les comptes sur les mois à venir : revenus qui s'érodent, échéancier des prêts, masse salariale.",
     unlocks:
@@ -87,6 +112,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "market_study",
     name: "Étude de marché",
+    branch: "marche",
     description:
       "Savoir ce qu'un segment attend : quelles fonctionnalités y pèsent double, lesquelles n'y changent presque rien.",
     unlocks:
@@ -97,6 +123,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "cv_reading",
     name: "Lecture de CV",
+    branch: "equipe",
     description:
       "Jauger un candidat sur dossier : ce qu'il espère gagner et comment il négociera, avant même de le recevoir.",
     unlocks:
@@ -107,6 +134,7 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
   {
     id: "tech_watch",
     name: "Veille technologique",
+    branch: "marche",
     description:
       "Suivre les laboratoires et les salons : savoir quelle technologie arrive, quand, et ce qu'elle changera au marché.",
     unlocks:
@@ -119,6 +147,13 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
 
 export const getFounderSkill = (id: FounderSkillId): FounderSkillDef =>
   FOUNDER_SKILLS.find((s) => s.id === id)!;
+
+/**
+ * Palier d'une formation dans l'arbre : 0 sans prérequis, 1 avec un prérequis
+ * sans prérequis, etc.
+ */
+export const skillTier = (def: FounderSkillDef): number =>
+  def.requires ? skillTier(getFounderSkill(def.requires)) + 1 : 0;
 
 export const hasFounderSkill = (
   acquired: FounderSkillId[],

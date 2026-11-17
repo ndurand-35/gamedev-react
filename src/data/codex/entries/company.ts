@@ -393,7 +393,7 @@ export const COMPANY_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "La page **Entreprise → Recherche / formation** liste les compétences que le **fondateur** peut acquérir. Une compétence acquise l'est pour toute la partie.",
+        text: "La page **Entreprise → Recherche / formation** présente en arbre les compétences que le **fondateur** peut acquérir, rangées en quatre branches (Atelier, Gestion, Marché, Équipe) : une compétence se débloque quand celle du dessus est acquise. Une compétence acquise l'est pour toute la partie.",
       },
       {
         type: "table",
