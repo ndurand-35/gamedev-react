@@ -126,7 +126,9 @@ Fichiers : `NewProductModal.tsx`, `ProductModal.tsx`, `ProductActions.tsx`,
   pression 3).
 - Fiche : utilisateurs, arrivées, départs, revenu ; courbe 24 mois ; modèle ;
   champ prix (ou pression 1–5) avec référence et effets estimés ; avertissement
-  de choc sur une hausse.
+  de choc sur une hausse ; bloc « Pourquoi ils partent » (facteurs
+  d'attrition).
+- Maquettes de référence : https://claude.ai/artifact/VcrmKEKSZpmtjuoQa3WXq4
 - Marché : barre de population (studio, concurrents, diffuse, libre).
 - Concurrents : utilisateurs et modèle.
 - Journal : annonce des modèles à l'arrivée de leur technologie ; arrivées et

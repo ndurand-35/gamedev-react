@@ -208,7 +208,9 @@ Supprimés : le calcul « demande × part » (`computeProductRevenues`,
   prix préréglé sur la référence (ou pression 3).
 - **Fiche** (`ProductModal`) : utilisateurs, arrivées et départs du mois,
   revenu ; courbe des utilisateurs sur 24 mois ; modèle ; prix modifiable (ou
-  pression), référence, effet estimé sur l'acquisition et l'attrition.
+  pression), référence, effet estimé sur l'acquisition et l'attrition ; bloc
+  « Pourquoi ils partent » qui détaille l'attrition facteur par facteur.
+- **Maquettes** : https://claude.ai/artifact/VcrmKEKSZpmtjuoQa3WXq4
 - **Marché** (`SegmentBar`, `MarketTable`) : répartition de la population entre
   le studio, les concurrents, la concurrence diffuse et le public libre.
 - **Journal** : arrivée des modèles ; utilisateurs gagnés et perdus dans le
