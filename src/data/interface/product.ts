@@ -40,7 +40,7 @@ export interface GenreDef {
   baseline: number;
   /** Taille minimale (composants) pour qu'un produit tienne sur ce segment. */
   minSize: number;
-  /** Ampleur du pic de lancement (0.5 = jusqu'à +50 % à hype maximale). */
+  /** Ampleur de l'élan de lancement (0.5 = attractivité jusqu'à +50 % à hype maximale). */
   spike: number;
 }
 

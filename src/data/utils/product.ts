@@ -67,7 +67,7 @@ export const PRODUCT_CREATION_COST: Record<ProductGenre, number> = {
   [ProductGenre.PLATEFORME]: 50_000,
 };
 
-/** Durée du pic de lancement (mois pleins). */
+/** Durée de l'élan de lancement (mois pleins). */
 export const LAUNCH_SPIKE_MONTHS = 2;
 /** Part du pic acquise sans aucune hype ; le reste vient de la campagne. */
 export const LAUNCH_SPIKE_BASE_SHARE = 0.4;
@@ -198,9 +198,10 @@ export const monthsSinceLaunch = (p: Product, time: number): number =>
       );
 
 /**
- * Pic de lancement : pendant `LAUNCH_SPIKE_MONTHS`, le revenu est majoré d'une
- * part de `genre.spike` — une part acquise d'office, le reste proportionnel à
- * la hype. Sans campagne, un jeu sort donc à +40 % ; à hype pleine, à +100 %.
+ * Élan de lancement : pendant `LAUNCH_SPIKE_MONTHS`, l'attractivité du produit
+ * à l'acquisition est majorée d'une part de `genre.spike` — une part acquise
+ * d'office, le reste proportionnel à la hype. Sans campagne, un jeu attire
+ * donc +40 % ; à hype pleine, +100 % (cf. `utils/audience`).
  */
 export const launchSpikeMultiplier = (p: Product, time: number): number => {
   if (monthsSinceLaunch(p, time) >= LAUNCH_SPIKE_MONTHS) return 1;

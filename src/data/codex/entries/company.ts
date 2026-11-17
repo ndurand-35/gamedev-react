@@ -407,7 +407,7 @@ export const COMPANY_ENTRIES: CodexEntry[] = [
           ["Lecture de CV", "—", "2 000 €", "7 jours", "Le salaire attendu et le tempérament d'un candidat, visibles sans entretien."],
           ["Climat social", "Lecture de CV", "4 000 €", "12 jours", "L'entente de chaque salarié avec ses collègues et son effet sur le moral, la grille des ententes par bâtiment, l'entente prévue d'un candidat."],
           ["Lecture des caractères", "Climat social", "6 000 €", "18 jours", "Le caractère et les traits des candidats, visibles sans entretien."],
-          ["Veille technologique", "Étude de marché", "3 500 €", "12 jours", "La prochaine technologie et ses effets, les fonctionnalités à venir et la demande de chaque segment projetée à 3 ans."],
+          ["Veille technologique", "Étude de marché", "3 500 €", "12 jours", "La prochaine technologie et ses effets, les fonctionnalités à venir et la population de chaque segment projetée à 3 ans."],
         ],
       },
       {

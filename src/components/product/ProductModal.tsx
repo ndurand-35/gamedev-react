@@ -62,7 +62,7 @@ const Metric: FC<{ label: string; children: ReactNode }> = ({
 /**
  * La fiche d'un produit : tout ce que la ligne du tableau ne montre pas —
  * l'assemblage et le poids de chaque fonctionnalité, le segment avec les
- * produits rivaux nommés, le pic de lancement — et les actions. Ouverte quand
+ * produits rivaux nommés, l'élan de lancement — et les actions. Ouverte quand
  * `productId` désigne un produit existant (cf. Modal).
  */
 export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
@@ -174,7 +174,7 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
               <div className="flex flex-row flex-wrap gap-2">
                 {spike > 1 && (
                   <span className="badge badge-sm bg-white">
-                    Pic de lancement +{Math.round((spike - 1) * 100)} % ·{" "}
+                    Élan de lancement +{Math.round((spike - 1) * 100)} % ·{" "}
                     {LAUNCH_SPIKE_MONTHS - monthsSinceLaunch(p, time)} mois
                   </span>
                 )}

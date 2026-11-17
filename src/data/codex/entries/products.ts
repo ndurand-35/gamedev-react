@@ -12,11 +12,11 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     category: "produits",
     title: "Produits",
     summary:
-      "Un produit s'assemble, se développe avec les composants du stock, puis rapporte chaque mois sur son segment.",
+      "Un produit s'assemble, se développe avec les composants du stock, puis gagne des utilisateurs qui le font vivre.",
     body: [
       {
         type: "p",
-        text: "Un **produit** est un logiciel vendu par le studio pour son propre compte. Il appartient à un **genre**, choisi à la création et définitif, qui fixe le segment de marché où il se vend.",
+        text: "Un **produit** est un logiciel vendu par le studio pour son propre compte. Il appartient à un **genre**, choisi à la création et définitif, qui fixe le segment de marché où il se vend. Il a aussi un **modèle économique**, figé lui aussi, et un **prix**, modifiable à tout moment.",
       },
       {
         type: "table",
@@ -28,11 +28,11 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
           ],
           [
             "En production",
-            "Le produit rapporte chaque mois, coûte une **maintenance**, peut attraper des bugs et recevoir de nouvelles fonctionnalités.",
+            "Le produit gagne et perd des **utilisateurs**, rapporte selon son modèle, coûte une **maintenance**, peut attraper des bugs et recevoir de nouvelles fonctionnalités.",
           ],
           [
             "Retiré",
-            "Le retrait est **définitif** : plus de revenu, plus de maintenance, plus de promotion.",
+            "Le retrait est **définitif** : plus de revenu, plus de maintenance, plus de promotion. Ses utilisateurs redeviennent libres.",
           ],
         ],
       },
@@ -61,6 +61,8 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     ],
     related: [
       "genres",
+      "modeles-economiques",
+      "utilisateurs",
       "fonctionnalites",
       "lancement",
       "fraicheur",
@@ -170,6 +172,123 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     ],
   },
   {
+    id: "modeles-economiques",
+    category: "produits",
+    title: "Modèles économiques",
+    summary:
+      "Comment un produit gagne de l'argent sur ses utilisateurs : choisi à la création, figé, et inventé au fil des époques.",
+    body: [
+      {
+        type: "p",
+        text: "Le **modèle économique** se choisit à la création, parmi ceux que le genre propose à cette date, et ne change plus. En 1970, tout se vend à l'unité ; les technologies apportent les autres modèles, et le journal annonce chacun à son arrivée.",
+      },
+      {
+        type: "table",
+        head: ["Modèle", "Apparaît", "Genres", "Revenu du mois"],
+        rows: [
+          [
+            "Vente unitaire",
+            "1970",
+            "Tous",
+            "Nouveaux utilisateurs × prix d'achat",
+          ],
+          [
+            "Paiement à la partie",
+            "1972, bornes d'arcade",
+            "Jeu",
+            "Utilisateurs × 30 parties × prix d'une partie",
+          ],
+          [
+            "Licence annuelle",
+            "1985, réseaux d'entreprise",
+            "Outil, Plateforme",
+            "Utilisateurs × prix annuel ÷ 12",
+          ],
+          [
+            "Abonnement",
+            "1995, Internet",
+            "Outil, Service, Plateforme",
+            "Utilisateurs × prix mensuel",
+          ],
+          [
+            "Publicité",
+            "1995, Internet",
+            "Service",
+            "Utilisateurs × recette publicitaire",
+          ],
+          [
+            "Freemium",
+            "2008, smartphones",
+            "Jeu",
+            "Utilisateurs qui paient × prix des achats intégrés",
+          ],
+        ],
+      },
+      {
+        type: "p",
+        text: "Le **prix** est libre et se change à tout moment depuis la fiche. Chaque modèle a un **prix de référence** par genre : plus bas, il attire davantage ; plus haut, il attire moins. Le Jeu est le plus sensible au prix, la Plateforme le moins. Au prix de référence, un utilisateur rapporte à peu près autant d'un modèle à l'autre : ce qui les distingue, c'est leur rythme.",
+      },
+      {
+        type: "list",
+        items: [
+          "**Vente unitaire** et **paiement à la partie** : le client a déjà payé, le prix ne joue que sur les arrivées. La vente encaisse dès le lancement, puis s'essouffle quand le public est conquis.",
+          "**Licence**, **abonnement** et **freemium** : le client paie tant qu'il reste. Un prix au-dessus de la référence le pousse à partir, et une **hausse** fait partir d'un coup une partie des utilisateurs à la clôture suivante. Ces modèles bâtissent une base qui dure.",
+          "**Publicité** et **freemium** sont gratuits : ils attirent deux fois plus. En publicité, le levier est la **pression publicitaire**, de 1 à 5 : plus de publicité rapporte plus par utilisateur et en fait partir davantage.",
+        ],
+      },
+    ],
+    related: ["produits", "utilisateurs", "technologies", "genres", "marche"],
+  },
+  {
+    id: "utilisateurs",
+    category: "produits",
+    title: "Utilisateurs",
+    summary:
+      "Un produit lancé gagne des utilisateurs dans le public libre et en perd chaque mois : le rythme des départs dépend surtout du genre.",
+    body: [
+      {
+        type: "p",
+        text: "À chaque clôture de mois, un produit lancé perd une part de ses utilisateurs (l'**attrition**), qui redeviennent libres, puis en gagne dans le **public libre** du segment (cf. Marché et segments). Le journal annonce les arrivées et les départs ; la fiche les montre sur 24 mois.",
+      },
+      {
+        type: "table",
+        head: ["Genre", "Départs par mois", "La moitié est partie après"],
+        rows: [
+          ["Jeu", "12 %", "environ 5 mois"],
+          ["Outil", "3 %", "environ 2 ans"],
+          ["Service", "2 %", "environ 3 ans"],
+          ["Plateforme", "1 %", "environ 6 ans"],
+        ],
+      },
+      {
+        type: "p",
+        text: "Ces taux valent pour un produit frais, sans bug, au prix de référence. Ils se multiplient par :",
+      },
+      {
+        type: "list",
+        items: [
+          "le **modèle** : la licence annuelle retient (×0,6), la publicité (×1,3), le paiement à la partie et le freemium (×1,5) retiennent mal ;",
+          "l'**âge** : un produit au plancher de fraîcheur perd ses utilisateurs jusqu'à trois fois plus vite ;",
+          "les **bugs** non corrigés, selon la sensibilité du genre ;",
+          "le **prix** des modèles où l'on paie tant qu'on reste, ou la **pression publicitaire** ;",
+          "une campagne **Rétention** en cours, qui les réduit jusqu'à moitié.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Le bloc **Pourquoi ils partent** de la fiche détaille ce calcul pour chaque produit. Les partants peuvent revenir : ils retournent au public libre et choisissent à nouveau, souvent le produit le plus attrayant du segment.",
+      },
+    ],
+    related: [
+      "marche",
+      "modeles-economiques",
+      "fraicheur",
+      "bugs",
+      "marketing",
+      "genres",
+    ],
+  },
+  {
     id: "affinites",
     category: "produits",
     title: "Affinités des fonctionnalités",
@@ -193,7 +312,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     category: "produits",
     title: "Lancement",
     summary:
-      "À sa sortie, un produit reçoit une note publique sur 10 et profite d'un pic de revenu pendant deux mois.",
+      "À sa sortie, un produit reçoit une note publique sur 10 et profite d'un élan qui attire les utilisateurs pendant deux mois.",
     body: [
       {
         type: "p",
@@ -205,28 +324,28 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "Pendant les **deux premiers mois**, un **pic de lancement** majore le revenu. Il existe sans aucune publicité et grandit avec la **hype** : la popularité acquise avant la sortie, ou une campagne **Notoriété** en cours, la plus forte des deux. Son ampleur dépend du genre ; le Jeu est le plus marqué.",
+        text: "Pendant les **deux premiers mois**, un **élan de lancement** rend le produit plus attrayant : il attire davantage d'utilisateurs. Il existe sans aucune publicité et grandit avec la **hype** : la popularité acquise avant la sortie, ou une campagne **Notoriété** en cours, la plus forte des deux. Son ampleur dépend du genre ; le Jeu est le plus marqué. En **vente unitaire**, c'est là que se fait l'essentiel des ventes.",
       },
     ],
-    related: ["produits", "popularite", "reputation", "marketing"],
+    related: ["produits", "popularite", "reputation", "marketing", "utilisateurs"],
   },
   {
     id: "fraicheur",
     category: "produits",
     title: "Fraîcheur et mises à jour",
     summary:
-      "Un produit vieillit et son attrait s'érode ; ajouter une fonctionnalité le rajeunit.",
+      "Un produit vieillit : il attire moins et ses utilisateurs partent plus vite. Ajouter une fonctionnalité le rajeunit.",
     body: [
       {
         type: "p",
-        text: "La **fraîcheur** mesure l'âge commercial d'un produit. Elle reste à 100 % quelques mois après le lancement, puis s'érode chaque mois jusqu'à un plancher. Elle multiplie l'attractivité du produit, donc sa part du segment.",
+        text: "La **fraîcheur** mesure l'âge commercial d'un produit. Elle reste à 100 % quelques mois après le lancement, puis s'érode chaque mois jusqu'à un plancher. Elle multiplie l'attractivité du produit, donc ses arrivées, et un produit vieilli perd ses utilisateurs jusqu'à trois fois plus vite (**attrition**).",
       },
       {
         type: "p",
         text: "Une **mise à jour** (ajout d'une fonctionnalité) rajeunit le produit en proportion de la taille ajoutée : une grosse fonctionnalité sur un petit produit peut le remettre à neuf, jamais au-delà. Elle corrige aussi tous les bugs en cours. Le nombre de mises à jour figure sur la fiche.",
       },
     ],
-    related: ["produits", "fonctionnalites", "bugs", "marche"],
+    related: ["produits", "fonctionnalites", "bugs", "marche", "utilisateurs"],
   },
   {
     id: "bugs",
@@ -241,7 +360,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "Chaque bug non corrigé réduit l'**attractivité** du produit, jusqu'à un plafond ; la fiche affiche la perte en pourcentage. Les bugs abaissent aussi la **popularité** que le bouche-à-oreille accorde au produit, le Service y étant le plus sensible.",
+        text: "Chaque bug non corrigé réduit l'**attractivité** du produit, jusqu'à un plafond ; la fiche affiche la perte en pourcentage. Il fait aussi partir les **utilisateurs** plus vite, et abaisse la **popularité** que le bouche-à-oreille accorde au produit. Le Service est le genre le plus sensible aux bugs.",
       },
       {
         type: "list",
@@ -251,7 +370,14 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
         ],
       },
     ],
-    related: ["produits", "fraicheur", "popularite", "qa", "composants"],
+    related: [
+      "produits",
+      "fraicheur",
+      "popularite",
+      "qa",
+      "composants",
+      "utilisateurs",
+    ],
   },
   {
     id: "popularite",
@@ -266,7 +392,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "Une **promotion** coûte **4 000 €** et dure **30 jours**, menée par un marketeur. Elle monte d'autant plus vite que le marketeur est efficace et que le produit est peu connu. Un marketeur ne mène qu'une campagne à la fois ; s'il quitte le studio, la promotion s'interrompt. Promu avant sa sortie, un produit arrive avec un pic de lancement plus fort.",
+        text: "Une **promotion** coûte **4 000 €** et dure **30 jours**, menée par un marketeur. Elle monte d'autant plus vite que le marketeur est efficace et que le produit est peu connu. Un marketeur ne mène qu'une campagne à la fois ; s'il quitte le studio, la promotion s'interrompt. Promu avant sa sortie, un produit arrive avec un élan de lancement plus fort.",
       },
       {
         type: "table",
@@ -313,30 +439,42 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     category: "marche",
     title: "Marché et segments",
     summary:
-      "Chaque segment offre une demande mensuelle que se partagent les produits lancés, au prorata de leur attractivité.",
+      "Chaque segment a une population que se disputent les produits lancés : chaque mois, une part du public libre choisit un produit.",
     body: [
       {
         type: "p",
-        text: "Le marché compte quatre **segments**, un par genre. Chacun offre une **demande** mensuelle en euros, égale à son **potentiel** multiplié par la **confiance du public**. Le potentiel suit les technologies adoptées ; son évolution sur un an s'affiche sur chaque segment.",
+        text: "Le marché compte quatre **segments**, un par genre. Chacun a une **population** : des entreprises pour l'Outil, des comptes pour le Service, des joueurs pour le Jeu, de grands comptes pour la Plateforme. Elle vaut son **potentiel** multiplié par la **confiance du public**. Le potentiel suit les technologies adoptées ; son évolution sur un an s'affiche sur chaque segment.",
       },
       {
-        type: "p",
-        text: "La demande se répartit entre les produits lancés du segment, ceux du studio comme ceux des concurrents, au prorata de leur **attractivité**. Une part revient toujours à la **concurrence diffuse** : le reste de la jauge du segment. Deux produits du studio sur un même segment se partagent cette demande.",
+        type: "table",
+        head: ["Part de la population", "Ce que c'est"],
+        rows: [
+          ["Nous", "Les utilisateurs des produits du studio."],
+          ["Concurrents", "Ceux des produits des studios concurrents."],
+          [
+            "Concurrence diffuse",
+            "Tout ce que le marché propose d'autre : elle garde toujours sa part.",
+          ],
+          ["Public libre", "Ceux qui n'utilisent encore rien, ou plus rien."],
+        ],
       },
       {
         type: "list",
         items: [
-          "L'attractivité d'un produit dépend de ses **fonctionnalités**, de sa **finition**, de sa **fraîcheur**, de ses **bugs** et de sa **popularité**.",
-          "Le **pic de lancement** et une campagne marketing **Acquisition** ou **Rétention** en cours majorent ensuite le revenu.",
+          "Chaque mois, une part du **public libre** choisit un produit, au prorata de son **attractivité** : fonctionnalités, finition, fraîcheur, bugs, popularité, puis prix, élan de lancement et campagne **Acquisition**.",
+          "Les **départs** (cf. Utilisateurs) rendent chaque mois des utilisateurs au public libre.",
+          "Deux produits du studio sur un même segment se disputent le même public.",
           "Les revenus des produits sont encaissés à la clôture du mois, maintenance déduite.",
         ],
       },
       {
         type: "p",
-        text: "Le 1er janvier, le journal dresse le **bilan** du marché : l'évolution du potentiel de chaque segment sur l'année écoulée. La demande projetée à trois ans relève d'une **compétence du fondateur**.",
+        text: "Le 1er janvier, le journal dresse le **bilan** du marché : l'évolution du potentiel de chaque segment sur l'année écoulée. La population projetée à trois ans relève d'une **compétence du fondateur**.",
       },
     ],
     related: [
+      "utilisateurs",
+      "modeles-economiques",
       "confiance-public",
       "technologies",
       "concurrents",
@@ -351,11 +489,11 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     category: "marche",
     title: "Confiance du public",
     summary:
-      "Trop de sorties médiocres sur un segment font chuter la confiance du public, et la demande avec elle.",
+      "Trop de sorties médiocres sur un segment font chuter la confiance du public, et sa population avec elle.",
     body: [
       {
         type: "p",
-        text: "Chaque segment a une **confiance du public**, en pourcentage, qui multiplie sa demande. Elle est recalculée le 1er de chaque mois d'après les sorties de l'année écoulée sur ce segment, **tous studios confondus**.",
+        text: "Chaque segment a une **confiance du public**, en pourcentage, qui multiplie sa population. Elle est recalculée le 1er de chaque mois d'après les sorties de l'année écoulée sur ce segment, **tous studios confondus**. Quand la population tombe sous le nombre d'utilisateurs, l'excédent quitte tous les produits au prorata.",
       },
       {
         type: "p",
@@ -383,7 +521,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     category: "marche",
     title: "Technologies",
     summary:
-      "Les technologies font évoluer le marché : demande des segments, fonctionnalités possibles, modes et salaires.",
+      "Les technologies font évoluer le marché : population des segments, fonctionnalités et modèles possibles, modes et salaires.",
     body: [
       {
         type: "p",
@@ -392,8 +530,8 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       {
         type: "list",
         items: [
-          "À mesure de son adoption, elle fait grossir, ou parfois rétrécir, la **demande** des segments qu'elle touche ; l'effet à terme figure dans l'infobulle de la technologie.",
-          "Dès son arrivée, elle débloque de nouvelles **fonctionnalités**.",
+          "À mesure de son adoption, elle fait grossir, ou parfois rétrécir, la **population** des segments qu'elle touche ; l'effet à terme figure dans l'infobulle de la technologie.",
+          "Dès son arrivée, elle débloque de nouvelles **fonctionnalités**, et parfois un nouveau **modèle économique**.",
           "Elle fait naître des **tendances**.",
           "Elle rend les équipes plus **productives** et renchérit les **salaires** du marché : le 1er janvier, le journal annonce la hausse, et les employés attendent davantage.",
         ],
@@ -406,6 +544,7 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
     related: [
       "marche",
       "fonctionnalites",
+      "modeles-economiques",
       "tendances",
       "salaires",
       "moral",
@@ -451,12 +590,12 @@ export const PRODUCT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "Chaque mois, un studio peut **lancer un produit** ; le journal l'annonce. Ce produit pèse dans la part du segment comme ceux du studio du joueur, vieillit lui aussi, puis se retire au bout d'un certain temps. Sa qualité varie d'un produit à l'autre et compte dans la **confiance du public**.",
+        text: "Chaque mois, un studio peut **lancer un produit** ; le journal l'annonce. Ce produit a son **modèle économique**, le plus souvent le plus récent de l'époque, et un prix proche de la référence. Il gagne et perd des utilisateurs comme ceux du studio du joueur, vieillit lui aussi, puis se retire : vite pour un jeu, après des années pour une plateforme. Ses utilisateurs redeviennent alors libres. Sa qualité varie d'un produit à l'autre et compte dans la **confiance du public**.",
       },
       {
         type: "list",
         items: [
-          "Les studios visent les segments où il reste de la demande à prendre, et ceux qui ont le vent en poupe.",
+          "Les studios visent les segments où il reste du **public libre** à prendre, et ceux qui ont le vent en poupe.",
           "Plus la **réputation** du studio du joueur est haute, plus la concurrence lance de produits.",
           "Un **Partenaire** ne lance pas de produit sur un segment où le studio du joueur a déjà un produit en vente.",
         ],

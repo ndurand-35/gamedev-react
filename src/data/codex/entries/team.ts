@@ -485,8 +485,16 @@ export const TEAM_ENTRIES: CodexEntry[] = [
         head: ["Campagne", "Coût", "Effet"],
         rows: [
           ["Notoriété", "5 000 €", "Réputation en hausse pendant 30 jours"],
-          ["Acquisition", "8 000 €", "Revenu en hausse pendant 30 jours"],
-          ["Rétention", "6 000 €", "Freine la décroissance du revenu"],
+          [
+            "Acquisition",
+            "8 000 €",
+            "Produits plus attrayants pendant 30 jours : plus d'arrivées",
+          ],
+          [
+            "Rétention",
+            "6 000 €",
+            "Moins de départs d'utilisateurs pendant 30 jours",
+          ],
         ],
       },
       {
@@ -498,7 +506,13 @@ export const TEAM_ENTRIES: CodexEntry[] = [
         text: "La **promotion** se lance depuis la page Produits, pour 4 000 €, et fait monter la **popularité** du produit. Elle s'interrompt si son marketeur quitte le studio.",
       },
     ],
-    related: ["popularite", "produits", "reputation", "competences"],
+    related: [
+      "popularite",
+      "produits",
+      "utilisateurs",
+      "reputation",
+      "competences",
+    ],
   },
   {
     id: "salaires",
