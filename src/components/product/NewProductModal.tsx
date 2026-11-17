@@ -22,7 +22,28 @@ import { CodexLink } from "@/components/codex/CodexLink";
 import { Modal } from "@/components/global/Modal";
 import { useTrends } from "@/data/hooks/useTrends";
 import { useAppSelector } from "@/data/redux/hooks";
-import { segmentDemand } from "@/data/utils/marketDemand";
+import {
+  AUDIENCE_UNIT,
+  formatUsers,
+  segmentPopulation,
+} from "@/data/utils/audience";
+import {
+  AD_PRESSURE_REFERENCE,
+  BusinessModel,
+  defaultPrice,
+  isModelUnlocked,
+  modelDef,
+  modelsForGenre,
+} from "@/data/utils/businessModel";
+import { useMarketConfidence } from "@/data/hooks/useMarket";
+import {
+  formatFactor,
+  formatModelPrice,
+  formatPriceWithUnit,
+  parsePriceInput,
+  priceEffects,
+  referenceGapLabel,
+} from "@/components/product/businessModelView";
 import { KindPill } from "@/components/component";
 import {
   kindLabel,
@@ -33,7 +54,14 @@ import {
 export interface NewProductModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (name: string, genre: ProductGenre, features: string[]) => void;
+  onCreate: (
+    name: string,
+    genre: ProductGenre,
+    features: string[],
+    model: BusinessModel,
+    price: number,
+    adPressure?: number,
+  ) => void;
 }
 
 /**
@@ -54,6 +82,11 @@ export const NewProductModal: FC<NewProductModalProps> = ({
   const [name, setName] = useState("");
   const [genre, setGenre] = useState<ProductGenre>(ProductGenre.OUTIL);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [model, setModel] = useState<BusinessModel>(BusinessModel.SALE);
+  const [priceDraft, setPriceDraft] = useState(
+    formatModelPrice(defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL)),
+  );
+  const confidence = useMarketConfidence();
   const hasMarketStudy = useFounderSkill("market_study");
   const trends = useTrends();
   const time = useAppSelector((s) => s.engine.time);
@@ -69,14 +102,31 @@ export const NewProductModal: FC<NewProductModalProps> = ({
       setName("");
       setGenre(ProductGenre.OUTIL);
       setPicked(new Set());
+      setModel(BusinessModel.SALE);
+      setPriceDraft(
+        formatModelPrice(defaultPrice(BusinessModel.SALE, ProductGenre.OUTIL)),
+      );
     }
   }, [open]);
 
-  // Changer de genre remet l'assemblage à zéro : les affinités changent.
+  const pickModel = (next: BusinessModel, forGenre: ProductGenre = genre) => {
+    setModel(next);
+    setPriceDraft(formatModelPrice(defaultPrice(next, forGenre)));
+  };
+
+  // Changer de genre remet l'assemblage à zéro : les affinités changent, et
+  // le modèle repart sur la vente unitaire, proposée partout.
   const pickGenre = (next: ProductGenre) => {
     setGenre(next);
     setPicked(new Set());
+    pickModel(BusinessModel.SALE, next);
   };
+
+  const def = modelDef(model);
+  const price =
+    def.lever === "price" ? parsePriceInput(priceDraft) : 0;
+  const effects =
+    price !== null ? priceEffects(model, genre, price) : undefined;
 
   const core = coreFeature(genre);
   // Le catalogue s'adapte au genre : seules les options qui ont leur place
@@ -92,7 +142,11 @@ export const NewProductModal: FC<NewProductModalProps> = ({
   );
   const creationCost = PRODUCT_CREATION_COST[genre];
   const affordable = money >= creationCost;
-  const canCreate = name.trim().length > 0 && affordable;
+  const canCreate =
+    name.trim().length > 0 &&
+    affordable &&
+    price !== null &&
+    isModelUnlocked(model, time);
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -104,8 +158,15 @@ export const NewProductModal: FC<NewProductModalProps> = ({
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!canCreate) return;
-    onCreate(name.trim(), genre, features);
+    if (!canCreate || price === null) return;
+    onCreate(
+      name.trim(),
+      genre,
+      features,
+      model,
+      price,
+      def.lever === "adPressure" ? AD_PRESSURE_REFERENCE : undefined,
+    );
     onClose();
   };
 
@@ -177,7 +238,8 @@ export const NewProductModal: FC<NewProductModalProps> = ({
                       {g}
                     </span>
                     <span className="block text-xs font-bold text-base-content/70 tabular-nums">
-                      {formatPrice(segmentDemand(g, time))} € / mois
+                      {formatUsers(segmentPopulation(g, time, confidence))}{" "}
+                      {AUDIENCE_UNIT[g]}
                     </span>
                     <span
                       className={
@@ -196,6 +258,95 @@ export const NewProductModal: FC<NewProductModalProps> = ({
             <p className="mt-2 text-sm font-semibold text-base-content/70">
               {GENRES[genre].description}
             </p>
+          </div>
+
+          {/* Modèle économique : figé au lancement. Ceux que l'époque n'a
+              pas encore inventés restent visibles, verrouillés. */}
+          <div>
+            <h4 className="mb-2 flex items-center gap-2 font-display text-base font-semibold">
+              Modèle économique
+              <CodexLink id="modeles-economiques" />
+              <span className="ml-auto text-xs font-bold text-base-content/60">
+                Figé au lancement
+              </span>
+            </h4>
+            <div role="radiogroup" aria-label="Modèle économique" className="grid gap-2">
+              {modelsForGenre(genre).map((m) => {
+                const unlocked = isModelUnlocked(m, time);
+                const checked = m === model;
+                const ref = defaultPrice(m, genre);
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    disabled={!unlocked}
+                    onClick={() => pickModel(m)}
+                    className={
+                      "flex items-center gap-3 rounded-[0.8rem] px-3 py-2 text-left text-sm " +
+                      (!unlocked
+                        ? "border-2 border-dashed border-base-content/30 text-base-content/60"
+                        : checked
+                          ? "border-[3px] border-ink bg-[#fff0c2] shadow-toy-sm"
+                          : "border-2 border-ink bg-white hover:bg-base-100")
+                    }
+                  >
+                    {!unlocked && (
+                      <Lock width={15} height={15} strokeWidth={2.4} aria-hidden="true" />
+                    )}
+                    <span className="flex-1 leading-tight">
+                      <span className="block font-extrabold">{m}</span>
+                      <span className="block text-xs font-semibold text-base-content/70">
+                        {unlocked
+                          ? modelDef(m).description
+                          : "Pas encore inventé."}
+                      </span>
+                    </span>
+                    <span className="text-xs font-bold whitespace-nowrap text-base-content/70 tabular-nums">
+                      {!unlocked
+                        ? "À venir"
+                        : modelDef(m).lever === "price"
+                          ? `réf. ${formatPriceWithUnit(m, ref)}`
+                          : "gratuit"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {def.lever === "price" ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm font-extrabold">
+                  {def.priceLabel}
+                  <span className="flex items-center rounded-[0.8rem] border-2 border-ink bg-white px-3">
+                    <input
+                      inputMode="decimal"
+                      className="w-24 border-0 bg-transparent py-1.5 font-extrabold tabular-nums outline-none"
+                      value={priceDraft}
+                      onChange={(e) => setPriceDraft(e.target.value)}
+                    />
+                    €
+                  </span>
+                </label>
+                {price !== null && effects && (
+                  <span className="text-xs font-semibold text-base-content/70">
+                    {referenceGapLabel(model, genre, price)} · acquisition{" "}
+                    {formatFactor(effects.acquisition)}
+                  </span>
+                )}
+                {price === null && (
+                  <span className="text-xs font-bold text-error">
+                    Prix invalide
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs font-semibold text-base-content/70">
+                Gratuit pour les utilisateurs. La pression publicitaire
+                (référence {AD_PRESSURE_REFERENCE}) se règle sur la fiche du
+                produit.
+              </p>
+            )}
           </div>
 
           {/* Fonctionnalités : le socle est imposé, le reste se coche. */}

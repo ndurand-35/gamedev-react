@@ -73,6 +73,14 @@ describe("processMarketTick", () => {
     expect(text).toMatch(/Tendance :/);
   });
 
+  it("annonce les modèles économiques qu'une technologie apporte", () => {
+    const dispatch = vi.fn();
+    processMarketTick(dispatch as never, stateAt(timeOfYear(1995)));
+    const text = messages(dispatch).join(" | ");
+    expect(text).toMatch(/nouveau modèle économique : Abonnement/);
+    expect(text).toMatch(/nouveau modèle économique : Publicité/);
+  });
+
   it("annonce un krach quand un segment est inondé de sorties médiocres", () => {
     const t = timeOfYear(1980) + 31 * 24; // 1er février 1980
     const flood = Array.from({ length: 8 }, (_, i) => rival(i + 1, t - 24 * 10));

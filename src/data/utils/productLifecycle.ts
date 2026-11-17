@@ -58,6 +58,7 @@ import {
 } from "@/data/utils/audience";
 import { getTimeAsDate } from "@/data/utils/time";
 import { formatPrice } from "@/data/utils";
+import type { BusinessModel } from "@/data/utils/businessModel";
 import { Marketing, PersonType, QA } from "@/data/interface";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,6 +81,9 @@ export const createProductThunk =
     genre: ProductGenre;
     features: string[];
     time?: number;
+    model?: BusinessModel;
+    price?: number;
+    adPressure?: number;
   }) =>
   (dispatch: AppDispatch, getState: () => RootState): { ok: boolean } => {
     const state = getState();

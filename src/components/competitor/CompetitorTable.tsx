@@ -18,6 +18,8 @@ import {
   sortCompetitors,
 } from "@/data/utils/competitor";
 import { rivalsOf } from "@/data/utils/competitorProduct";
+import { AUDIENCE_UNIT, formatUsers } from "@/data/utils/audience";
+import { formatPriceWithUnit } from "@/components/product/businessModelView";
 import { getTimeAsDate } from "@/data/utils/time";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,11 +124,12 @@ const StandingRow: FC<{
               <li
                 key={`rival_${p.id}`}
                 className="badge badge-sm badge-ghost gap-1"
-                title={`${p.genre} · lancé le ${getTimeAsDate(p.launchTime).format("DD/MM/YYYY")}`}
+                title={`${p.genre} · ${p.model} · ${formatPriceWithUnit(p.model, p.price)} · lancé le ${getTimeAsDate(p.launchTime).format("DD/MM/YYYY")}`}
               >
                 {p.name}
                 <span className="font-semibold text-base-content/60">
-                  {p.genre}
+                  {p.genre} · {p.model} · {formatUsers(p.users)}{" "}
+                  {AUDIENCE_UNIT[p.genre]}
                 </span>
               </li>
             ))}

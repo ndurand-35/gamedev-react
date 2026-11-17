@@ -23,7 +23,6 @@ import {
   productFreshness,
   productGenre,
   productMaintenance,
-  rivalAppeal,
 } from "@/data/utils/product";
 import {
   computeProductRevenues,
@@ -33,6 +32,8 @@ import {
 } from "@/data/utils/audience";
 import { getTimeAsDate } from "@/data/utils/time";
 import { CostBadges } from "@/components/product/CostBadges";
+import { PopulationBar } from "@/components/product/PopulationBar";
+import { AudiencePanel } from "@/components/product/AudiencePanel";
 import { ProductActions } from "@/components/product/ProductActions";
 import { formatScore, pct } from "@/components/product/productView";
 import { Modal } from "@/components/global/Modal";
@@ -219,6 +220,8 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
               </div>
             )}
 
+            {p && <AudiencePanel product={p} revenue={revenue} />}
+
             <section className="flex flex-col gap-1.5">
               <h4 className="font-display text-base font-semibold">
                 Fonctionnalités
@@ -271,21 +274,13 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
                   {AUDIENCE_UNIT[segment.genre.genre]}
                 </h4>
                 <div className="toy-tile flex flex-col gap-2 px-4 py-3">
-                  <div className="flex h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-base-300">
-                    <div
-                      className="h-full bg-ink"
-                      style={{ width: pct(segment.share) }}
-                    />
-                    <div
-                      className="h-full bg-ink/30"
-                      style={{ width: pct(segment.rivalShare) }}
-                    />
-                  </div>
+                  <PopulationBar report={segment} />
                   <p className="text-xs font-semibold text-base-content/70 tabular-nums">
                     Nous {pct(segment.share)} ({segment.products.length} produit
                     {segment.products.length > 1 ? "s" : ""}) · concurrents{" "}
                     {pct(segment.rivalShare)} · concurrence diffuse{" "}
-                    {pct(Math.max(0, 1 - segment.share - segment.rivalShare))}
+                    {pct(segment.diffuseShare)} · public libre{" "}
+                    {pct(segment.freeShare)}
                   </p>
                   {segment.rivals.length > 0 && (
                     <ul className="flex flex-col gap-0.5 border-t-[1.5px] border-base-300 pt-2 text-xs">
@@ -302,8 +297,8 @@ export const ProductModal: FC<ProductModalProps> = ({ productId, onClose }) => {
                             {r.name}
                           </span>
                           <span className="whitespace-nowrap text-base-content/60">
-                            attractivité {rivalAppeal(r, time).toFixed(0)} ·
-                            depuis le{" "}
+                            {r.model} · {formatUsers(r.users)}{" "}
+                            {AUDIENCE_UNIT[r.genre]} · depuis le{" "}
                             {getTimeAsDate(r.launchTime).format("MM/YYYY")}
                           </span>
                         </li>

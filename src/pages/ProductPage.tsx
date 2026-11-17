@@ -56,6 +56,7 @@ import {
   segmentReports,
   AUDIENCE_UNIT,
   formatUsers,
+  projectedPopulation,
 } from "@/data/utils/audience";
 import {
   addFeatureThunk,
@@ -66,6 +67,12 @@ import {
 } from "@/data/utils/productLifecycle";
 import { NewProductModal } from "@/components/product";
 import { CostBadges } from "@/components/product/CostBadges";
+import { AudiencePanel } from "@/components/product/AudiencePanel";
+import {
+  PopulationBar,
+  PopulationLegend,
+} from "@/components/product/PopulationBar";
+import { BusinessModel } from "@/data/utils/businessModel";
 import { PromotionPanel } from "@/components/product/PromotionPanel";
 import { TrendBadge, TrendsBar } from "@/components/product/Trends";
 import { useTrends } from "@/data/hooks/useTrends";
@@ -75,7 +82,6 @@ import {
   MarketConfidence,
   demandChangeOverYear,
   formatDemandChange,
-  projectedDemand,
 } from "@/data/utils/marketDemand";
 import {
   CONFIDENCE_WARNING,
@@ -140,27 +146,19 @@ const SegmentStrip = ({
               {formatUsers(r.population)} {AUDIENCE_UNIT[r.genre.genre]}
             </span>
           </div>
-          {/* Nous, puis les concurrents, sur la même jauge : ce qui reste
-              est la concurrence diffuse. */}
-          <div
-            className="flex h-3 w-full overflow-hidden rounded-full border-2 border-ink bg-base-300"
-            title={`Nous : ${pct(r.share)} · concurrents : ${pct(r.rivalShare)}`}
-          >
-            <div className="h-full bg-sun" style={{ width: pct(r.share) }} />
-            <div
-              className="h-full bg-base-content/35"
-              style={{ width: pct(r.rivalShare) }}
-            />
-          </div>
+          {/* Nous, les concurrents, la concurrence diffuse, puis le public
+              libre : ce qu'il reste à prendre. */}
+          <PopulationBar report={r} />
           <p className="text-xs opacity-70 tabular-nums">
             {r.products.length === 0
               ? "Aucun produit à nous"
-              : `${pct(r.share)} du segment · ${formatPrice(r.revenue)} € / mois`}
+              : `${formatUsers(r.users)} chez nous (${pct(r.share)}) · ${formatPrice(r.revenue)} € / mois`}
           </p>
           <p className="text-xs opacity-70 tabular-nums">
             {r.rivals.length === 0
               ? "Aucun concurrent"
               : `${r.rivals.length} produit${r.rivals.length > 1 ? "s" : ""} concurrent${r.rivals.length > 1 ? "s" : ""} · ${pct(r.rivalShare)}`}
+            {` · libre ${pct(r.freeShare)}`}
           </p>
           <DemandChange change={demandChangeOverYear(r.genre.genre, time)} />
           <p
@@ -178,8 +176,10 @@ const SegmentStrip = ({
           {techWatch && (
             <p className="text-xs opacity-70 tabular-nums">
               Dans 3 ans : ≈{" "}
-              {formatPrice(projectedDemand(r.genre.genre, time, 3, confidence))}{" "}
-              € / mois
+              {formatUsers(
+                projectedPopulation(r.genre.genre, time, 3, confidence),
+              )}{" "}
+              {AUDIENCE_UNIT[r.genre.genre]}
             </p>
           )}
         </div>
@@ -661,12 +661,14 @@ const ProductPanel = ({
               <Stat label="Mises à jour" value={String(p.updates ?? 0)} />
               {spike > 1 && (
                 <Stat
-                  label="Pic de lancement"
+                  label="Élan de lancement"
                   value={`+${Math.round((spike - 1) * 100)} % · ${LAUNCH_SPIKE_MONTHS - monthsSinceLaunch(p, time)} mois`}
                 />
               )}
             </dl>
           )}
+
+          <AudiencePanel product={p} revenue={revenue} />
 
           <PromotionPanel product={p} />
 
@@ -824,9 +826,20 @@ export const ProductPage: React.FC = (): ReactElement => {
     name: string,
     genre: ProductGenre,
     features: string[],
+    model: BusinessModel,
+    price: number,
+    adPressure?: number,
   ) => {
     const result = dispatch(
-      createProductThunk({ name, genre, features, time }),
+      createProductThunk({
+        name,
+        genre,
+        features,
+        time,
+        model,
+        price,
+        adPressure,
+      }),
     );
     if (!result.ok) return;
     // Le nouveau produit (dernier de la liste) s'ouvre aussitôt.
@@ -909,6 +922,7 @@ export const ProductPage: React.FC = (): ReactElement => {
 
         <TechnologyPanel time={time} />
 
+        <PopulationLegend />
         <SegmentStrip
           reports={segments}
           trends={trends}

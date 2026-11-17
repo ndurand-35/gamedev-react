@@ -151,6 +151,22 @@ export const segmentPopulation = (
 ): number =>
   potentialPopulation(genre, time) * segmentConfidence(genre, confidence);
 
+/**
+ * Population projetée dans `years` ans, à confiance inchangée. Réservée à la
+ * compétence « Veille technologique » : c'est une prévision.
+ */
+export const projectedPopulation = (
+  genre: ProductGenre,
+  time: number,
+  years: number,
+  confidence?: MarketConfidence,
+): number =>
+  segmentPopulation(
+    genre,
+    time + Math.round(years * 365.25 * 24),
+    confidence,
+  );
+
 /** Utilisateurs de la concurrence diffuse en début de partie : l'équilibre. */
 export const initialDiffuseUsers = (
   genre: ProductGenre,

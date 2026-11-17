@@ -4,6 +4,7 @@ import { pushNotification } from "@/data/redux/notificationSlice";
 import { setMarketState } from "@/data/redux/productSlice";
 import type { AppDispatch, RootState } from "@/data/redux/store";
 import { FEATURE_BY_ID } from "@/data/utils/feature";
+import { modelDef, modelsUnlockedBy } from "@/data/utils/businessModel";
 import {
   CONFIDENCE_RECOVERED,
   CONFIDENCE_WARNING,
@@ -55,6 +56,16 @@ export const processMarketTick = (dispatch: AppDispatch, state: RootState) => {
         type: "success",
       }),
     );
+    // Les modèles économiques que la technologie rend possibles.
+    for (const model of modelsUnlockedBy(tech.id)) {
+      const def = modelDef(model);
+      dispatch(
+        pushNotification({
+          message: `${tech.year} — nouveau modèle économique : ${model} (${def.genres.join(", ")}). ${def.description}`,
+          type: "success",
+        }),
+      );
+    }
   }
 
   // 2. Tendances.

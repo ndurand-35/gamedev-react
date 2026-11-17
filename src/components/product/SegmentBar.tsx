@@ -7,6 +7,7 @@ import {
   formatUsers,
 } from "@/data/utils/audience";
 import { pct } from "@/components/product/productView";
+import { PopulationBar } from "@/components/product/PopulationBar";
 
 /**
  * Le marché sur une ligne : pour chaque segment, sa demande, la part que nos
@@ -28,20 +29,7 @@ export const SegmentBar: FC<{ reports: SegmentReport[] }> = ({ reports }) => (
             {formatUsers(r.population)} {AUDIENCE_UNIT[r.genre.genre]}
           </span>
         </div>
-        <div
-          className="flex h-1.5 w-full rounded bg-base-200 overflow-hidden"
-          role="img"
-          aria-label={`${r.genre.genre} : nous ${pct(r.share)}, concurrents ${pct(r.rivalShare)}`}
-        >
-          <div
-            className="h-full bg-base-content/60"
-            style={{ width: pct(r.share) }}
-          />
-          <div
-            className="h-full bg-base-content/20"
-            style={{ width: pct(r.rivalShare) }}
-          />
-        </div>
+        <PopulationBar report={r} compact />
         <p className="text-xs tabular-nums opacity-70 truncate">
           {r.products.length === 0 ? "—" : `${pct(r.share)} · ${formatPrice(r.revenue)} €`}
           {r.rivals.length > 0 && (
