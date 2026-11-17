@@ -24,6 +24,7 @@ import {
   computeExpectedSalary,
 } from "@/data/utils/recruitment";
 import { rollTraits } from "@/data/utils/traits";
+import { rollCharacter } from "@/data/utils/compatibility";
 import { rollStatRangeOffsets } from "@/data/utils/candidateStats";
 import { randomAvatar } from "@/data/utils/avatar";
 
@@ -187,7 +188,8 @@ const generateCandidateForRole = (
   seniority: Seniority,
 ): Person => {
   if (role === PersonType.QA) return generateQaCandidate(seniority);
-  if (role === PersonType.MARKETING) return generateMarketingCandidate(seniority);
+  if (role === PersonType.MARKETING)
+    return generateMarketingCandidate(seniority);
   return generateProductionCandidate(seniority, role as Specialty);
 };
 
@@ -216,6 +218,7 @@ const enrichCandidate = (
     salary: expectedSalary,
     temperament: pickTemperament(),
     traits: rollTraits(candidate.personType),
+    character: rollCharacter(),
     revealedStats: false,
     statRangeOffsets: rollStatRangeOffsets(candidate),
   };

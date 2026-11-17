@@ -233,6 +233,7 @@ export const TEAM_ENTRIES: CodexEntry[] = [
           "**Deadline manquée** sur un contrat : baisse pour toute l'équipe.",
           "**Prime**, **augmentation** ou réponse à une demande : effet indiqué avant validation.",
           "**Congés** payés, depuis la fiche : une semaine (+10) ou deux (+18), regagnés au retour. Absent, l'employé ne produit pas ; il ne repart pas avant trois mois.",
+          "**Ambiance** : l'entente entre collègues d'un même bâtiment fait monter ou baisser le moral chaque mois (cf. caractères).",
         ],
       },
       {
@@ -249,7 +250,34 @@ export const TEAM_ENTRIES: CodexEntry[] = [
       "affectation",
       "rythme",
       "amenagements",
+      "caracteres",
     ],
+  },
+  {
+    id: "caracteres",
+    category: "equipe",
+    title: "Caractères et ententes",
+    summary:
+      "Chaque salarié a un caractère. Certains s'entendent, d'autres se heurtent : l'ambiance d'un bâtiment pèse sur le moral.",
+    body: [
+      {
+        type: "p",
+        text: "Chaque salarié, fondateur compris, a un **type de caractère** : Organisateur, Chef de file, Artisan, Stratège, Animateur, Fonceur, Rêveur ou Franc-tireur. Comme les traits, il se révèle à l'**entretien** ou par le process RH.",
+      },
+      {
+        type: "p",
+        text: "Deux caractères s'entendent plus ou moins bien, sur cinq niveaux : **très incompatible**, **incompatible**, **neutre**, **compatible**, **très compatible**. Chaque mois, à la paie, l'entente moyenne d'un salarié avec ses collègues du **même bâtiment** fait varier son moral, jusqu'à **3 points** dans un sens ou dans l'autre. Les salariés en congés ne comptent pas.",
+      },
+      {
+        type: "list",
+        items: [
+          "Le **fondateur** pèse sur l'ambiance, mais son propre moral n'en dépend pas.",
+          "Pour séparer deux salariés qui se heurtent, il faut les installer dans des **bâtiments différents**.",
+          "Sans formation, on constate seulement que le moral bouge. La formation **Climat social** du fondateur montre qui s'entend avec qui.",
+        ],
+      },
+    ],
+    related: ["moral", "entretien", "competences-fondateur", "batiments"],
   },
   {
     id: "amenagements",

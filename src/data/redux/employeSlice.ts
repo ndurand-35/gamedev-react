@@ -1,3 +1,4 @@
+import { rollCharacter } from "@/data/utils/compatibility";
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import {
@@ -48,7 +49,13 @@ export const employeSlice = createSlice({
     initializeEmployeState(state, action: PayloadAction<Person>) {
       state.employeList = [
         ...DEFAULT_EMPLOYE_STATE.employeList,
-        { ...action.payload, id: 1, buildingId: 1 },
+        // Le fondateur tire aussi son type de caractère (cf. `utils/compatibility`).
+        {
+          character: rollCharacter(),
+          ...action.payload,
+          id: 1,
+          buildingId: 1,
+        },
       ];
       state.candidateList = DEFAULT_EMPLOYE_STATE.candidateList;
       state.nextEmployeId = 2;

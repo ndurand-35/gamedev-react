@@ -18,6 +18,8 @@ import type { AppDispatch, RootState } from "@/data/redux/store";
 import { formatPrice } from "@/data/utils";
 import { isProductionPerson } from "@/data/utils/component";
 import { moraleAura } from "@/data/utils/traits";
+import { ambianceMorale } from "@/data/utils/compatibility";
+import { hasFounderSkill } from "@/data/utils/research";
 import { employeSchedule, scheduleMorale } from "@/data/utils/workSchedule";
 import {
   HOURS_PER_MONTH,
@@ -35,7 +37,9 @@ import {
 //     • bâtiment plein             → −2 (on gagne en synergie, on perd en confort) ;
 //     • production à l'arrêt       → −2 (ni bureau, ou ni tâche ni formation) ;
 //     • rythme du studio           → +2 en Détente, −2 en Soutenu, −8 en Crunch
-//                                    (cf. `utils/workSchedule`).
+//                                    (cf. `utils/workSchedule`) ;
+//     • entente entre collègues    → de −3 à +3 selon les types de caractère
+//                                    du bâtiment (cf. `utils/compatibility`).
 //   Sur le coup :
 //     • un collègue licencié       → −5 dans son bâtiment, −2 ailleurs ;
 //     • une deadline manquée       → −3 pour toute l'équipe.
@@ -71,7 +75,8 @@ export type MoraleCause =
   | "crowded"
   | "idle"
   | "gloomy"
-  | "overworked";
+  | "overworked"
+  | "ambiance";
 
 export const MORALE_CAUSE_LABEL: Record<MoraleCause, string> = {
   underpaid: "salaire sous les attentes",
@@ -79,6 +84,7 @@ export const MORALE_CAUSE_LABEL: Record<MoraleCause, string> = {
   idle: "production à l'arrêt",
   gloomy: "collègue rabat-joie",
   overworked: "horaires épuisants",
+  ambiance: "mauvaise entente entre collègues",
 };
 
 export interface MoraleDrift {
@@ -170,6 +176,10 @@ export const computeMonthlyMoraleDrift = (
     const aura = moraleAura(e, employes);
     delta += aura;
     if (aura < 0) causes.push("gloomy");
+    // Entente avec les collègues du bâtiment (cf. `utils/compatibility`).
+    const ambiance = ambianceMorale(e, employes);
+    delta += ambiance;
+    if (ambiance < 0) causes.push("ambiance");
     return { employeId: e.id, delta, causes };
   });
 };
@@ -200,15 +210,22 @@ export const processMonthlyMorale = (
     idle: 0,
     gloomy: 0,
     overworked: 0,
+    ambiance: 0,
   };
-  for (const d of unhappy) for (const c of d.causes) counts[c]++;
+  // Sans la formation « Climat social », l'ambiance pèse mais reste muette.
+  const seesAmbiance = hasFounderSkill(
+    state.research.acquired,
+    "social_climate",
+  );
+  for (const d of unhappy)
+    for (const c of d.causes) if (c !== "ambiance" || seesAmbiance) counts[c]++;
   const detail = (Object.keys(counts) as MoraleCause[])
     .filter((c) => counts[c] > 0)
     .map((c) => `${MORALE_CAUSE_LABEL[c]} (${counts[c]})`)
     .join(", ");
   dispatch(
     pushNotification({
-      message: `Moral en baisse pour ${unhappy.length} employé${unhappy.length > 1 ? "s" : ""} : ${detail}.`,
+      message: `Moral en baisse pour ${unhappy.length} employé${unhappy.length > 1 ? "s" : ""}${detail ? ` : ${detail}` : ""}.`,
       type: "warning",
     }),
   );
@@ -219,7 +236,8 @@ export const processMonthlyMorale = (
  * lit le bâtiment des partants dans l'état courant.
  */
 export const applyFiringShock =
-  (firedIds: number[]) => (dispatch: AppDispatch, getState: () => RootState) => {
+  (firedIds: number[]) =>
+  (dispatch: AppDispatch, getState: () => RootState) => {
     const employes = getState().employe.employeList;
     const leaving = new Set(firedIds);
     const buildings = new Set(
@@ -234,7 +252,9 @@ export const applyFiringShock =
       dispatch(
         adjustMorale({
           employeId: e.id,
-          delta: -(near ? MORALE_FIRING_SAME_BUILDING : MORALE_FIRING_ELSEWHERE),
+          delta: -(near
+            ? MORALE_FIRING_SAME_BUILDING
+            : MORALE_FIRING_ELSEWHERE),
         }),
       );
       shaken++;

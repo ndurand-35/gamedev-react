@@ -40,6 +40,8 @@ import { COMPONENT_BTN_CLASS, COMPONENT_ICON } from "@/components/component";
 import { qaLossReductionRatio } from "@/data/utils/economy";
 import { RoleBadge } from "@/components/employe/RoleBadge";
 import { TraitBadges } from "@/components/employe/TraitBadges";
+import { AmbiancePanel } from "@/components/employe/AmbiancePanel";
+import { useFounderSkill } from "@/data/hooks/useFounderSkill";
 import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
 import { AvatarEditModal } from "@/components/employe/AvatarEditModal";
 import { MoraleHearts } from "@/components/employe/MoraleIcon";
@@ -63,7 +65,7 @@ import { PostPicker } from "@/components/employe/PostPicker";
 // employé trouve sa place dans un onglet plutôt que d'allonger la fiche.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type FicheTab = "activite" | "competences" | "formation";
+type FicheTab = "activite" | "competences" | "formation" | "entente";
 
 const SPECIALTY_LABEL = (specialty: Specialty): string =>
   specialty === "FULLSTACK" ? "Fullstack" : specialty;
@@ -241,6 +243,8 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
   const [pendingTraining, setPendingTraining] =
     useState<PendingTraining | null>(null);
   const money = useAppSelector((s) => s.company.money);
+  const employes = useAppSelector((s) => s.employe.employeList);
+  const knowsClimate = useFounderSkill("social_climate");
   const time = useAppSelector((s) => s.engine.time);
   // Produit dont ce marketeur mène la promotion, s'il y en a un.
   const promoted = useAppSelector((s) =>
@@ -309,6 +313,7 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
     { id: "activite", label: "Activité" },
     { id: "competences", label: "Compétences" },
     ...(prod ? [{ id: "formation" as const, label: "Formation" }] : []),
+    ...(knowsClimate ? [{ id: "entente" as const, label: "Entente" }] : []),
   ];
 
   const isFounder = employe?.id === 1;
@@ -542,6 +547,20 @@ export const EmployeModal: FC<EmployeModalProps> = ({ employeId, onClose }) => {
                   </Section>
                 )}
               </TabPanel>
+
+              {knowsClimate && (
+                <TabPanel baseId={tabsId} id="entente" value={tab}>
+                  <Section
+                    title={
+                      <>
+                        Entente avec les collègues <CodexLink id="caracteres" />
+                      </>
+                    }
+                  >
+                    <AmbiancePanel employe={employe} employes={employes} />
+                  </Section>
+                </TabPanel>
+              )}
 
               <TabPanel baseId={tabsId} id="competences" value={tab}>
                 <Section title="Compétences" aside={<StatLegend />}>

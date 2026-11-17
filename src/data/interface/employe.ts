@@ -29,6 +29,18 @@ export type TraitId =
   | "fidele"
   | "mercenaire";
 
+// Types de caractère (cf. `utils/compatibility`) : un par personne, révélé
+// comme les traits. Leur combinaison fixe l'entente entre collègues.
+export type CharacterTypeId =
+  | "organisateur"
+  | "chefDeFile"
+  | "artisan"
+  | "stratege"
+  | "animateur"
+  | "fonceur"
+  | "reveur"
+  | "francTireur";
+
 // Interface générique pour les attributs communs à tous les employés
 export interface Person {
   id: number;
@@ -54,6 +66,8 @@ export interface Person {
   seniority?: Seniority;
   // Traits de caractère. Absent sur le fondateur et les profils d'avant.
   traits?: TraitId[];
+  /** Type de caractère ; absent des anciennes sauvegardes (cf. `characterOf`). */
+  character?: CharacterTypeId;
   // Volet A : tant que false, stats affichées en fourchette floue côté UI.
   revealedStats?: boolean;
   // Volet A : position de la vraie valeur dans chaque fourchette estimée,

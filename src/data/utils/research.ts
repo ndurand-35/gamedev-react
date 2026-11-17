@@ -24,6 +24,7 @@ export type FounderSkillId =
   | "cash_forecast"
   | "market_study"
   | "cv_reading"
+  | "social_climate"
   | "tech_watch";
 
 /**
@@ -130,6 +131,18 @@ export const FOUNDER_SKILLS: FounderSkillDef[] = [
       "Le salaire attendu et le tempérament d'un candidat sont visibles sans entretien.",
     cost: 2000,
     durationHours: 7 * 24,
+  },
+  {
+    id: "social_climate",
+    name: "Climat social",
+    branch: "equipe",
+    description:
+      "Comprendre qui s'entend avec qui : quels caractères se complètent, lesquels se heurtent, et ce que l'ambiance coûte au moral.",
+    unlocks:
+      "L'entente de chaque salarié avec ses collègues de bâtiment et son effet sur le moral, la grille des ententes par bâtiment, et l'entente prévue d'un candidat avec l'équipe.",
+    cost: 4000,
+    durationHours: 12 * 24,
+    requires: "cv_reading",
   },
   {
     id: "tech_watch",

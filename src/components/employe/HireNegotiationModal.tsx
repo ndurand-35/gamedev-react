@@ -4,6 +4,7 @@ import { Coins, Eye, UserPlus, WarningTriangle } from "iconoir-react";
 import { Candidate, jobLabel } from "@/data/interface";
 import { CandidateStatBars } from "@/components/employe/CandidateStatBars";
 import { TraitBadges } from "@/components/employe/TraitBadges";
+import { HireAmbiancePreview } from "@/components/employe/AmbiancePanel";
 import { EmployeAvatar } from "@/components/employe/EmployeAvatar";
 import { Modal } from "@/components/global/Modal";
 import { rejectCandidate, revealCandidate } from "@/data/redux/employeSlice";
@@ -384,6 +385,8 @@ export const HireNegotiationModal: FC<Props> = ({ candidate, onClose }) => {
                 recruter davantage.
               </div>
             )}
+
+            {revealed && <HireAmbiancePreview candidate={candidate} />}
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* Profil */}

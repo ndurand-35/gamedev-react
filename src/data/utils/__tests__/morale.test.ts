@@ -39,6 +39,9 @@ const prod = (over: Partial<ProductionPerson> = {}): ProductionPerson => ({
   uxMaxStat: 200,
   buildingId: 1,
   assignedComponentType: ComponentType.CODE,
+  // Entente neutre entre deux francs-tireurs : l'ambiance ne brouille pas
+  // les causes testées ici (cf. compatibility.test.ts).
+  character: "francTireur",
   ...over,
 });
 

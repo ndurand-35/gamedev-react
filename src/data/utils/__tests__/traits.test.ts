@@ -42,6 +42,8 @@ const person = (
     salary: 2000,
     expectedSalary: 2000,
     buildingId: 1,
+    // Entente neutre : seuls les traits jouent (cf. compatibility.test.ts).
+    character: "francTireur",
     traits,
     ...over,
   }) as Person;

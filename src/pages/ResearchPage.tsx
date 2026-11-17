@@ -11,6 +11,7 @@ import {
   Check,
   Clock,
   Coins,
+  Community,
   GraduationCap,
   Lock,
   Page,
@@ -67,6 +68,7 @@ const SKILL_ICON: Record<FounderSkillId, typeof Truck> = {
   market_study: Reports,
   tech_watch: AntennaSignal,
   cv_reading: Page,
+  social_climate: Community,
 };
 
 /** Couleur de la branche, exposée en `--c` aux classes du nœud. */

@@ -405,6 +405,7 @@ export const COMPANY_ENTRIES: CodexEntry[] = [
           ["Prévision de trésorerie", "Contrôle de gestion", "4 500 €", "15 jours", "L'alerte de rupture de trésorerie à venir, le compte de résultat prévisionnel et les mois d'autonomie."],
           ["Étude de marché", "—", "3 000 €", "10 jours", "L'affinité de chaque fonctionnalité avec le genre du produit et l'attractivité totale d'un assemblage."],
           ["Lecture de CV", "—", "2 000 €", "7 jours", "Le salaire attendu et le tempérament d'un candidat, visibles sans entretien."],
+          ["Climat social", "Lecture de CV", "4 000 €", "12 jours", "L'entente de chaque salarié avec ses collègues et son effet sur le moral, la grille des ententes par bâtiment, l'entente prévue d'un candidat."],
           ["Veille technologique", "Étude de marché", "3 500 €", "12 jours", "La prochaine technologie et ses effets, les fonctionnalités à venir et la demande de chaque segment projetée à 3 ans."],
         ],
       },
