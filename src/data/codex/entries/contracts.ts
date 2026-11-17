@@ -41,10 +41,11 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
-        text: "**Signer** n'exige aucun stock : l'acompte est encaissé et la deadline démarre. Un contrat signé ne peut pas être annulé ; il se termine par une **livraison** ou par une **deadline dépassée**.",
+        text: "**Signer** n'exige aucun stock : l'acompte est encaissé et la deadline démarre. Avant de signer, on choisit une **formule** (souple, standard ou serrée) qui fixe le délai, le solde et le malus. Un contrat signé ne peut pas être annulé ; il se termine par une **livraison** ou par une **deadline dépassée**.",
       },
     ],
     related: [
+      "negociation-contrat",
       "exigences-contrat",
       "deadline",
       "livraison",
@@ -93,7 +94,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
     category: "contrats",
     title: "Deadline",
     summary:
-      "Un contrat non livré à la fin de son délai échoue : malus, perte de réputation, client perdu et moral en baisse.",
+      "Un contrat non livré à la fin de son délai échoue : malus, perte de réputation, relation client en baisse et moral en baisse.",
     body: [
       {
         type: "p",
@@ -108,7 +109,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         items: [
           "le **malus** affiché sur le contrat est débité de la trésorerie ;",
           "le studio perd **2 points de réputation** ;",
-          "le client **rompt** définitivement et ne propose plus aucun contrat ;",
+          "la **relation** avec le client baisse de 3 points ; il reste au carnet et pourra encore proposer des contrats ;",
           "le **moral** de toute l'équipe baisse (le fondateur excepté).",
         ],
       },
@@ -144,7 +145,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
       {
         type: "list",
         items: [
-          "**Prime d'avance** : +20 % sur le solde tant que moins de 70 % du délai est écoulé. Le badge « bonus livraison anticipée » signale cette fenêtre.",
+          "**Prime d'avance** : +20 % sur le solde tant que moins de 70 % du délai est écoulé (jamais en formule souple). Le badge « Prime d'anticipation » signale cette fenêtre.",
           "**Réputation** : une livraison rapporte de la réputation, davantage pour un contrat de niveau 3 ou plus, dans une limite mensuelle.",
         ],
       },
@@ -185,6 +186,10 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
       },
       {
         type: "p",
+        text: "La **formule** choisie à la signature modifie le délai, le solde et le malus, jamais l'acompte (voir **Négociation**).",
+      },
+      {
+        type: "p",
         text: "Les montants croissent avec le **travail** demandé (composants avancés compris) et, dans une moindre mesure, avec la **difficulté**. Un contrat de niveau 3 ou 4 paie un solde majoré.",
       },
       {
@@ -192,7 +197,56 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         text: "Avec un client fidèle, une **prime de fidélité** est déjà comprise dans l'acompte et le solde affichés. Elle ne s'applique jamais au malus.",
       },
     ],
-    related: ["contrats", "livraison", "deadline", "clients", "tresorerie"],
+    related: [
+      "contrats",
+      "negociation-contrat",
+      "livraison",
+      "deadline",
+      "clients",
+      "tresorerie",
+    ],
+  },
+  {
+    id: "negociation-contrat",
+    category: "contrats",
+    title: "Négociation",
+    summary:
+      "À la signature, on choisit une formule : plus de temps pour moins d'argent, ou l'inverse.",
+    body: [
+      {
+        type: "p",
+        text: "Les contrats disponibles sont affichés en formule **standard**. Au moment de signer, un sélecteur propose trois formules ; les montants affichés suivent la formule choisie.",
+      },
+      {
+        type: "table",
+        head: ["Formule", "Délai", "Solde", "Malus", "Prime d'avance"],
+        rows: [
+          ["Souple", "+40 %", "−15 %", "inchangé", "aucune"],
+          ["Standard", "inchangé", "inchangé", "inchangé", "+20 %"],
+          ["Serré", "−30 %", "+25 %", "+50 %", "+20 %"],
+        ],
+      },
+      {
+        type: "list",
+        items: [
+          "L'**acompte** est le même quelle que soit la formule.",
+          "La **prime d'avance** se mesure sur le délai négocié : avant 70 % du délai serré pour un contrat serré.",
+          "La formule est figée à la signature et s'affiche sur le contrat en cours.",
+          "Le **premier contrat** ne se négocie pas.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Avec l'**Estimation de délai**, chaque formule porte une pastille : verte si la prime d'avance est atteignable, orange si le délai est tenu sans prime, rouge hors délai.",
+      },
+    ],
+    related: [
+      "contrats",
+      "paiement-contrat",
+      "livraison",
+      "deadline",
+      "estimation-delai",
+    ],
   },
   {
     id: "clients",
@@ -211,7 +265,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
         rows: [
           ["Dans les temps", "+1"],
           ["En avance (prime d'avance)", "+2"],
-          ["Deadline dépassée", "Rupture définitive"],
+          ["Deadline dépassée", "−3"],
         ],
       },
       {
@@ -222,12 +276,11 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
           ["Habitué", "1 à 2"],
           ["Fidèle", "3 à 5"],
           ["Partenaire", "6 et plus"],
-          ["Perdu", "Rompu après une deadline manquée"],
         ],
       },
       {
         type: "p",
-        text: "Plus la relation est bonne, plus le client revient souvent dans la liste des contrats, avec une **prime de fidélité** (badge « +N % ») comprise dans ses prix, plafonnée à +40 %. Un client **Perdu** ne propose plus jamais de contrat.",
+        text: "Plus la relation est bonne, plus le client revient souvent dans la liste des contrats, avec une **prime de fidélité** (badge « +N % ») comprise dans ses prix, plafonnée à +40 %. La relation ne descend jamais sous 0 : après un échec, un client retombé à 0 revient comme un nouveau client, sans prime.",
       },
       {
         type: "p",
@@ -311,7 +364,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
     body: [
       {
         type: "p",
-        text: "Une fois la compétence acquise, la liste des contrats disponibles gagne une colonne **Estimation**, à comparer au délai proposé.",
+        text: "Une fois la compétence acquise, la liste des contrats disponibles gagne une colonne **Estimation**, comparée au délai de la formule choisie. Chaque formule du sélecteur porte aussi une pastille de la même couleur.",
       },
       {
         type: "table",
@@ -336,6 +389,7 @@ export const CONTRACT_ENTRIES: CodexEntry[] = [
     ],
     related: [
       "contrats",
+      "negociation-contrat",
       "exigences-contrat",
       "deadline",
       "competences-fondateur",

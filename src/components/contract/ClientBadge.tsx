@@ -18,7 +18,6 @@ interface ClientBadgeProps {
 
 const tierTitle = (client: Client | undefined, tier: ClientTier): string => {
   if (!client) return "Premier contact — jamais travaillé ensemble";
-  if (client.lost) return "Relation rompue : ce client ne reviendra pas";
   return (
     `${tier} · relation ${client.relation}` +
     ` · ${client.delivered} contrat${client.delivered > 1 ? "s" : ""} livré${client.delivered > 1 ? "s" : ""}` +

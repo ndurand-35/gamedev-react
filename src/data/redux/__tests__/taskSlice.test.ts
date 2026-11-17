@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import taskReducer, {
   acceptContract,
   initializeTaskState,
-  loseClient,
+  recordClientFailure,
   recordClientDelivery,
 } from "@/data/redux/taskSlice";
 import type { TaskState } from "@/data/redux/taskSlice";
@@ -13,6 +13,7 @@ import {
   ContractType,
   StartedContract,
 } from "@/data/interface";
+import { CLIENT_RELATION_MISSED } from "@/data/utils/client";
 
 const baseState = (overrides: Partial<TaskState> = {}): TaskState => ({
   taskList: [],
@@ -30,7 +31,6 @@ const client = (overrides: Partial<Client> = {}): Client => ({
   relation: 0,
   delivered: 0,
   early: 0,
-  lost: false,
   lastSeen: 0,
   ...overrides,
 });
@@ -70,7 +70,6 @@ describe("taskSlice — carnet de clients", () => {
       name: "Hettinger LLC",
       relation: 0,
       delivered: 0,
-      lost: false,
       lastSeen: 100,
     });
   });
@@ -131,22 +130,28 @@ describe("taskSlice — carnet de clients", () => {
     expect(floored.clients["c1"].relation).toBe(0);
   });
 
-  it("rompt définitivement sur une deadline manquée", () => {
+  it("baisse la relation sur une deadline manquée sans retirer le client", () => {
     const state = baseState({
       clients: { c1: client({ relation: 6, delivered: 3 }) },
     });
-    const lost = taskReducer(state, loseClient({ clientId: "c1", time: 900 }));
+    const failed = taskReducer(
+      state,
+      recordClientFailure({
+        clientId: "c1",
+        delta: CLIENT_RELATION_MISSED,
+        time: 900,
+      }),
+    );
 
-    expect(lost.clients["c1"]).toMatchObject({
-      lost: true,
-      relation: 0,
+    expect(failed.clients["c1"]).toMatchObject({
+      relation: 3,
       delivered: 3,
       lastSeen: 900,
     });
 
-    // Un client rompu ne se répare pas : plus aucune livraison ne le compte.
+    // La relation se reconstruit : une livraison suivante compte à nouveau.
     const after = taskReducer(
-      lost,
+      failed,
       recordClientDelivery({
         clientId: "c1",
         delta: 2,
@@ -154,7 +159,18 @@ describe("taskSlice — carnet de clients", () => {
         time: 950,
       }),
     );
-    expect(after.clients["c1"]).toMatchObject({ lost: true, relation: 0 });
+    expect(after.clients["c1"]).toMatchObject({ relation: 5, delivered: 4 });
+
+    // Jamais sous 0.
+    const floored = taskReducer(
+      baseState({ clients: { c1: client({ relation: 1 }) } }),
+      recordClientFailure({
+        clientId: "c1",
+        delta: CLIENT_RELATION_MISSED,
+        time: 1,
+      }),
+    );
+    expect(floored.clients["c1"].relation).toBe(0);
   });
 
   it("ignore une livraison pour un client inconnu", () => {

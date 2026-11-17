@@ -21,7 +21,7 @@ import {
   recipeShortfall,
   requirementsToRecipe,
 } from "@/data/utils/recipes";
-import { EARLY_DELIVERY_RATIO, computeContractPayout } from "@/data/utils/task";
+import { computeContractPayout, earlyWindowHours } from "@/data/utils/task";
 import { techProductivity } from "@/data/utils/technology";
 import { scheduleByBuilding } from "@/data/utils/workSchedule";
 
@@ -197,7 +197,7 @@ export const adviseDelivery = (input: DeliveryAdviceInput): DeliveryAdvice => {
   const { contract } = input;
   const deadline = contract.startDate + contract.time;
   const lastEarlyTime =
-    contract.startDate + Math.ceil(contract.time * EARLY_DELIVERY_RATIO) - 1;
+    contract.startDate + Math.ceil(earlyWindowHours(contract)) - 1;
   const { missing } = selectComponents(input.stock, contract.requirements);
   const at = deliverableAt(
     input,

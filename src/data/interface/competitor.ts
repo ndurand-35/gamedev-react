@@ -7,10 +7,9 @@ import { ProductGenre } from "@/data/interface/product";
  *
  * Aujourd'hui, c'est elle qui émet les contrats de la liste hebdomadaire ; le
  * carnet d'adresses (`Client`, indexé par le même `id`) mémorise ce qu'on lui
- * doit — palier de relation, livraisons, rupture. Les deux facettes restent
- * séparées : un studio rompu ne propose plus rien, mais il n'a pas disparu du
- * marché. C'est ce qui prépare l'étape suivante, où ces studios lanceront
- * leurs propres produits face aux nôtres.
+ * doit — palier de relation, livraisons. Les deux facettes restent séparées :
+ * un studio existe sur le marché, qu'on ait travaillé avec lui ou non. C'est
+ * ce qui permet à ces studios de lancer leurs propres produits face aux nôtres.
  */
 export interface Competitor {
   /** Identifiant stable, porté par tous les contrats de ce studio. */

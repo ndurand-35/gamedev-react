@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Recipe, StartedContract } from "@/data/interface";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
 import {
-  EARLY_DELIVERY_RATIO,
+  earlyWindowHours,
   deliverContract,
   selectComponents,
 } from "@/data/utils";
@@ -40,8 +40,7 @@ export const useContractDelivery = (contract: StartedContract) => {
   const daysLeft = Math.max(0, Math.round(hoursLeft / 24));
   // La fenêtre de prime est un fait du contrat, pas un conseil : affichée
   // même sans compétence.
-  const early =
-    time - contract.startDate < contract.time * EARLY_DELIVERY_RATIO;
+  const early = time - contract.startDate < earlyWindowHours(contract);
   const deliver = () => dispatch(deliverContract(contract.id));
 
   return { deliverable, heldByKind, hoursLeft, daysLeft, early, deliver };

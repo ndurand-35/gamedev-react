@@ -20,6 +20,7 @@ import {
   sortContracts,
 } from "@/data/utils/task";
 import { estimateContractLeadTime } from "@/data/utils/deliveryAdvisor";
+import { applyContractTerms, negotiableTerms } from "@/data/utils/task";
 import { requirementsToRecipe } from "@/data/utils/recipes";
 import { FOUNDER_ID, hasFounderSkill } from "@/data/utils/research";
 
@@ -65,7 +66,9 @@ export const TaskPage: React.FC = (): ReactElement => {
       map.set(
         contract.id,
         estimateContractLeadTime({
-          contract,
+          // Horizon : le délai le plus long négociable ; la carte compare
+          // ensuite l'estimation à la deadline de chaque formule.
+          contract: applyContractTerms(contract, negotiableTerms(contract)[0]),
           stock,
           employes: producing,
           productionProgress,

@@ -5,10 +5,12 @@ import {
   ComponentRequirement,
   ComponentType,
   Contract,
+  ContractTerms,
   ContractType,
   StartedContract,
   clientTier,
 } from "@/data/interface";
+import { FIRST_CONTRACT_CLIENT } from "@/data/utils/firstContract";
 import { faker } from "@faker-js/faker/locale/en";
 import { capitalize, randomIntFromInterval } from "@/data/utils";
 import { selectComponents } from "@/data/utils/component";
@@ -30,12 +32,13 @@ import { pushNotification } from "@/data/redux/notificationSlice";
 import { removeComponents } from "@/data/redux/componentSlice";
 
 import {
-  loseClient,
   recordClientDelivery,
+  recordClientFailure,
   removeTask,
   setTaskList,
 } from "@/data/redux/taskSlice";
 import {
+  CLIENT_RELATION_MISSED,
   CLIENT_RETURN_CHANCE,
   clampRelation,
   clientRelationDelta,
@@ -212,8 +215,8 @@ export const requirementsForType = (
  * Lot de contrats disponibles. Chaque contrat est émis par un studio du marché
  * (`competitors`) : un habitué tiré du carnet (au plus une fois par lot,
  * pondéré par la relation), sinon un studio du roster qui n'a pas encore de
- * contrat dans le lot — jamais un studio rompu. Sans roster (partie antérieure
- * au marché, ou tout le monde rompu), un inconnu de passage est nommé.
+ * contrat dans le lot. Sans roster (partie antérieure au marché), un inconnu
+ * de passage est nommé.
  *
  * La prime de fidélité suit la relation, quel que soit le chemin de tirage :
  * c'est le rendement de la relation, pas du talent.
@@ -283,12 +286,12 @@ export const generateNewContract = (
         : undefined;
     const client =
       returning ??
-      pickContractIssuer(competitors, clients, issued) ??
+      pickContractIssuer(competitors, issued) ??
       newClientIdentity();
     issued.set(client.id, (issued.get(client.id) ?? 0) + 1);
 
     const known = clients[client.id];
-    const bonus = known && !known.lost ? loyaltyBonus(known.relation) : 0;
+    const bonus = known ? loyaltyBonus(known.relation) : 0;
     // Le malus reste au tarif du contrat nu : la fidélité paie mieux, elle
     // n'assure pas contre l'échec.
     priceDeposit = Math.round(priceDeposit * (1 + bonus));
@@ -326,10 +329,109 @@ export const generateNewContract = (
 export const contractReputationGain = (contract: Contract): number =>
   1 + (requirementsMaxTier(contract.requirements) >= 3 ? 1 : 0);
 
+// --- Négociation à la signature ---------------------------------------------
+// Le lot ne propose que des contrats standard ; le joueur choisit la formule en
+// signant. L'acompte ne bouge pas : le choix ne porte que sur le risque (délai,
+// malus) et le rendement (solde, prime d'avance).
+
+export interface ContractTermsSpec {
+  label: string;
+  /** Multiplicateur du délai standard. */
+  time: number;
+  /** Multiplicateur du solde. */
+  additional: number;
+  /** Multiplicateur du malus. */
+  malus: number;
+  /** La prime d'avance s'applique-t-elle ? */
+  earlyBonus: boolean;
+}
+
+/**
+ * Les trois formules. Souple n'a pas de prime d'avance : sinon 0,85 × 1,2
+ * battrait un standard livré à l'heure, avec une fenêtre 40 % plus large.
+ */
+export const CONTRACT_TERMS: Record<ContractTerms, ContractTermsSpec> = {
+  souple: {
+    label: "Souple",
+    time: 1.4,
+    additional: 0.85,
+    malus: 1,
+    earlyBonus: false,
+  },
+  standard: {
+    label: "Standard",
+    time: 1,
+    additional: 1,
+    malus: 1,
+    earlyBonus: true,
+  },
+  serre: {
+    label: "Serré",
+    time: 0.7,
+    additional: 1.25,
+    malus: 1.5,
+    earlyBonus: true,
+  },
+};
+
+/** Ordre d'affichage du sélecteur, du plus prudent au plus risqué. */
+export const CONTRACT_TERMS_ORDER: ContractTerms[] = [
+  "souple",
+  "standard",
+  "serre",
+];
+
+/**
+ * Formules ouvertes pour un contrat. Le premier contrat (tutoriel) ne se
+ * négocie pas.
+ */
+export const negotiableTerms = (contract: Contract): ContractTerms[] =>
+  contract.clientId === FIRST_CONTRACT_CLIENT.id
+    ? ["standard"]
+    : CONTRACT_TERMS_ORDER;
+
+/** Le contrat aux termes d'une formule : délai (au jour plein), solde, malus. */
+export const applyContractTerms = <C extends Contract>(
+  contract: C,
+  terms: ContractTerms,
+): C => {
+  if (terms === "standard") return contract;
+  const spec = CONTRACT_TERMS[terms];
+  return {
+    ...contract,
+    time: Math.max(24, Math.round((contract.time * spec.time) / 24) * 24),
+    priceAdditional: Math.round(contract.priceAdditional * spec.additional),
+    priceMalus: Math.round(contract.priceMalus * spec.malus),
+  };
+};
+
+/** Contrat signé à `time` dans la formule choisie : ses termes sont figés. */
+export const signContract = (
+  contract: Contract,
+  terms: ContractTerms,
+  time: number,
+): StartedContract => ({
+  ...applyContractTerms(contract, terms),
+  terms,
+  startDate: time,
+});
+
+/**
+ * Durée (heures depuis la signature) de la fenêtre de prime d'avance : 0 pour
+ * une formule qui n'y ouvre pas droit. Seule source de vérité pour le solde,
+ * la prévision de livraison et le badge.
+ */
+export const earlyWindowHours = (
+  contract: Contract & { terms?: ContractTerms },
+): number =>
+  CONTRACT_TERMS[contract.terms ?? "standard"].earlyBonus
+    ? contract.time * EARLY_DELIVERY_RATIO
+    : 0;
+
 export interface ContractPayout {
   /** Solde versé par le client, arrondi. */
   reward: number;
-  /** Vrai si la livraison intervient avant `EARLY_DELIVERY_RATIO` du délai. */
+  /** Vrai si la livraison tombe dans la fenêtre de prime (`earlyWindowHours`). */
   early: boolean;
   /** Réputation gagnée, avant le plafond mensuel. */
   reputationGain: number;
@@ -337,14 +439,14 @@ export interface ContractPayout {
 
 /**
  * Valorise une livraison : le solde convenu, majoré d'une prime si le contrat
- * part en avance.
+ * part en avance (et que sa formule y ouvre droit).
  */
 export const computeContractPayout = (
   contract: StartedContract,
   time: number,
 ): ContractPayout => {
   const elapsed = time - contract.startDate;
-  const early = elapsed < contract.time * EARLY_DELIVERY_RATIO;
+  const early = elapsed < earlyWindowHours(contract);
   const reward = Math.round(
     contract.priceAdditional * (early ? EARLY_DELIVERY_BONUS : 1),
   );
@@ -495,17 +597,30 @@ export const treatTasks = (dispatch: AppDispatch, state: RootState) => {
           type: "error",
         }),
       );
-      // Une deadline manquée est sans appel : le client sort du carnet et ne
-      // proposera plus rien. C'est le prix d'une signature de trop.
+      // Le client reste au carnet : il se souvient de l'échec (relation en
+      // baisse, prime de fidélité réduite) mais pourra encore commander.
       const client = state.task.clients?.[task.clientId];
-      if (client && !client.lost) {
-        dispatch(loseClient({ clientId: task.clientId, time }));
+      if (client) {
         dispatch(
-          pushNotification({
-            message: `${task.clientName} rompt : plus aucun contrat de leur part.`,
-            type: "error",
+          recordClientFailure({
+            clientId: task.clientId,
+            delta: CLIENT_RELATION_MISSED,
+            time,
           }),
         );
+        const before = clientTier(client);
+        const after = clientTier({
+          ...client,
+          relation: clampRelation(client.relation + CLIENT_RELATION_MISSED),
+        });
+        if (after !== before) {
+          dispatch(
+            pushNotification({
+              message: `${task.clientName} refroidit : relation « ${after} ».`,
+              type: "warning",
+            }),
+          );
+        }
       }
       continue;
     }

@@ -5,7 +5,6 @@ import { CodexLink } from "@/components/codex/CodexLink";
 import {
   CLIENT_RELATION_MAX,
   CLIENT_TIER_BADGE_CLASS,
-  ClientTier,
   CompetitorProduct,
 } from "@/data/interface";
 import { useAppSelector } from "@/data/redux/hooks";
@@ -25,9 +24,8 @@ import { getTimeAsDate } from "@/data/utils/time";
 // ─────────────────────────────────────────────────────────────────────────────
 // Le marché vu depuis notre carnet d'adresses. Chaque studio du roster est là,
 // qu'on ait travaillé avec lui ou non ; la ligne dit où en est la relation :
-// qui revient (et à quelle prime), qui n'a encore rien signé, et qui a claqué
-// la porte — un contrat raté ne coûte pas qu'un malus, il retire un donneur
-// d'ordre pour de bon.
+// qui revient (et à quelle prime), et qui n'a encore rien signé. Un contrat
+// raté refroidit la relation sans retirer le studio du carnet.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Initiales d'un nom de studio (« Hettinger LLC » → « HL »). */
@@ -56,9 +54,8 @@ const StandingRow: FC<{
   products: CompetitorProduct[];
 }> = ({ standing, products }) => {
   const { competitor, client, tier, bonus } = standing;
-  const lost = client?.lost ?? false;
   return (
-    <tr className={lost ? "opacity-50" : ""}>
+    <tr>
       <td data-stack="title">
         <div className="flex items-center gap-3">
           <span
@@ -67,9 +64,7 @@ const StandingRow: FC<{
           >
             {initials(competitor.name)}
           </span>
-          <span className={"font-extrabold " + (lost ? "line-through" : "")}>
-            {competitor.name}
-          </span>
+          <span className="font-extrabold">{competitor.name}</span>
         </div>
       </td>
       <td data-label="Relation">
@@ -77,7 +72,7 @@ const StandingRow: FC<{
           <span className={`badge badge-sm ${CLIENT_TIER_BADGE_CLASS[tier]}`}>
             {tier}
           </span>
-          {client && !lost && (
+          {client && (
             <span className="text-xs font-bold text-base-content/70 tabular-nums">
               {client.relation} / {CLIENT_RELATION_MAX}
             </span>
@@ -168,14 +163,13 @@ export const CompetitorTable: FC = () => {
   }
 
   const worked = standings.filter((s) => s.client).length;
-  const lost = standings.filter((s) => s.tier === ClientTier.PERDU).length;
 
   return (
     <div className="space-y-3">
       <p className="text-sm font-semibold text-base-content/70">
         {plural(standings.length, "studio")} sur le marché
         {worked > 0 && ` · ${worked} avec qui vous avez travaillé`}
-        {lost > 0 && ` · ${plural(lost, "rompu")}`}. <CodexLink id="clients" />
+        . <CodexLink id="clients" />
       </p>
       {/* Téléphone : lignes en cartes, l'en-tête est masqué ; le tri passe
           par ce menu. */}

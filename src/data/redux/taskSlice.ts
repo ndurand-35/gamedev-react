@@ -94,7 +94,6 @@ export const taskSlice = createSlice({
           relation: 0,
           delivered: 0,
           early: 0,
-          lost: false,
           lastSeen: startDate,
         };
       }
@@ -114,22 +113,24 @@ export const taskSlice = createSlice({
       }>,
     ) {
       const client = ensureClients(state)[action.payload.clientId];
-      if (!client || client.lost) return;
+      if (!client) return;
       client.relation = clampRelation(client.relation + action.payload.delta);
       client.delivered += 1;
       if (action.payload.early) client.early += 1;
       client.lastSeen = action.payload.time;
     },
 
-    /** Rupture définitive après une deadline manquée. */
-    loseClient(
+    /**
+     * Deadline manquée : le client reste au carnet, mais la relation baisse
+     * de `delta` (cf. `CLIENT_RELATION_MISSED`).
+     */
+    recordClientFailure(
       state,
-      action: PayloadAction<{ clientId: string; time: number }>,
+      action: PayloadAction<{ clientId: string; delta: number; time: number }>,
     ) {
       const client = ensureClients(state)[action.payload.clientId];
       if (!client) return;
-      client.lost = true;
-      client.relation = 0;
+      client.relation = clampRelation(client.relation + action.payload.delta);
       client.lastSeen = action.payload.time;
     },
 
@@ -152,7 +153,7 @@ export const {
   generateAvailableContractList,
   acceptContract,
   recordClientDelivery,
-  loseClient,
+  recordClientFailure,
   removeTask,
   setTaskList,
   initializeTaskState,

@@ -26,7 +26,6 @@ const client = (overrides: Partial<Client> = {}): Client => ({
   relation: 0,
   delivered: 0,
   early: 0,
-  lost: false,
   lastSeen: 0,
   ...overrides,
 });
@@ -49,16 +48,12 @@ describe("relation client — gains et paliers", () => {
     expect(clampRelation(4)).toBe(4);
   });
 
-  it("dérive le palier de la relation, et « Perdu » d'une rupture", () => {
+  it("dérive le palier de la relation", () => {
     expect(clientTier(undefined)).toBe(ClientTier.NOUVEAU);
     expect(clientTier(client({ relation: 0 }))).toBe(ClientTier.NOUVEAU);
     expect(clientTier(client({ relation: 1 }))).toBe(ClientTier.HABITUE);
     expect(clientTier(client({ relation: 3 }))).toBe(ClientTier.FIDELE);
     expect(clientTier(client({ relation: 6 }))).toBe(ClientTier.PARTENAIRE);
-    // Une rupture prime sur la relation accumulée.
-    expect(clientTier(client({ relation: 9, lost: true }))).toBe(
-      ClientTier.PERDU,
-    );
   });
 
   it("plafonne la prime de fidélité", () => {
@@ -69,11 +64,10 @@ describe("relation client — gains et paliers", () => {
 });
 
 describe("sélection des clients qui repassent commande", () => {
-  it("écarte les clients rompus et ceux jamais satisfaits", () => {
+  it("écarte les clients sans relation", () => {
     const candidates = returningCandidates({
       ok: client({ id: "ok", relation: 2 }),
       neuf: client({ id: "neuf", relation: 0 }),
-      perdu: client({ id: "perdu", relation: 5, lost: true }),
     });
     expect(candidates.map((c) => c.id)).toEqual(["ok"]);
   });
@@ -138,11 +132,11 @@ describe("generateNewContract — clients persistants", () => {
     expect(habitue.priceMalus).toBe(anonyme.priceMalus);
   });
 
-  it("ne fait jamais revenir un client rompu", () => {
+  it("ne fait pas revenir en habitué un client retombé à 0", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const contracts = generateNewContract(0, {
-      perdu: client({ id: "perdu", relation: 8, lost: true }),
+      froid: client({ id: "froid", relation: 0, delivered: 4 }),
     });
-    expect(contracts.some((c) => c.clientId === "perdu")).toBe(false);
+    expect(contracts.some((c) => c.clientId === "froid")).toBe(false);
   });
 });

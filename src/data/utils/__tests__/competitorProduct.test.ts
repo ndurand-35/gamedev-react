@@ -96,7 +96,6 @@ const client = (over: Partial<Client> = {}): Client => ({
   relation: 0,
   delivered: 0,
   early: 0,
-  lost: false,
   lastSeen: 0,
   ...over,
 });

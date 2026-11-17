@@ -5,7 +5,7 @@
  *
  * Cycle de vie : un client naît anonyme à la signature de son premier contrat,
  * gagne de la `relation` à chaque livraison (double si elle est anticipée), et
- * rompt définitivement (`lost`) à la première deadline manquée. La relation
+ * en perd sur une deadline manquée — sans jamais quitter le carnet. La relation
  * pilote deux choses : la probabilité de revoir ce client dans la liste des
  * contrats disponibles, et la prime de fidélité sur ses prix.
  */
@@ -20,15 +20,12 @@ export interface Client {
   delivered: number;
   /** Livraisons anticipées parmi elles. */
   early: number;
-  /** Rompu après une deadline manquée : ne proposera plus jamais de contrat. */
-  lost: boolean;
-  /** Dernière interaction (heures de jeu) : signature, livraison ou rupture. */
+  /** Dernière interaction (heures de jeu) : signature, livraison ou échec. */
   lastSeen: number;
 }
 
 /** Palier de relation, dérivé de `relation` — jamais stocké. */
 export enum ClientTier {
-  PERDU = "Perdu",
   NOUVEAU = "Nouveau",
   HABITUE = "Habitué",
   FIDELE = "Fidèle",
@@ -46,7 +43,6 @@ export const CLIENT_TIER_THRESHOLDS: ReadonlyArray<[number, ClientTier]> = [
 ];
 
 export const CLIENT_TIER_BADGE_CLASS: Record<ClientTier, string> = {
-  [ClientTier.PERDU]: "badge-error",
   [ClientTier.NOUVEAU]: "badge-ghost",
   [ClientTier.HABITUE]: "badge-info",
   [ClientTier.FIDELE]: "badge-success",
@@ -59,7 +55,6 @@ export const CLIENT_TIER_BADGE_CLASS: Record<ClientTier, string> = {
  */
 export const clientTier = (client?: Client): ClientTier => {
   if (!client) return ClientTier.NOUVEAU;
-  if (client.lost) return ClientTier.PERDU;
   for (const [threshold, tier] of CLIENT_TIER_THRESHOLDS) {
     if (client.relation >= threshold) return tier;
   }

@@ -4,6 +4,7 @@ import { NavArrowRight, Page } from "iconoir-react";
 
 import { ComponentType, StartedContract } from "@/data/interface";
 import { KindPill } from "@/components/component";
+import { ContractTermsBadge } from "@/components/contract/ContractTermsBadge";
 import { kindFamily, kindLabel } from "@/data/utils/recipes";
 import {
   deadlineLabel,
@@ -67,6 +68,7 @@ const MissionCard: FC<{ contract: StartedContract }> = ({
           <span className="rounded-full border-2 border-ink px-2.5 py-0.5 text-xs font-extrabold tabular-nums">
             +{formatPrice(contract.priceAdditional)} €
           </span>
+          <ContractTermsBadge contract={contract} />
           {early && hoursLeft > 0 && (
             <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-extrabold text-success">
               Prime d'anticipation

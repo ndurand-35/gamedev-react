@@ -4,6 +4,7 @@ import {
   Component,
   ComponentType,
   Contract,
+  ContractTerms,
   GENRES,
   MAX_STAT_KEY_BY_TYPE,
   Marketing,
@@ -60,7 +61,12 @@ import {
   hireCandidate,
   searchCandidates,
 } from "@/data/redux/recruitmentThunks";
-import { deliverContract } from "@/data/utils/task";
+import {
+  applyContractTerms,
+  deliverContract,
+  negotiableTerms,
+  signContract,
+} from "@/data/utils/task";
 import {
   createProductThunk,
   launchProductThunk,
@@ -158,6 +164,8 @@ const PRODUCT_BUILD_HOURS = 9 * 720;
 const PRODUCT_TEAM_SHARE = 0.5;
 /** Fraîcheur sous laquelle un produit lancé mérite une mise à jour. */
 const REFRESH_BELOW = 0.7;
+/** Le bot corrige un produit à partir de ce nombre de bugs. */
+const PATCH_FROM_BUGS = 2;
 /** Part d'un segment sous laquelle le bot y lance un produit de plus. */
 const EXPAND_BELOW_SHARE = 0.4;
 /** Mois de revenu sous la maintenance avant de retirer un produit. */
@@ -169,6 +177,8 @@ const RETIRE_AFTER_MONTHS = 3;
 const RECURRING_GRACE_MONTHS = 36;
 /** Signatures de contrats au plus par jour. */
 const CONTRACTS_PER_DAY = 3;
+/** Formules essayées à la signature, de la plus rémunératrice à la plus sûre. */
+const BOT_TERMS_PREFERENCE: ContractTerms[] = ["serre", "standard", "souple"];
 /** Profils demandés par recherche au pôle emploi. */
 const SEARCH_COUNT = 3;
 /**
@@ -578,6 +588,30 @@ export class Bot {
         product: true,
       });
     }
+    // La mise à jour en cours et les correctifs dus sont du travail produit :
+    // leurs pièces sont mises de côté comme celles du développement.
+    const feature = this.update
+      ? FEATURE_BY_ID[this.update.featureId]
+      : undefined;
+    if (feature) {
+      list.push({
+        deadline: Infinity,
+        requirements: recipeToRequirements(feature.cost),
+        product: true,
+      });
+    }
+    const patchCode = state.product.products
+      .filter(
+        (p) => p.status === ProductStatus.LAUNCHED && (p.bugs ?? 0) >= PATCH_FROM_BUGS,
+      )
+      .reduce((acc, p) => acc + (p.bugs ?? 0) * PATCH_CODE_PER_BUG, 0);
+    if (patchCode > 0) {
+      list.push({
+        deadline: Infinity,
+        requirements: [{ kind: "code", quantity: patchCode }],
+        product: true,
+      });
+    }
     return list;
   }
 
@@ -758,16 +792,30 @@ export class Bot {
     }
     const stock = countKinds(state.component.stock);
     const work = (c: Contract) => Math.max(1, requirementUnits(c.requirements));
-    const best = state.task.availableContractList
-      .filter((c) => this.canTake(c, state, producers, points, stock))
-      .sort(
-        (a, b) =>
-          (b.priceDeposit + b.priceAdditional) / work(b) -
-          (a.priceDeposit + a.priceAdditional) / work(a),
-      )[0];
-    if (!best) return false;
+    // Négociation : la formule la plus rémunératrice qu'il sait tenir, du
+    // serré au souple.
+    const offers = state.task.availableContractList.flatMap((c) => {
+      const options = negotiableTerms(c);
+      const terms = BOT_TERMS_PREFERENCE.find(
+        (t) =>
+          options.includes(t) &&
+          this.canTake(applyContractTerms(c, t), state, producers, points, stock),
+      );
+      return terms
+        ? [{ contract: c, offer: applyContractTerms(c, terms), terms }]
+        : [];
+    });
+    const value = ({ offer }: { offer: Contract }) =>
+      (offer.priceDeposit + offer.priceAdditional) / work(offer);
+    const chosen = offers.sort((a, b) => value(b) - value(a))[0];
+    if (!chosen) return false;
+    const best = chosen.offer;
     this.dispatch(setMoney(state.company.money + best.priceDeposit));
-    this.dispatch(acceptContract({ ...best, startDate: state.engine.time }));
+    this.dispatch(
+      acceptContract(
+        signContract(chosen.contract, chosen.terms, state.engine.time),
+      ),
+    );
     this.dispatch(
       ensureCompetitor({
         id: best.clientId,
@@ -800,6 +848,8 @@ export class Bot {
     const state = this.state;
     const reserved = this.reserve(state);
     let stock = reserved.free;
+    let forProduct = reserved.forProduct;
+    const held = new Set<number>();
 
     if (this.update) {
       const { productId, featureId } = this.update;
@@ -808,7 +858,10 @@ export class Bot {
       if (!feature || !target || target.status !== ProductStatus.LAUNCHED) {
         this.update = null;
       } else {
-        const picked = this.pick(stock, feature.cost);
+        // Ses pièces sont comptées dans la part des produits (cf. `reserve`) :
+        // elle y puise d'abord, puis dans le stock libre.
+        const picked = this.pick([...forProduct, ...stock], feature.cost);
+        picked.push(...this.spareFromContracts(state, picked, feature.cost));
         if (picked.length >= recipeCount(feature.cost)) {
           this.dispatch(
             addFeature({
@@ -823,43 +876,17 @@ export class Bot {
         }
         // Complet ou non, ce lot est à la mise à jour : le développement
         // prend le reste.
-        const held = new Set(picked.map((c) => c.id));
+        for (const c of picked) held.add(c.id);
         stock = stock.filter((c) => !held.has(c.id));
+        forProduct = forProduct.filter((c) => !held.has(c.id));
       }
     }
 
     const product = this.developing(state);
     if (!product) return;
     const shortfall = recipeShortfall(product.requirements, product.invested);
-    const picked = this.pick([...reserved.forProduct, ...stock], shortfall);
-    // Les contrats ont le stock en premier, mais une équipe qui signe dès que
-    // le stock le permet ne laisse jamais de surplus : le produit prend aussi
-    // des pièces promises, une à une, tant que les contrats restent tenables
-    // sans elles (même estimation qu'à la signature).
-    const left = { ...shortfall };
-    for (const c of picked) left[c.kind] = (left[c.kind] ?? 0) - 1;
-    const taken = new Set(picked.map((c) => c.id));
-    const blocked = new Set<ComponentKindId>();
-    const pool = countKinds(state.component.stock);
-    for (const c of picked) pool[c.kind] = (pool[c.kind] ?? 0) - 1;
-    const points = this.teamPoints(state);
-    for (const t of COMPONENT_TYPE_ORDER) points[t] *= 1 - PRODUCT_SHARE;
-    for (const c of [...state.component.stock].sort(
-      (a, b) => b.producedAt - a.producedAt,
-    )) {
-      if (taken.has(c.id) || (left[c.kind] ?? 0) <= 0 || blocked.has(c.kind))
-        continue;
-      const after = { ...pool, [c.kind]: (pool[c.kind] ?? 0) - 1 };
-      if (this.wouldSlip(state, points, DEADLINE_SAFETY, after)) {
-        // Une de plus ferait glisser un contrat : inutile d'en essayer d'autres.
-        blocked.add(c.kind);
-        continue;
-      }
-      pool[c.kind] = after[c.kind];
-      left[c.kind]! -= 1;
-      taken.add(c.id);
-      picked.push(c);
-    }
+    const picked = this.pick([...forProduct, ...stock], shortfall);
+    picked.push(...this.spareFromContracts(state, picked, shortfall, held));
     if (picked.length > 0) {
       this.dispatch(
         investInProduct({
@@ -870,6 +897,51 @@ export class Bot {
     }
     const fresh = this.state.product.products.find((p) => p.id === product.id);
     if (fresh && isProductReady(fresh)) this.launch(fresh);
+  }
+
+  /**
+   * Les contrats ont le stock en premier, mais une équipe qui signe dès que le
+   * stock le permet ne laisse jamais de surplus : le travail produit
+   * (développement, mise à jour, correctif) prend aussi des pièces promises,
+   * une à une, tant que les contrats restent tenables sans elles (même
+   * estimation qu'à la signature). Renvoie les pièces empruntées, en plus de
+   * `taken`, pour couvrir `needs`.
+   */
+  private spareFromContracts(
+    state: RootState,
+    taken: Component[],
+    needs: Recipe,
+    exclude: Set<number> = new Set(),
+  ): Component[] {
+    const left = { ...needs };
+    for (const c of taken) left[c.kind] = (left[c.kind] ?? 0) - 1;
+    const used = new Set([...taken.map((c) => c.id), ...exclude]);
+    const blocked = new Set<ComponentKindId>();
+    const pool = countKinds(state.component.stock);
+    for (const id of used) {
+      const c = state.component.stock.find((x) => x.id === id);
+      if (c) pool[c.kind] = (pool[c.kind] ?? 0) - 1;
+    }
+    const points = this.teamPoints(state);
+    for (const t of COMPONENT_TYPE_ORDER) points[t] *= 1 - PRODUCT_SHARE;
+    const extra: Component[] = [];
+    for (const c of [...state.component.stock].sort(
+      (a, b) => b.producedAt - a.producedAt,
+    )) {
+      if (used.has(c.id) || (left[c.kind] ?? 0) <= 0 || blocked.has(c.kind))
+        continue;
+      const after = { ...pool, [c.kind]: (pool[c.kind] ?? 0) - 1 };
+      if (this.wouldSlip(state, points, DEADLINE_SAFETY, after)) {
+        // Une de plus ferait glisser un contrat : inutile d'en essayer d'autres.
+        blocked.add(c.kind);
+        continue;
+      }
+      pool[c.kind] = after[c.kind];
+      left[c.kind]! -= 1;
+      used.add(c.id);
+      extra.push(c);
+    }
+    return extra;
   }
 
   private launch(product: Product) {
@@ -1103,10 +1175,16 @@ export class Bot {
 
   private patchProducts() {
     for (const p of this.state.product.products) {
-      if (p.status !== ProductStatus.LAUNCHED || (p.bugs ?? 0) < 2) continue;
-      const { free } = this.reserve(this.state);
+      if (p.status !== ProductStatus.LAUNCHED || (p.bugs ?? 0) < PATCH_FROM_BUGS)
+        continue;
+      // Un correctif est du travail produit : il puise dans la part des
+      // produits et le stock libre, puis emprunte aux contrats ce qu'ils
+      // peuvent céder sans glisser.
+      const state = this.state;
+      const { free, forProduct } = this.reserve(state);
       const needs: Recipe = { code: (p.bugs ?? 0) * PATCH_CODE_PER_BUG };
-      const picked = this.pick(free, needs);
+      const picked = this.pick([...free, ...forProduct], needs);
+      picked.push(...this.spareFromContracts(state, picked, needs));
       if (picked.length < (needs.code ?? 0)) continue;
       this.consume(picked);
       this.dispatch(patchProduct(p.id));
@@ -1211,7 +1289,6 @@ export class Bot {
             featureAppeal(b, p.genre) / featureCost(b) -
             featureAppeal(a, p.genre) / featureCost(a),
         )[0];
-
     // Mise à jour : le produit le moins frais qui a encore de quoi grandir.
     if (!this.update) {
       for (const p of stale) {

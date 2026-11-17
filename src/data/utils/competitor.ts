@@ -16,9 +16,9 @@ import { SortState, nextSort, sortBy } from "@/data/utils/sort";
 export const COMPETITOR_ROSTER_SIZE = 10;
 /**
  * Plafond du marché. Un inconnu de passage qui signe avec nous y entre, mais
- * pas au-delà : sinon, une fois brouillé avec tous les studios, chaque contrat
- * ajouterait un concurrent de plus, et ces centaines de studios inonderaient
- * les segments de sorties (krach permanent).
+ * pas au-delà : sinon chaque contrat d'inconnu ajouterait un concurrent de
+ * plus, et ces centaines de studios inonderaient les segments de sorties
+ * (krach permanent).
  */
 export const COMPETITOR_ROSTER_MAX = 2 * COMPETITOR_ROSTER_SIZE;
 
@@ -39,24 +39,21 @@ export const buildRoster = (
 };
 
 /**
- * Émetteur d'un contrat parmi le roster : jamais un studio rompu, et parmi
- * les autres celui qui a le moins de contrats dans le lot (`issued` : id →
- * nombre déjà émis), tiré au sort entre ex æquo. Un lot se répartit donc sur
- * tout le marché avant qu'un studio n'en émette un deuxième. `undefined`
- * quand plus personne n'accepte de travailler avec nous. `random` est injecté
- * pour rendre le tirage testable.
+ * Émetteur d'un contrat parmi le roster : celui qui a le moins de contrats
+ * dans le lot (`issued` : id → nombre déjà émis), tiré au sort entre ex æquo.
+ * Un lot se répartit donc sur tout le marché avant qu'un studio n'en émette
+ * un deuxième. `undefined` sans roster. `random` est injecté pour rendre le
+ * tirage testable.
  */
 export const pickContractIssuer = (
   competitors: Competitor[],
-  clients: Record<string, Client>,
   issued: ReadonlyMap<string, number>,
   random: () => number = Math.random,
 ): Competitor | undefined => {
-  const open = competitors.filter((c) => !clients[c.id]?.lost);
-  if (open.length === 0) return undefined;
+  if (competitors.length === 0) return undefined;
   const count = (c: Competitor) => issued.get(c.id) ?? 0;
-  const least = Math.min(...open.map(count));
-  const pool = open.filter((c) => count(c) === least);
+  const least = Math.min(...competitors.map(count));
+  const pool = competitors.filter((c) => count(c) === least);
   return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
 };
 
@@ -68,7 +65,7 @@ export interface CompetitorStanding {
   /** Absent tant qu'on n'a jamais signé avec ce studio. */
   client?: Client;
   tier: ClientTier;
-  /** Prime de fidélité courante sur ses prix (0 sans relation ou rompu). */
+  /** Prime de fidélité courante sur ses prix (0 sans relation). */
   bonus: number;
 }
 
@@ -81,18 +78,15 @@ export const competitorStanding = (
     competitor,
     client,
     tier: clientTier(client),
-    bonus: client && !client.lost ? loyaltyBonus(client.relation) : 0,
+    bonus: client ? loyaltyBonus(client.relation) : 0,
   };
 };
 
-/** Actifs d'abord, puis par relation décroissante, les rompus en fin de liste. */
+/** Par relation décroissante, puis par contrats livrés. */
 export const byStanding = (
   a: CompetitorStanding,
   b: CompetitorStanding,
 ): number => {
-  const aLost = a.client?.lost ?? false;
-  const bLost = b.client?.lost ?? false;
-  if (aLost !== bLost) return aLost ? 1 : -1;
   const aRel = a.client?.relation ?? 0;
   const bRel = b.client?.relation ?? 0;
   if (bRel !== aRel) return bRel - aRel;
@@ -108,11 +102,10 @@ export const competitorStandings = (
 
 // ── Tri du tableau des concurrents — mécanique dans sort.ts ──────────────────
 
-/** Colonnes triables ; un studio rompu se classe sous toute relation. */
+/** Colonnes triables. */
 export const COMPETITOR_SORT_ACCESSORS = {
   name: (s: CompetitorStanding) => s.competitor.name,
-  relation: (s: CompetitorStanding) =>
-    s.client?.lost ? -1 : (s.client?.relation ?? 0),
+  relation: (s: CompetitorStanding) => s.client?.relation ?? 0,
   delivered: (s: CompetitorStanding) => s.client?.delivered ?? 0,
   lastSeen: (s: CompetitorStanding) => s.client?.lastSeen ?? -1,
 } satisfies Record<string, (s: CompetitorStanding) => string | number>;

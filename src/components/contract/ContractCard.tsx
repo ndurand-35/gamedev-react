@@ -1,6 +1,6 @@
-import { FC, ReactElement, memo, useMemo } from "react";
+import { FC, ReactElement, memo, useMemo, useState } from "react";
 
-import { Contract, Recipe, StartedContract } from "@/data/interface";
+import { Contract, ContractTerms, Recipe } from "@/data/interface";
 import { countKinds } from "@/data/utils/recipes";
 import { useUncraftableKinds } from "@/components/contract/useUncraftableKinds";
 import { ClientBadge } from "@/components/contract/ClientBadge";
@@ -9,40 +9,70 @@ import { setMoney } from "@/data/redux/companySlice";
 import { acceptContract } from "@/data/redux/taskSlice";
 import { ensureCompetitor } from "@/data/redux/competitorSlice";
 import { useAppDispatch, useAppSelector } from "@/data/redux/hooks";
-import { EARLY_DELIVERY_RATIO, formatPrice, hourToWeek } from "@/data/utils";
+import { formatPrice, hourToWeek } from "@/data/utils";
+import {
+  CONTRACT_TERMS,
+  applyContractTerms,
+  earlyWindowHours,
+  negotiableTerms,
+  signContract,
+} from "@/data/utils/task";
 
 interface ContractCardProps {
   contract: Contract;
   /**
    * Heures estimées avant de pouvoir livrer (compétence « Estimation de
    * délai ») : `undefined` sans la compétence (colonne absente), `null` si les
-   * composants ne seront pas réunis dans le délai.
+   * composants ne seront pas réunis dans le délai le plus long négociable.
    */
   leadTimeHours?: number | null;
 }
 
-/** Cellule d'estimation : le délai estimé comparé au délai du contrat. */
+type LeadTone = "success" | "warning" | "error";
+
+/**
+ * Estimation rapportée aux termes d'une formule : vert si la prime d'avance
+ * reste atteignable, orange dans les temps, rouge hors délai.
+ */
+const leadTone = (
+  leadTimeHours: number | null,
+  offer: Contract & { terms: ContractTerms },
+): LeadTone => {
+  if (leadTimeHours === null || leadTimeHours > offer.time) return "error";
+  return leadTimeHours < earlyWindowHours(offer) ? "success" : "warning";
+};
+
+const TONE_TEXT: Record<LeadTone, string> = {
+  success: "text-success",
+  warning: "text-warning",
+  error: "text-error",
+};
+
+const TONE_DOT: Record<LeadTone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  error: "bg-error",
+};
+
+/** Cellule d'estimation : le délai estimé comparé à la formule choisie. */
 const LeadTimeCell = ({
   leadTimeHours,
-  contractHours,
+  tone,
 }: {
   leadTimeHours: number | null;
-  contractHours: number;
+  tone: LeadTone;
 }): ReactElement => {
-  if (leadTimeHours === null) {
+  if (tone === "error") {
     return <span className="text-error text-sm">hors délai</span>;
   }
   if (leadTimeHours === 0) {
     return <span className="text-success text-sm">stock prêt</span>;
   }
-  const days = Math.ceil(leadTimeHours / 24);
-  // Vert tant que la prime d'avance reste atteignable, orange sinon.
-  const tone =
-    leadTimeHours < contractHours * EARLY_DELIVERY_RATIO
-      ? "text-success"
-      : "text-warning";
+  const days = Math.ceil((leadTimeHours ?? 0) / 24);
   return (
-    <span className={"text-sm tabular-nums whitespace-nowrap " + tone}>
+    <span
+      className={"text-sm tabular-nums whitespace-nowrap " + TONE_TEXT[tone]}
+    >
       ~{days} jour{days > 1 ? "s" : ""}
     </span>
   );
@@ -50,9 +80,13 @@ const LeadTimeCell = ({
 
 /**
  * Ce que partagent la ligne et la tuile d'un contrat disponible : le stock
- * qui couvre chaque exigence, la durée en semaines et la signature.
+ * qui couvre chaque exigence, la formule négociée (et les termes qui en
+ * découlent), la durée en semaines et la signature.
  */
-const useContractOffer = (contract: Contract) => {
+const useContractOffer = (
+  contract: Contract,
+  leadTimeHours: number | null | undefined,
+) => {
   const dispatch = useAppDispatch();
 
   const money = useAppSelector((state) => state.company.money);
@@ -65,16 +99,25 @@ const useContractOffer = (contract: Contract) => {
   // décisive avant de signer.
   const uncraftable = useUncraftableKinds();
 
-  const weeks = Number(hourToWeek(contract.time));
+  const options = negotiableTerms(contract);
+  const [terms, setTerms] = useState<ContractTerms>("standard");
+  const offer = useMemo(
+    () => ({ ...applyContractTerms(contract, terms), terms }),
+    [contract, terms],
+  );
+  const toneOf = (t: ContractTerms): LeadTone | undefined =>
+    leadTimeHours === undefined
+      ? undefined
+      : leadTone(leadTimeHours, {
+          ...applyContractTerms(contract, t),
+          terms: t,
+        });
+
+  const weeks = Number(hourToWeek(offer.time));
 
   const submit = () => {
     dispatch(setMoney(money + contract.priceDeposit));
-
-    const newAcceptedContract: StartedContract = {
-      ...contract,
-      startDate: time,
-    };
-    dispatch(acceptContract(newAcceptedContract));
+    dispatch(acceptContract(signContract(contract, terms, time)));
     // Normalement déjà au marché ; un inconnu de passage y entre ici.
     dispatch(
       ensureCompetitor({
@@ -85,7 +128,73 @@ const useContractOffer = (contract: Contract) => {
     );
   };
 
-  return { heldByKind, uncraftable, weeks, submit };
+  return {
+    heldByKind,
+    uncraftable,
+    weeks,
+    submit,
+    options,
+    terms,
+    setTerms,
+    offer,
+    toneOf,
+  };
+};
+
+/** Résumé d'une formule, en infobulle. */
+const termsTitle = (t: ContractTerms): string => {
+  const spec = CONTRACT_TERMS[t];
+  const pct = (f: number) =>
+    f === 1
+      ? "inchangé"
+      : `${f > 1 ? "+" : "−"}${Math.round(Math.abs(f - 1) * 100)} %`;
+  return (
+    `Délai ${pct(spec.time)}, solde ${pct(spec.additional)}, malus ${pct(spec.malus)}` +
+    (spec.earlyBonus ? "" : ", sans prime d'avance")
+  );
+};
+
+/**
+ * Choix de la formule avant signature. Avec l'estimation de délai, chaque
+ * formule prend la couleur de l'estimation rapportée à sa propre deadline.
+ */
+const TermsPicker: FC<{
+  options: ContractTerms[];
+  terms: ContractTerms;
+  onChange: (terms: ContractTerms) => void;
+  toneOf: (terms: ContractTerms) => LeadTone | undefined;
+}> = ({ options, terms, onChange, toneOf }) => {
+  if (options.length < 2) return null;
+  return (
+    <div className="join" role="radiogroup" aria-label="Formule du contrat">
+      {options.map((t) => {
+        const tone = toneOf(t);
+        const active = t === terms;
+        return (
+          <button
+            key={t}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(t)}
+            title={termsTitle(t)}
+            className={
+              "btn join-item btn-xs gap-1 " +
+              (active ? "btn-neutral" : "btn-ghost")
+            }
+          >
+            {tone && (
+              <span
+                aria-hidden="true"
+                className={`size-1.5 rounded-full ${TONE_DOT[tone]}`}
+              />
+            )}
+            {CONTRACT_TERMS[t].label}
+          </button>
+        );
+      })}
+    </div>
+  );
 };
 
 /**
@@ -96,8 +205,18 @@ const useContractOffer = (contract: Contract) => {
  */
 export const ContractCard: FC<ContractCardProps> = memo(
   ({ contract, leadTimeHours }): ReactElement => {
-    const { heldByKind, uncraftable, weeks, submit } =
-      useContractOffer(contract);
+    const {
+      heldByKind,
+      uncraftable,
+      weeks,
+      submit,
+      options,
+      terms,
+      setTerms,
+      offer,
+      toneOf,
+    } = useContractOffer(contract, leadTimeHours);
+    const tone = toneOf(terms);
 
     return (
       <tr>
@@ -117,22 +236,19 @@ export const ContractCard: FC<ContractCardProps> = memo(
         <td className="tabular-nums whitespace-nowrap">
           {weeks} semaine{weeks > 1 ? "s" : ""}
         </td>
-        {leadTimeHours !== undefined && (
+        {leadTimeHours !== undefined && tone && (
           <td>
-            <LeadTimeCell
-              leadTimeHours={leadTimeHours}
-              contractHours={contract.time}
-            />
+            <LeadTimeCell leadTimeHours={leadTimeHours} tone={tone} />
           </td>
         )}
         <td className="tabular-nums text-right">
           {formatPrice(contract.priceDeposit)}
         </td>
         <td className="tabular-nums text-right text-success">
-          {formatPrice(contract.priceAdditional)}
+          {formatPrice(offer.priceAdditional)}
         </td>
         <td className="tabular-nums text-right text-error">
-          {formatPrice(contract.priceMalus)}
+          {formatPrice(offer.priceMalus)}
         </td>
         <td>
           <RequirementList
@@ -142,13 +258,21 @@ export const ContractCard: FC<ContractCardProps> = memo(
           />
         </td>
         <td>
-          <button
-            onClick={submit}
-            className="btn btn-primary btn-sm"
-            data-tuto="contract-sign"
-          >
-            Signer
-          </button>
+          <div className="flex flex-col items-end gap-1.5">
+            <TermsPicker
+              options={options}
+              terms={terms}
+              onChange={setTerms}
+              toneOf={toneOf}
+            />
+            <button
+              onClick={submit}
+              className="btn btn-primary btn-sm"
+              data-tuto="contract-sign"
+            >
+              Signer
+            </button>
+          </div>
         </td>
       </tr>
     );
@@ -161,8 +285,18 @@ export const ContractCard: FC<ContractCardProps> = memo(
  */
 export const ContractTile: FC<ContractCardProps> = memo(
   ({ contract, leadTimeHours }): ReactElement => {
-    const { heldByKind, uncraftable, weeks, submit } =
-      useContractOffer(contract);
+    const {
+      heldByKind,
+      uncraftable,
+      weeks,
+      submit,
+      options,
+      terms,
+      setTerms,
+      offer,
+      toneOf,
+    } = useContractOffer(contract, leadTimeHours);
+    const tone = toneOf(terms);
 
     return (
       <article className="toy-tile flex flex-col gap-3 p-3.5">
@@ -209,7 +343,7 @@ export const ContractTile: FC<ContractCardProps> = memo(
               Solde
             </dt>
             <dd className="text-sm font-extrabold text-success tabular-nums">
-              {formatPrice(contract.priceAdditional)}
+              {formatPrice(offer.priceAdditional)}
             </dd>
           </div>
         </dl>
@@ -218,19 +352,23 @@ export const ContractTile: FC<ContractCardProps> = memo(
           <span>
             Malus de retard{" "}
             <span className="text-error tabular-nums">
-              {formatPrice(contract.priceMalus)}
+              {formatPrice(offer.priceMalus)}
             </span>
           </span>
-          {leadTimeHours !== undefined && (
+          {leadTimeHours !== undefined && tone && (
             <span className="flex items-center gap-1">
               Estimation
-              <LeadTimeCell
-                leadTimeHours={leadTimeHours}
-                contractHours={contract.time}
-              />
+              <LeadTimeCell leadTimeHours={leadTimeHours} tone={tone} />
             </span>
           )}
         </p>
+
+        <TermsPicker
+          options={options}
+          terms={terms}
+          onChange={setTerms}
+          toneOf={toneOf}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <RequirementList

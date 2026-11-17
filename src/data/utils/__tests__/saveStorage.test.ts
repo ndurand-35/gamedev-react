@@ -187,7 +187,6 @@ describe("runMigrations (migration ascendante)", () => {
       relation: 3,
       delivered: 2,
       early: 1,
-      lost: false,
       lastSeen: 10,
     };
     const out = migrations[3]({ task: { clients: { acme } } }) as {

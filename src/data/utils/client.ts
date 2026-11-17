@@ -18,6 +18,12 @@ export const CLIENT_RETURN_CHANCE = 0.3;
 export const CLIENT_RELATION_ON_TIME = 1;
 /** Relation gagnée sur une livraison anticipée : c'est ce qui fait revenir. */
 export const CLIENT_RELATION_EARLY = 2;
+/**
+ * Relation perdue sur une deadline manquée. Le client reste au carnet : un
+ * Partenaire redescend Fidèle, un Habitué retombe à zéro et ne revient plus
+ * que comme un inconnu, jusqu'à la prochaine livraison.
+ */
+export const CLIENT_RELATION_MISSED = -3;
 /** Relation perdue quand on livre du stock bâclé (réputation en baisse). */
 export const CLIENT_RELATION_SLOPPY = -1;
 
@@ -55,11 +61,10 @@ export const clampRelation = (relation: number): number =>
 export const loyaltyBonus = (relation: number): number =>
   Math.min(Math.max(0, relation) * CLIENT_LOYALTY_STEP, CLIENT_LOYALTY_MAX);
 
-/** Clients susceptibles de repasser commande : jamais rompus, déjà satisfaits. */
+/** Clients susceptibles de repasser commande : ceux qu'on a déjà satisfaits. */
 export const returningCandidates = (
   clients: Record<string, Client> | undefined,
-): Client[] =>
-  Object.values(clients ?? {}).filter((c) => !c.lost && c.relation > 0);
+): Client[] => Object.values(clients ?? {}).filter((c) => c.relation > 0);
 
 /**
  * Tirage pondéré par la relation : les meilleurs clients occupent plus souvent

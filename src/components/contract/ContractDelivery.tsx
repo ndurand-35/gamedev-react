@@ -3,6 +3,7 @@ import { Hourglass } from "iconoir-react";
 
 import { StartedContract } from "@/data/interface";
 import { ClientBadge } from "@/components/contract/ClientBadge";
+import { ContractTermsBadge } from "@/components/contract/ContractTermsBadge";
 import { DeliveryAdvisor } from "@/components/contract/DeliveryAdvisor";
 import { RequirementList } from "@/components/contract/RequirementList";
 import { requirementsToRecipe } from "@/data/utils/recipes";
@@ -118,6 +119,7 @@ export const ContractDelivery: FC<ContractDeliveryProps> = ({
             <Hourglass width={12} height={12} strokeWidth={2.4} />
             {deadlineLabel(hoursLeft, daysLeft)}
           </span>
+          <ContractTermsBadge contract={contract} />
           {early && hoursLeft > 0 && (
             <span className="rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-extrabold text-success">
               Prime d'anticipation

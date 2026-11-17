@@ -55,4 +55,13 @@ export interface ConsumedComponent {
   kind: ComponentKindId;
 }
 
-export interface StartedContract extends StartedTask, Contract {}
+/**
+ * Formule négociée à la signature (cf. `CONTRACT_TERMS`) : délai, solde et
+ * malus du contrat signé en découlent.
+ */
+export type ContractTerms = "souple" | "standard" | "serre";
+
+export interface StartedContract extends StartedTask, Contract {
+  /** Formule signée ; absente sur les contrats d'avant la négociation (standard). */
+  terms?: ContractTerms;
+}
